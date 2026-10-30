@@ -264,3 +264,39 @@ def test_term_model_imex_integrates():
         max_steps=10_000,
     )
     assert jnp.allclose(sol.ys[-1], jnp.exp(-1.0), atol=1e-3)
+
+
+# ----------------------------------------------------------------------
+# Scaling a mixed IMEX sum (review on #39; somax routed it all explicit)
+# ----------------------------------------------------------------------
+
+
+def _mixed():
+    return Linear(rate=-0.5) + implicit(Linear(rate=-2.0))
+
+
+def test_scaled_mixed_sum_keeps_its_implicit_part():
+    exp, imp = partition(2.0 * _mixed())
+    assert exp is not None and exp.kind == EXPLICIT
+    assert imp is not None and imp.kind == IMPLICIT
+    assert isinstance(build_diffrax_terms(2.0 * _mixed()), dfx.MultiTerm)
+
+
+def test_negated_and_nested_scalings_keep_their_implicit_part():
+    for term in (-_mixed(), 3.0 * (2.0 * _mixed()), ConstForce() - _mixed()):
+        _, imp = partition(term)
+        assert imp is not None and imp.kind == IMPLICIT, term
+
+
+def test_partitioned_parts_sum_to_the_scaled_term():
+    state = jnp.array([1.0, -2.0, 3.0])
+    term = 2.0 * _mixed()
+    exp, imp = partition(term)
+    total = exp(0.0, state) + imp(0.0, state)
+    assert jnp.allclose(total, term(0.0, state))
+
+
+def test_single_kind_scaled_sum_stays_one_summand():
+    term = 2.0 * (Linear() + ConstForce())
+    exp, imp = partition(term)
+    assert imp is None and exp is term
