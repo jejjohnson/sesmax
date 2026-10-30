@@ -12,3 +12,6 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+        # Python and notebooks only, as CI's `ruff format --check .` sees them;
+        # Markdown code sketches keep their aligned shape columns.
+        types_or: [python, pyi, jupyter]

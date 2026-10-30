@@ -19,9 +19,51 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Development Status :: 2 - Pre-Alpha",
 ]
-# Empty in phase C0; phase C1 adds the base install and the [da], [flows],
-# [xarray] and [checkpoint] extras with the code (docs/design/workspace_and_core.md).
-dependencies = []
+# Copied from somax's pyproject.toml at 9cb19b3 (versions and pins unchanged).
+# Git dependencies are direct references so a bare install of this package
+# resolves the same commits without the workspace around it.
+dependencies = [
+    "jax>=0.10.2",
+    "jaxlib>=0.11.1",
+    "jaxtyping>=0.3.9",
+    "equinox>=0.13.8",
+    "diffrax>=0.7.2",
+    "lineax>=0.1.1",
+    "optimistix>=0.1",
+    "einops>=0.8.2",
+    # Constrained / frozen parameters: ``positive`` and ``interval`` store a
+    # bounded parameter in an unconstrained space, so an optimiser can never
+    # step a viscosity or a drag negative.
+    "paramax>=0.0.5",
+    "finitevolx[pipekit] @ git+https://github.com/jejjohnson/finitevolX.git@c6f3d9916c6a2cd9ffb4e8e67d64cecc0bd17aeb",
+    "spectraldiffx @ git+https://github.com/jejjohnson/spectraldiffx.git@0.1.1",
+    "pipekit @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-cycle",
+    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-jax",
+    # The spatial bases of the forcing bank (only ``geonnax.basis`` is used).
+    "geonnax @ git+https://github.com/jejjohnson/geonnax.git@9f160d3",
+]
+
+[project.optional-dependencies]
+# Ensemble filters (filterax) and variational assimilation (vardax) drive any
+# model through ``sesmax_core.da``.
+da = [
+    "filterax @ git+https://github.com/jejjohnson/filterax@28c1070",
+    "vardax @ git+https://github.com/jejjohnson/vardax@a00b1ae",
+]
+# The flowjax bridge in ``sesmax_core.flows``.
+flows = [
+    "flowjax",
+]
+# State <-> xarray Dataset and Zarr in ``sesmax_core.io``.
+xarray = [
+    "xarray>=2026.4.0",
+    "zarr>=3.1.6",
+]
+# The orbax checkpointer in ``sesmax_core.checkpoint``.
+checkpoint = [
+    "orbax-checkpoint>=0.11.37",
+]
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/sesmax"
@@ -30,5 +72,14 @@ Repository = "https://github.com/jejjohnson/sesmax"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/sesmax_core"]
+
+[tool.uv.sources]
+# finitevolX sources spectraldiffx by git *tag*; uv needs the same form for one
+# package across the graph, and a source takes precedence over the direct
+# reference above (which pip users still get).
+spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }

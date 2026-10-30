@@ -24,7 +24,9 @@ jobs:
         # The dev group installs every workspace package (as editable members).
         run: uv sync --group dev
       - name: Run tests with coverage
-        run: uv run pytest -v
+        # The slow tier (gradients through long integrations) runs in
+        # full-tests.yml; packages/sesmax-core/tests/conftest.py tags it.
+        run: uv run pytest -v -m "not slow"
       - name: Upload coverage report
         if: matrix.python-version == '3.12'
         uses: actions/upload-artifact@v7
@@ -38,9 +40,12 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
 
-  # Each package installed alone, from its own directory, with no workspace
-  # around it: proves its base install is complete and that it imports no
-  # package above its tier (docs/design/workspace_and_core.md).
+  # Each package installed alone into a clean venv, with no workspace around
+  # it: proves its base install is complete, that it imports no package above
+  # its tier (docs/design/workspace_and_core.md), and that no optional extra
+  # is pulled in. The stack's git pins only resolve together with the
+  # workspace's override-dependencies (gaussx, pipekit), so those are passed
+  # in, read from the root pyproject.toml.
   bare-install:
     runs-on: ubuntu-latest
     strategy:
@@ -52,8 +57,14 @@ jobs:
       - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
-      - name: Import ${{ matrix.package.module }} from a bare install
+      - name: Install ${{ matrix.package.dist }} alone
+        run: |
+          python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml', 'rb'))['tool']['uv']['override-dependencies']))" > overrides.txt
+          uv venv bare
+          uv pip install --python bare ./packages/${{ matrix.package.dist }} --override overrides.txt
+      - name: Import ${{ matrix.package.module }}; no optional extra present
         run: >-
-          uv run --isolated --no-project
-          --with ./packages/${{ matrix.package.dist }}
-          python -c "import ${{ matrix.package.module }}"
+          bare/bin/python -c "import importlib.util as u, ${{ matrix.package.module }};
+          extras = ['xarray', 'zarr', 'orbax', 'filterax', 'vardax', 'flowjax'];
+          present = [m for m in extras if u.find_spec(m)];
+          assert not present, present"

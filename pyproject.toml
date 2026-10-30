@@ -14,17 +14,32 @@ dependencies = []
 [tool.uv.workspace]
 members = ["packages/*"]
 
+[tool.uv]
+# Copied from somax at 9cb19b3. filterax pins gaussx to a commit while vardax
+# asks for a bare ``gaussx`` and finitevolX needs gaussx >= 0.6.5: force
+# finitevolX's tag across the graph. finitevolX pins pipekit to a commit while
+# vardax follows pipekit's main: force the same commit everywhere (bump all
+# three with finitevolX's pin, and with packages/sesmax-core/pyproject.toml).
+override-dependencies = [
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.5",
+    "pipekit @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-cycle",
+    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-jax",
+]
+
 [tool.uv.sources]
 sesmax = { workspace = true }
 sesmax-core = { workspace = true }
 
 [dependency-groups]
 dev = [
-    # Workspace members are dev-installed so the tests can import them.
+    # Workspace members are dev-installed so the tests can import them, with
+    # every optional extra so the tests of the optional modules run.
     "sesmax",
-    "sesmax-core",
+    "sesmax-core[da,flows,xarray,checkpoint]",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
     "pre-commit>=4.6.0",
 ]
 lint = [
@@ -72,7 +87,8 @@ src = ["packages/*/src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E402", "E721", "E731", "E741"]
+# F722: jaxtyping shape strings ("Ny Nx") read as forward annotations.
+ignore = ["E402", "E721", "E731", "E741", "F722"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -90,6 +106,19 @@ docstring-code-line-length = 72
 
 [tool.ty.environment]
 python-version = "3.12"
+
+# Copied from somax at 9cb19b3 so the moved code type-checks unchanged.
+# Removing them, one rule per PR, is sesmax#30.
+[tool.ty.rules]
+call-non-callable = "ignore"  # eqx.Module subclasses with __call__
+invalid-argument-type = "ignore"
+invalid-assignment = "ignore"
+invalid-method-override = "ignore"
+invalid-parameter-default = "ignore"
+invalid-return-type = "ignore"
+not-iterable = "ignore"
+unresolved-attribute = "ignore"
+unresolved-import = "ignore"  # optional deps (orbax) + git-based deps
 
 [tool.pytest.ini_options]
 # Each package's tests, the workspace tests (docs build, capability index), and
