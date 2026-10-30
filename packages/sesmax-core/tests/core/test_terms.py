@@ -300,3 +300,16 @@ def test_single_kind_scaled_sum_stays_one_summand():
     term = 2.0 * (Linear() + ConstForce())
     exp, imp = partition(term)
     assert imp is None and exp is term
+
+
+def test_composition_with_a_mixed_operand_routes_implicit():
+    """``(a + implicit(b)) @ c`` keeps its stiff part implicit (review on #39)."""
+    for term in (_mixed() @ Linear(), Linear() @ _mixed()):
+        assert term.kind == IMPLICIT
+        exp, imp = partition(term)
+        assert exp is None and imp is term
+
+
+def test_composition_of_explicit_operands_stays_explicit():
+    term = Linear() @ (Linear() + ConstForce())
+    assert term.kind == EXPLICIT

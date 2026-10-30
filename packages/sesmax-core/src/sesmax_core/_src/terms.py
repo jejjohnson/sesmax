@@ -237,9 +237,10 @@ class Compose(Term):
     @property
     def kind(self) -> Kind:
         # Composition is treated as a single atomic leaf for IMEX
-        # partitioning; if either factor is implicit the whole composite
-        # routes to the implicit stage.
-        if self.outer.kind == IMPLICIT or self.inner.kind == IMPLICIT:
+        # partitioning; if either factor is implicit, or a mixed sum that
+        # contains an implicit part, the whole composite routes to the
+        # implicit stage.
+        if {self.outer.kind, self.inner.kind} & {IMPLICIT, MIXED}:
             return IMPLICIT
         return EXPLICIT
 
