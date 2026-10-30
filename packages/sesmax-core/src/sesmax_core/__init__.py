@@ -1,12 +1,12 @@
 """The core of sesmax: what every simple Earth-system model shares.
 
 ``sesmax_core`` holds the model-agnostic machinery moved from somax (at
-commit ``9cb19b3``): the state and parameter types, the parameter
-constraints, the model base classes, the term algebra, and
-non-dimensionalisation and standardisation (``Scales``, ``StateAffine``,
-``ScaledModel``), and the layered-fluid pieces (``ModalTransform``, the
-Helmholtz caches). The forcing, data-assimilation adapters, monitors and I/O
-join as the rest of phase C1 of ``docs/design/workspace_and_core.md``
+commit ``9cb19b3``): the state and parameter types and their constraints,
+the model base classes, the term algebra, non-dimensionalisation and
+standardisation (``Scales``, ``StateAffine``, ``ScaledModel``), the
+layered-fluid pieces (``ModalTransform``, the Helmholtz caches), and forcing
+with its reduced-order bases. The data-assimilation adapters, monitors and
+I/O join as the rest of phase C1 of ``docs/design/workspace_and_core.md``
 lands.
 
 A model is an :class:`equinox.Module` whose ``vector_field`` is a pure
@@ -18,6 +18,40 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from sesmax_core._src.basis import (
+    BasisForcing,
+    ConstantInTime,
+    ForcingTerm,
+    FourierInTime,
+    SpatialBasis,
+    TemporalBasis,
+    TransformedForcing,
+    VectorBasisForcing,
+    VectorSpatialBasis,
+    add_to,
+    add_vector_to,
+    control_filter,
+)
+from sesmax_core._src.forcing import (
+    ConstantForcing,
+    ForcingProtocol,
+    InterpolatedForcing,
+    NoForcing,
+    SeasonalWindForcing,
+)
+from sesmax_core._src.forcing_bank import (
+    GaussianWindowsInTime,
+    matern_spectral_density,
+    spatial_from_divfree,
+    spatial_from_eof,
+    spatial_from_fourier,
+    spatial_from_gabor,
+    spatial_from_graph_laplacian,
+    spatial_from_rbf,
+    spatial_from_spherical_rbf,
+    spatial_from_wavelet,
+    tile_in_time,
+)
 from sesmax_core._src.gfd.helmholtz import (
     DirichletHelmholtzCache,
     HelmholtzCache,
@@ -61,14 +95,23 @@ if TYPE_CHECKING:
 __version__ = "0.0.0"  # x-release-please-version
 
 __all__ = [
+    "BasisForcing",
     "Compose",
+    "ConstantForcing",
+    "ConstantInTime",
     "Diagnostics",
     "DirichletHelmholtzCache",
+    "ForcingProtocol",
+    "ForcingTerm",
+    "FourierInTime",
+    "GaussianWindowsInTime",
     "HelmholtzCache",
+    "InterpolatedForcing",
     "ModalTransform",
     "Model",
     "MultimodalHelmholtzCache",
     "NeumannHelmholtzCache",
+    "NoForcing",
     "OperatorTerm",
     "Params",
     "PeriodicHelmholtzCache",
@@ -76,22 +119,41 @@ __all__ = [
     "Scaled",
     "ScaledModel",
     "Scales",
+    "SeasonalWindForcing",
+    "SpatialBasis",
     "State",
     "StateAffine",
     "StratificationProfile",
     "Sum",
+    "TemporalBasis",
     "Term",
     "TermFn",
     "TermModel",
+    "TransformedForcing",
+    "VectorBasisForcing",
+    "VectorSpatialBasis",
     "__version__",
+    "add_to",
+    "add_vector_to",
     "as_parameter",
     "build_diffrax_terms",
+    "control_filter",
     "explicit",
     "frozen",
     "implicit",
     "interval",
+    "matern_spectral_density",
     "partition",
     "positive",
+    "spatial_from_divfree",
+    "spatial_from_eof",
+    "spatial_from_fourier",
+    "spatial_from_gabor",
+    "spatial_from_graph_laplacian",
+    "spatial_from_rbf",
+    "spatial_from_spherical_rbf",
+    "spatial_from_wavelet",
+    "tile_in_time",
     "trainable_mask",
 ]
 
