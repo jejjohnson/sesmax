@@ -60,7 +60,7 @@ The geostack plan's module table was inferred from somax's capability index; rea
 | Repository | rename `jejjohnson/somax` | new repository `jejjohnson/sesmax`; somax archived after parity (not deleted) |
 | Spatial bases | duplicates of vardax, removed | they are thin adapters over `geonnax.basis` that return somax's `SpatialBasis` with a prior standard deviation, and vardax has only four of the eight (RBF, Fourier, wavelet, EOF); they still move to vardax (SX-5), and the other four (Gabor, graph Laplacian, spherical RBF, divergence-free) go upstream first |
 | `eval` | split between core and ocean | moves whole to `sesmax-ocean`: every metric takes a finitevolX C-grid `Difference2D`, and `compute_eval_metrics` dispatches on QG models |
-| `models` | all to the ocean | Lorenz-63, Lorenz-96 and the 1D and 2D PDE test problems go to `sesmax_core.testing`; only the shallow-water, QG and spherical models go to the ocean |
+| `models` | all to the ocean | Lorenz-63, Lorenz-96, the 1D and 2D PDE test problems, the 1D shallow-water models and the 2D linear shallow-water model go to `sesmax_core.testing` (steps 1 to 16 of somax's tutorial series); only the nonlinear 2D, multilayer, QG and spherical models go to the ocean |
 | Modules the plan did not list | — | `basis`, `forcing_bank`, `scales`, `scaled`, `transforms`, `resolution`, `checkpoint`, `train`, `guards`, `operator_term`, `cli` (placed below) |
 
 ## The workspace
@@ -171,12 +171,14 @@ Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were
 | `models/base.py` | `DynamicalSystem`, marked for removal | dropped | — |
 | `core/resolution.py` | Munk, Stommel and deformation-radius resolution checks | `sesmax-ocean` (C2) | ocean boundary layers |
 | `eval/` | RMS divergence, enstrophy, KE, geostrophic imbalance, QG balance residual | `sesmax-ocean` (C2) | see the table above |
-| `models/qg/`, `swm/`, `spherical/`, `gfd_testcases.py`, `_diagnostic_ops.py` | the ocean models | `sesmax-ocean` (C2) | — |
+| `models/swm/linear_1d.py`, `nonlinear_1d.py`, `linear_2d.py`, `linear_swm_terms.py`, `gfd_testcases.py` | 1D linear and nonlinear shallow water, 2D linear shallow water (monolithic and term-based), gravity-wave, inertial-oscillation and geostrophic-adjustment cases | `sesmax_core.testing` | none (SX-3) |
+| `models/_diagnostic_ops.py` | finitevolX pipekit diagnostics shared by the C-grid models | `sesmax_core` (private until C2 needs a public name) | none |
+| `models/qg/`, `swm/nonlinear_2d.py`, `swm/multilayer.py`, `spherical/` | the ocean models | `sesmax-ocean` (C2) | — |
 | `cli/` runner (`_run`, `_progress`, `spec`, `_units`, `_data`, `_assertions`) | the `somax-sim` run loop, run specs, units, progress logs | `sesmax_core.sim`, behind `[sim]` (C2, SX-4) | the runner learns models through a registry each component fills |
 | `cli/models_registry/`, `cli/scenarios/`, `configs/`, DVC | the registered ocean models, scenarios (double gyre, Gulf Stream, …), run configs | `sesmax-ocean` (C2) | — |
 
-`sesmax_core.testing` holds about 2,850 lines of toy models (counted with `wc -l` at `9cb19b3`).
-They are the standard test problems of numerical analysis rather than Earth-system components, they import only the core and finitevolX, and the core's own tests for solvers, scaling, rollouts and operators run on them.
+`sesmax_core.testing` holds about 3,960 lines of toy models (counted with `wc -l` at `9cb19b3`): the Lorenz systems, the PDE test problems, and the linear shallow-water models that steps 14 to 16 of somax's tutorial series use.
+They are standard test problems (numerical analysis, chaos, linear geophysical waves) rather than Earth-system components, they import only the core and finitevolX, and the core's own tests for solvers, scaling, rollouts and operators run on them.
 
 ### Dependencies
 
@@ -247,12 +249,12 @@ dynamics = FilteraxDynamics(model=model, template=state0)
 
 ## Tests that move with the core
 
-Of somax's 62 files under `tests/`, 22 test only what moves to the core, 7 test the core through an ocean model, and the rest test the ocean models, the runner or the configs (from the imports at `9cb19b3`; not run yet).
+Of somax's 62 files under `tests/`, 27 test only what moves to the core, 7 mix core and ocean cases, and the rest test the ocean models, the runner or the configs (from the imports at `9cb19b3`; not run yet).
 
 | Group | somax test files | In sesmax |
 | --- | --- | --- |
-| Move whole (22) | `core/test_{checkpoint,forcing,helmholtz,model,terms,transforms,types}.py`, `domain/test_domain.py`, `da/test_{filterax,vardax}.py`, `test_{guards,monitor,scales,solvers,operators}.py`, `models/test_{burgers_terms,lorenz,pde1d,pde2d,navier_stokes,poisson}.py`, `test_pde_nondim.py` | `packages/sesmax-core/tests/` in C1, with only import changes and the four renames |
-| Split (7) | `core/test_basis.py`, `core/test_operator_term.py`, `test_scaled_model.py`, `test_state_affine.py`, `test_flows.py`, `test_paramax_integration.py`, `test_train.py` | the cases on toy models move in C1; the cases on shallow-water or QG models move with the ocean in C2 |
+| Move whole (27) | `core/test_{checkpoint,forcing,helmholtz,model,operator_term,terms,transforms,types}.py`, `domain/test_domain.py`, `da/test_{filterax,vardax}.py`, `test_{guards,monitor,scales,solvers,operators,train}.py`, `models/test_{burgers_terms,gfd_testcases,linear_swm_terms,lorenz,pde1d,pde2d,navier_stokes,poisson,swm_1d}.py`, `test_pde_nondim.py` | `packages/sesmax-core/tests/` in C1, with only import changes and the four renames |
+| Split (7) | `core/test_basis.py`, `test_scaled_model.py`, `test_state_affine.py`, `test_flows.py`, `test_paramax_integration.py`, `models/test_swm_2d.py`, `models/test_masks.py` | the cases on toy models (including linear shallow water) move in C1; the cases on nonlinear 2D shallow-water, multilayer or QG models move with the ocean in C2 |
 | With the ocean (the rest) | QG, shallow-water, spherical, conservation, invariants, masks, eval, I/O, CLI, configs, registry, preflight | `packages/sesmax-ocean/tests/` in C2 |
 
 A split test keeps its assertions; where a core feature was only tested through an ocean model, C1 adds the same assertion on a toy model so the core's coverage does not depend on C2.
@@ -298,7 +300,7 @@ All six were settled on 30 Oct 2026.
 | --- | --- | --- | --- |
 | SX-1 | What `sesmax` installs | a code-free umbrella; `sesmax-core` is the core | the umbrella's first release waits for `sesmax-ocean` |
 | SX-2 | How the code arrives | a copy at somax `9cb19b3`, with the source commit named in each C1 commit message and in the CHANGELOG | history and `git blame` stay in the archived somax repository |
-| SX-3 | Where the toy models live | `sesmax_core.testing` (Lorenz and the PDE test problems) | 22 somax test files move to the core whole |
+| SX-3 | Where the toy models live | `sesmax_core.testing`: Lorenz, the PDE test problems and, decided later the same day, the 1D shallow-water and 2D linear shallow-water models (the models of steps 1 to 16 of somax's tutorial series) | 27 somax test files move to the core whole; the step tutorials move with the models |
 | SX-4 | Where the `somax-sim` runner lives | leaning towards the core: the generic run loop in `sesmax_core.sim` behind a `[sim]` extra, with each component registering its models and scenarios; confirmed in the C2 design page | the runner stops hard-coding the ocean registry |
 | SX-5 | Spatial bases | take vardax's bases | vardax joins the core's base install; the four bases vardax lacks are proposed upstream (an ask for vardax, recorded here and not filed as a PR there) and stay over geonnax until they ship |
 | SX-6 | Coverage gate | very low to start: `fail_under = 30` per package, raised in follow-ups | the template's 90 % is a target, not a C1 gate |
