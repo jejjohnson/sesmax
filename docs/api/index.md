@@ -8,7 +8,14 @@ import sesmax_core
 
 The [capability index](capabilities.md) lists every public name on one page, with a one-line summary each.
 
-`sesmax_core` is empty until phase C1 of the workspace and core design, which moves the core machinery from somax; each public module then gets its own page here.
+`sesmax_core` receives the core machinery from somax during phase C1 of the workspace and core design; each public module gets its own page here as it lands.
+
+## Modules
+
+| Page | Contents |
+|---|---|
+| [Types and models](core.md) | `State`, `Params`, `PhysConsts`, `Diagnostics`; `positive`, `interval`, `frozen`, `as_parameter`, `trainable_mask`; `Model`, `TermModel` |
+| [Guards](guards.md) | `guard_finite`, `guard_positive`, `guard_ceiling` |
 
 ## Package overview
 

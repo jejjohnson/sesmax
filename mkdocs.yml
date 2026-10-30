@@ -53,6 +53,12 @@ plugins:
           paths: [packages/sesmax-core/src]
           options:
             docstring_style: google
+            # Docstrings moved from somax document **kwargs without a type and
+            # list dataclass fields under Args; griffe would warn, and strict
+            # mode would fail the build on docs that are correct as written.
+            docstring_options:
+              warn_unknown_params: false
+              warn_missing_types: false
             docstring_section_style: table
             show_source: true
             show_root_heading: true
@@ -70,3 +76,5 @@ plugins:
 nav:
   - Overview: index.md
   - Capability index: capabilities.md
+  - Types and models: core.md
+  - Guards: guards.md
