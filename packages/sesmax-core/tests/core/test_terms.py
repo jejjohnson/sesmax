@@ -284,7 +284,7 @@ def test_scaled_mixed_sum_keeps_its_implicit_part():
 
 def test_negated_and_nested_scalings_keep_their_implicit_part():
     for term in (-_mixed(), 3.0 * (2.0 * _mixed()), ConstForce() - _mixed()):
-        exp, imp = partition(term)
+        _, imp = partition(term)
         assert imp is not None and imp.kind == IMPLICIT, term
 
 
