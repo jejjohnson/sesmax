@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import ClassVar
 
 import equinox as eqx
@@ -612,3 +613,29 @@ class TestSampleMomentsSurviveHalfPrecision:
 
         grad = jax.grad(scale_of)(jnp.full((8, 4, 4), 2.0))
         assert bool(jnp.all(jnp.isfinite(grad)))
+
+
+class ShapedState(State):
+    """A state with a static field, as the static-shape contract asks."""
+
+    u: Array
+    shape: tuple = eqx.field(static=True, default=(2,))
+
+
+class TestStaticFieldsAreNotLeaves:
+    """Static fields are not pytree leaves (review on #40; somax raised)."""
+
+    def test_from_samples_skips_static_fields(self):
+        samples = ShapedState(u=jnp.arange(24.0).reshape(8, 3))
+        affine = StateAffine.from_samples(samples)
+        assert affine.loc.shape == (2,)
+        y = affine.forward(ShapedState(u=jnp.zeros(3)))
+        assert y.shape == (2,)
+        assert tree_allclose(affine.inverse(y), ShapedState(u=jnp.zeros(3)))
+
+    def test_from_scales_skips_static_fields(self, scales):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            affine = StateAffine.from_scales(ShapedState, scales)
+        assert affine.scale.u == pytest.approx(scales.U)
+        assert affine.loc.shape == (2,)

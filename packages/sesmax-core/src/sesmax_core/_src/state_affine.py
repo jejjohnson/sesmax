@@ -365,19 +365,26 @@ class StateAffine(eqx.Module):
 
 
 def _state_field_names(state_cls: type) -> tuple[str, ...]:
-    """Dataclass field names of an equinox ``Module`` subclass.
+    """Names of the pytree fields of an equinox ``Module`` subclass.
 
     ``dataclasses.fields`` rather than ``__dataclass_fields__``: the
     latter also lists ``ClassVar`` pseudo-fields, which is how a state
     declares its ``scale_kinds`` and ``mask_locations``, and those are
-    metadata about the state rather than part of it.
+    metadata about the state rather than part of it. Static fields
+    (``eqx.field(static=True)``, such as a shape) are skipped too: they
+    are not pytree leaves, and the affine map leaves them at their
+    defaults.
     """
     if not getattr(state_cls, "__dataclass_fields__", None):
         raise TypeError(
             f"StateAffine.from_scales: {state_cls!r} is not an equinox Module "
             "with dataclass fields."
         )
-    return tuple(field.name for field in dataclasses.fields(state_cls))
+    return tuple(
+        field.name
+        for field in dataclasses.fields(state_cls)
+        if not field.metadata.get("static", False)
+    )
 
 
 def _leaf_field_names(state: PyTree) -> list[str]:
