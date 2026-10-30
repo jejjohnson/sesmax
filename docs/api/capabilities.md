@@ -13,6 +13,12 @@ Every public name in `sesmax_core` (24 of them), each listed once at its public 
 | `Model` | class | Abstract base class defining the sesmax model contract. |
 | `TermModel` | class | A :class:`Model` whose RHS is an assembled :class:`Term` tree. |
 
+### ``OperatorTerm`` — use any pipekit ``Operator`` / ``Graph`` as a :class:`Term`. (`sesmax_core._src.operator_term`)
+
+| Name | Kind | What it does |
+|---|---|---|
+| `OperatorTerm` | class | Lift a pipekit operator into the :class:`Term` algebra. |
+
 ### Composable term algebra for sesmax model right-hand sides. (`sesmax_core._src.terms`)
 
 | Name | Kind | What it does |
@@ -48,9 +54,3 @@ Every public name in `sesmax_core` (24 of them), each listed once at its public 
 | `guard_ceiling` | function | Return ``x`` unchanged, raising in-JIT if ``\|x\|`` exceeds ``ceil``. |
 | `guard_finite` | function | Return ``x`` unchanged, raising in-JIT if it holds any NaN/Inf. |
 | `guard_positive` | function | Return ``x`` unchanged, raising in-JIT if any element ``<= floor``. |
-
-## `sesmax_core.terms`
-
-| Name | Kind | What it does |
-|---|---|---|
-| `OperatorTerm` | class | Lift a pipekit operator into the :class:`Term` algebra. |

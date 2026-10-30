@@ -13,6 +13,8 @@ function of time, state and parameters, so ``jax.jit``, ``jax.grad`` and
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from sesmax_core._src.model import Model, TermModel
 from sesmax_core._src.terms import (
     Compose,
@@ -38,12 +40,17 @@ from sesmax_core._src.types import (
 )
 
 
+if TYPE_CHECKING:
+    from sesmax_core._src.operator_term import OperatorTerm
+
+
 __version__ = "0.0.0"  # x-release-please-version
 
 __all__ = [
     "Compose",
     "Diagnostics",
     "Model",
+    "OperatorTerm",
     "Params",
     "PhysConsts",
     "Scaled",
@@ -63,3 +70,15 @@ __all__ = [
     "positive",
     "trainable_mask",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Import ``OperatorTerm`` on first use.
+
+    It needs pipekit, so a plain ``import sesmax_core`` stays pipekit-free.
+    """
+    if name == "OperatorTerm":
+        from sesmax_core._src.operator_term import OperatorTerm
+
+        return OperatorTerm
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
