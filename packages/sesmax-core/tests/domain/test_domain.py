@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import jax.numpy as jnp
+import numpy as np
 
 from sesmax_core._src.domain.domain import (
     Domain,
@@ -79,3 +80,19 @@ def test_time_domain_coords():
     # jnp.arange does not include endpoint
     assert coords[0] == 0.0
     assert len(coords) == 4  # [0.0, 0.25, 0.5, 0.75]
+
+
+def test_strided_slice_scales_the_spacing():
+    """A ``[::2]`` slice doubles ``dx`` (review on #40; somax copied ``dx``)."""
+    domain = Domain(xmin=0.0, xmax=10.0, dx=1.0, Nx=11, Lx=10.0)
+    sliced = domain[::2]
+    np.testing.assert_allclose(sliced.coords_axis[0], [0, 2, 4, 6, 8, 10])
+    assert sliced.dx == (2.0,)
+    assert sliced.cell_volume == 2.0
+
+
+def test_unit_stride_keeps_the_spacing_exactly():
+    domain = Domain(
+        xmin=(0.0, 0.0), xmax=(1.0, 2.0), dx=(0.1, 0.2), Nx=(11, 11), Lx=(1.0, 2.0)
+    )
+    assert domain[2:8, :].dx == (0.1, 0.2)

@@ -132,7 +132,13 @@ class Domain(eqx.Module):
         fn = lambda x: x[1] - x[0]
         Lx = tuple(map(fn, list(zip(*(xmin, xmax), strict=False))))
 
-        return Domain(xmin=xmin, xmax=xmax, Lx=Lx, Nx=Nx, dx=self.dx)
+        # change dx: a stride of k makes the spacing k times larger
+        dx = tuple(
+            spacing * abs(islice.step or 1)
+            for spacing, islice in zip(self.dx, values, strict=True)
+        )
+
+        return Domain(xmin=xmin, xmax=xmax, Lx=Lx, Nx=Nx, dx=dx)
 
     def __mul__(self, other):
         fn = lambda x, y: x + y
