@@ -22,9 +22,12 @@ SUBMODULES: list[str] = [
     "forcing",
     "gfd",
     "guards",
+    "monitor",
+    "operators",
     "scales",
     "solvers",
     "terms",
+    "train",
 ]
 
 
