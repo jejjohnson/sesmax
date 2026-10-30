@@ -12,7 +12,7 @@ Every issue carries exactly one `type:*`, one or more `area:*`, at most one `lay
 |---|---|
 | **Type** | `type:epic-wave`, `type:epic-theme`, `type:feature`, `type:design`, `type:chore`, `type:docs`, `type:bug`, `type:research` |
 | **Area** | `area:engineering`, `area:testing`, `area:docs`, `area:code` — extend per project (e.g. `area:algorithmic`, `area:integration`) |
-| **Layer** | `layer:0-primitives`, `layer:1-components`, `layer:2-models` — only if the project has a formal layer stack |
+| **Layer** | `layer:0-core`, `layer:1-components`, `layer:2-coupler` — the workspace tier the change lands in |
 | **Wave** | `wave:0`, `wave:1`, `wave:2`, … — release-scoped phases (add `wave:N-<slug>` variants for descriptive labels) |
 | **Priority** | `priority:p0` (blocker), `priority:p1` (high), `priority:p2` (normal) |
 
@@ -85,7 +85,7 @@ For drafted content, write the body to a file (minus the template's YAML frontma
 gh issue create \
   --title "feat(primitives): diagonal BLR update step" \
   --body-file /tmp/issue-body.md \
-  --label "type:feature,area:algorithmic,layer:0-primitives,wave:1,priority:p1" \
+  --label "type:feature,area:algorithmic,layer:0-core,wave:1,priority:p1" \
   --milestone "v0.1-diagonal"
 ```
 
@@ -122,7 +122,7 @@ Example prompts:
 
 ## Drafting a wave backlog
 
-For large planning exercises (new wave, new release, large refactor), draft the whole backlog as one markdown file **before** opening GitHub issues. A template lives at [`docs/templates/wave-backlog.md`](https://github.com/jejjohnson/pypackage_template/blob/main/docs/templates/wave-backlog.md).
+For large planning exercises (new wave, new release, large refactor), draft the whole backlog as one markdown file **before** opening GitHub issues. A template lives at [`docs/templates/wave-backlog.md`](https://github.com/jejjohnson/sesmax/blob/main/docs/templates/wave-backlog.md).
 
 Why:
 

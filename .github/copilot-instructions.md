@@ -4,27 +4,12 @@ Read [`AGENTS.md`](../AGENTS.md) at the repository root first: it is the
 single source of truth for every coding agent working here (the module map,
 "reuse before you write", the contracts, the tests that enforce them,
 commands, the pre-commit checklist, the two-tool docs, git and PR rules).
-Passages marked `<!-- template-example: … -->` there describe the bundled
-example package and are rewritten when the template is adopted.
 
 The essentials, in case you only read this file:
 
-<!-- template-example: the module map and contracts of the example package. -->
-
-- One package, `src/mypackage/`, dependency-free, with modules that import
-  only downward: `_typing` → `exceptions` → `utils` → `stats` / `smoothing`
-  → `transforms` → `cli`. Search
-  [`docs/api/capabilities.md`](../docs/api/capabilities.md) before writing a
-  helper.
-- Keep the contracts in `AGENTS.md`:
-  - **public functions** validate once, at the boundary, with the `utils`
-    validators, raise `ValidationError` naming the argument, and return a
-    new list without mutating their input;
-  - **transforms** satisfy the `Transform` protocol structurally; fitted ones
-    raise `NotFittedError` before `fit`, and `fit` returns `self`;
-  - **CLI** subcommands write to the injected streams and return an exit
-    status; library errors become exit 1, usage errors exit 2;
-  - every exception derives from `MypackageError` and its stdlib base.
+- A uv workspace: one package per directory under `packages/` (`sesmax-core` in tier 0, components such as `sesmax-ocean` in tier 1, a coupler in tier 2, and the code-free umbrella `sesmax`). A package imports only packages below its tier (`tests/test_workspace.py`). Search [`docs/api/capabilities.md`](../docs/api/capabilities.md) before writing a helper.
+- The plan, the phases and what moves from somax are in [`docs/design/workspace_and_core.md`](../docs/design/workspace_and_core.md); code copied from somax keeps its behaviour and changes only imports and the listed renames.
+- Model steps are pure functions of state, parameters and forcing that `jit`, `grad` and `vmap` go through; optional dependencies sit behind an extra and raise an `ImportError` naming it.
 
 The rules for every project:
 
@@ -36,11 +21,11 @@ The rules for every project:
   whole repo, never a subdirectory.
 - When you suggest a change, propose the code; when you fix a bug, add the
   test that reproduces it. Don't nitpick what ruff and the formatter handle.
-- Partial test runs need `--no-cov` (the 90 % coverage gate fails a subset).
+- Partial test runs need `--no-cov` (the coverage gate fails a subset).
 - Never push or merge to `main` unless told to; never replace an existing PR
   description, only append to it.
-- Step-by-step recipes (adopt the template, add a function, transform, CLI
-  command, guide page or notebook; pre-PR check; review) are plain Markdown
+- Step-by-step recipes (adopt the template, add a guide page or notebook;
+  pre-PR check; review) are plain Markdown
   in `.claude/skills/<name>/SKILL.md`, and the two review checklists in
   `.claude/agents/`; follow them as written.
 - Path-scoped standards live in `.github/instructions/`; code review follows
