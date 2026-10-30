@@ -297,10 +297,19 @@ def explicit(term: Term) -> Term:
 
 
 def _iter_summands(term: Term) -> Iterator[Term]:
-    """Yield the flat additive summands of ``term`` (recursing into Sum)."""
+    """Yield the flat additive summands of ``term``.
+
+    Recurses into :class:`Sum`, and distributes a :class:`Scaled` over a
+    mixed sum, ``c (a + b) = c a + c b``, so that scaling or negating an
+    IMEX sum keeps its implicit summands on the implicit stage. A scaled
+    term of a single kind stays one summand.
+    """
     if isinstance(term, Sum):
         for sub in term.terms:
             yield from _iter_summands(sub)
+    elif isinstance(term, Scaled) and term.kind == MIXED:
+        for sub in _iter_summands(term.term):
+            yield Scaled(sub, term.coeff)
     else:
         yield term
 
