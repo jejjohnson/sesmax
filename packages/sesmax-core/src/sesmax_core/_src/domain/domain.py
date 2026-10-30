@@ -189,8 +189,13 @@ def init_domain_from_bounds_and_numpoints(
 def init_domain_from_bounds_and_step(xmin: float, xmax: float, dx: float) -> int:
     """initialize 1d domain from bounds and step_size
     Eqs:
-         Nx = 1 + ceil((x_max - x_min) / dx)
+        Nx = 1 + floor((x_max - x_min) / dx)
         Lx = (x1 - x0)
+        dx' = Lx / (Nx - 1)
+
+    The bounds are kept and the coordinates span them with ``Nx`` points,
+    so when ``dx`` does not divide ``Lx`` the realized spacing ``dx'`` is
+    what the domain reports (it equals ``dx`` when ``dx`` divides ``Lx``).
 
     Args:
         xmin (float): x min value
@@ -205,5 +210,8 @@ def init_domain_from_bounds_and_step(xmin: float, xmax: float, dx: float) -> int
 
     # calculate Lx
     Lx = bounds_to_length(xmin=xmin, xmax=xmax)
+
+    # the spacing the coordinates realize
+    dx = bounds_and_points_to_step(xmin=xmin, xmax=xmax, Nx=Nx)
 
     return Domain(xmin=xmin, xmax=xmax, dx=dx, Nx=Nx, Lx=Lx)

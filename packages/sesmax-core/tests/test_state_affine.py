@@ -639,3 +639,34 @@ class TestStaticFieldsAreNotLeaves:
             affine = StateAffine.from_scales(ShapedState, scales)
         assert affine.scale.u == pytest.approx(scales.U)
         assert affine.loc.shape == (2,)
+
+
+class RequiredShapeState(State):
+    """A state whose static field has no default."""
+
+    u: Array
+    shape: tuple = eqx.field(static=True)
+
+
+class TestFromScalesTemplate:
+    """``template`` carries static fields (review on #40)."""
+
+    def test_required_static_field_needs_a_template(self, scales):
+        with pytest.raises(ValueError, match="template="):
+            StateAffine.from_scales(RequiredShapeState, scales)
+
+    def test_template_supplies_the_static_fields(self, scales):
+        state = RequiredShapeState(u=jnp.ones(3), shape=(3,))
+        affine = StateAffine.from_scales(RequiredShapeState, scales, template=state)
+        assert affine.loc.shape == (3,)
+        y = affine.forward(state)
+        assert tree_allclose(affine.inverse(y), state)
+
+    def test_template_matches_a_non_default_static_value(self, scales):
+        state = ShapedState(u=jnp.ones(3), shape=(5,))
+        affine = StateAffine.from_scales(ShapedState, scales, template=state)
+        assert tree_allclose(affine.inverse(affine.forward(state)), state)
+
+    def test_template_must_be_a_state_of_the_class(self, scales):
+        with pytest.raises(TypeError, match="template"):
+            StateAffine.from_scales(ShapedState, scales, template=object())

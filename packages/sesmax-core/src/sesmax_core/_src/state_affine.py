@@ -191,6 +191,8 @@ class StateAffine(eqx.Module):
         cls,
         state_cls: type,
         scales: Scales,
+        *,
+        template: Any = None,
         **per_field: float | tuple[float, float] | dict[str, Any],
     ) -> StateAffine:
         """Build the physical non-dimensionalising transform for a state type.
@@ -207,6 +209,11 @@ class StateAffine(eqx.Module):
                 for. Its dataclass fields define the pytree structure.
             scales: Characteristic scales to derive ``loc``/``scale``
                 from.
+            template: A ``state_cls`` instance whose static fields
+                (``eqx.field(static=True)``, such as a shape) ``loc``
+                and ``scale`` copy, so their pytree structure matches the
+                states they map. Required when a static field has no
+                default; otherwise static fields take their defaults.
             **per_field: Overrides keyed by field name. A bare number
                 sets ``scale`` and leaves ``loc`` at zero; a
                 ``(loc, scale)`` pair or a ``{"loc": ..., "scale": ...}``
@@ -220,9 +227,11 @@ class StateAffine(eqx.Module):
 
         Raises:
             ValueError: If an override names a field the state does not
-                have, or if any resolved scale is zero.
+                have, if any resolved scale is zero, or if a static field
+                has no default and no ``template`` is given.
         """
         fields = _state_field_names(state_cls)
+        static = _static_field_values(state_cls, template)
 
         unknown = set(per_field) - set(fields)
         if unknown:
@@ -257,7 +266,10 @@ class StateAffine(eqx.Module):
             )
 
         _check_nonzero_scales(scale_values)
-        return cls(loc=state_cls(**locs), scale=state_cls(**scale_values))
+        return cls(
+            loc=state_cls(**static, **locs),
+            scale=state_cls(**static, **scale_values),
+        )
 
     @classmethod
     def from_samples(
@@ -385,6 +397,39 @@ def _state_field_names(state_cls: type) -> tuple[str, ...]:
         for field in dataclasses.fields(state_cls)
         if not field.metadata.get("static", False)
     )
+
+
+def _static_field_values(state_cls: type, template: Any) -> dict[str, Any]:
+    """The static fields to build ``state_cls`` with, taken from ``template``.
+
+    Without a template, static fields take their defaults; a static field
+    with no default then cannot be filled in, so it is an error.
+    """
+    static = [
+        field
+        for field in dataclasses.fields(state_cls)
+        if field.metadata.get("static", False)
+    ]
+    if template is not None:
+        if not isinstance(template, state_cls):
+            raise TypeError(
+                f"StateAffine.from_scales: template must be a "
+                f"{state_cls.__name__}, got {type(template).__name__}."
+            )
+        return {field.name: getattr(template, field.name) for field in static}
+    required = [
+        field.name
+        for field in static
+        if field.default is dataclasses.MISSING
+        and field.default_factory is dataclasses.MISSING
+    ]
+    if required:
+        raise ValueError(
+            f"StateAffine.from_scales: {state_cls.__name__} has static field(s) "
+            f"{required} without a default; pass template=<a "
+            f"{state_cls.__name__}> to take their values from."
+        )
+    return {}
 
 
 def _leaf_field_names(state: PyTree) -> list[str]:

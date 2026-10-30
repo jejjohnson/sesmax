@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import jax.numpy as jnp
 import numpy as np
+import pytest
 
 from sesmax_core._src.domain.domain import (
     Domain,
@@ -96,3 +97,12 @@ def test_unit_stride_keeps_the_spacing_exactly():
         xmin=(0.0, 0.0), xmax=(1.0, 2.0), dx=(0.1, 0.2), Nx=(11, 11), Lx=(1.0, 2.0)
     )
     assert domain[2:8, :].dx == (0.1, 0.2)
+
+
+def test_step_that_does_not_divide_the_interval_reports_the_realized_spacing():
+    """The reported dx matches the coordinates (review on #40; somax kept 0.3)."""
+    domain = init_domain_from_bounds_and_step(xmin=0.0, xmax=1.0, dx=0.3)
+    coords = np.asarray(domain.coords_axis[0])
+    assert domain.Nx == (4,)
+    np.testing.assert_allclose(np.diff(coords), domain.dx[0], rtol=1e-6)
+    assert domain.dx[0] == pytest.approx(1.0 / 3.0)
