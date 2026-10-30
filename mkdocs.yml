@@ -79,6 +79,7 @@ nav:
   - Types and models: core.md
   - Terms: terms.md
   - Scales: scales.md
+  - Layered fluids: gfd.md
   - Domains: domain.md
   - Solvers: solvers.md
   - Guards: guards.md
