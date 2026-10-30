@@ -78,4 +78,7 @@ nav:
   - Capability index: capabilities.md
   - Types and models: core.md
   - Terms: terms.md
+  - Scales: scales.md
+  - Domains: domain.md
+  - Solvers: solvers.md
   - Guards: guards.md
