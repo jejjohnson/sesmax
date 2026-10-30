@@ -2,9 +2,11 @@
 
 ``sesmax_core`` holds the model-agnostic machinery moved from somax (at
 commit ``9cb19b3``): the state and parameter types, the parameter
-constraints, the model base classes and the term algebra. The steppers,
-forcing, data-assimilation adapters, monitors and I/O join as the rest of
-phase C1 of ``docs/design/workspace_and_core.md`` lands.
+constraints, the model base classes, the term algebra, and
+non-dimensionalisation and standardisation (``Scales``, ``StateAffine``,
+``ScaledModel``). The forcing, data-assimilation adapters, monitors and I/O
+join as the rest of phase C1 of ``docs/design/workspace_and_core.md``
+lands.
 
 A model is an :class:`equinox.Module` whose ``vector_field`` is a pure
 function of time, state and parameters, so ``jax.jit``, ``jax.grad`` and
@@ -14,6 +16,9 @@ function of time, state and parameters, so ``jax.jit``, ``jax.grad`` and
 from __future__ import annotations
 
 from sesmax_core._src.model import Model, TermModel
+from sesmax_core._src.scaled import ScaledModel
+from sesmax_core._src.scales import Scales
+from sesmax_core._src.state_affine import StateAffine
 from sesmax_core._src.terms import (
     Compose,
     Scaled,
@@ -47,7 +52,10 @@ __all__ = [
     "Params",
     "PhysConsts",
     "Scaled",
+    "ScaledModel",
+    "Scales",
     "State",
+    "StateAffine",
     "Sum",
     "Term",
     "TermFn",
