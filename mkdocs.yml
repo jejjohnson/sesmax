@@ -77,4 +77,5 @@ nav:
   - Overview: index.md
   - Capability index: capabilities.md
   - Types and models: core.md
+  - Terms: terms.md
   - Guards: guards.md

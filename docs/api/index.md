@@ -15,6 +15,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | Page | Contents |
 |---|---|
 | [Types and models](core.md) | `State`, `Params`, `PhysConsts`, `Diagnostics`; `positive`, `interval`, `frozen`, `as_parameter`, `trainable_mask`; `Model`, `TermModel` |
+| [Terms](terms.md) | `Term`, `TermFn`, `Sum`, `Scaled`, `Compose`, `explicit`, `implicit`, `partition`, `build_diffrax_terms`, `OperatorTerm` |
 | [Guards](guards.md) | `guard_finite`, `guard_positive`, `guard_ceiling` |
 
 ## Package overview
