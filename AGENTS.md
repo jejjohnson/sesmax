@@ -24,7 +24,7 @@ The public API of each package is its top-level `__all__`, plus its public submo
 ### Boundaries
 
 - **Tiers.** A package imports only packages in a lower tier; `sesmax_core` imports no component and nothing from `somax` (`tests/test_workspace.py` reads the sources and fails otherwise). Two components never import each other: what they share goes into the core, and what couples them goes into the coupler.
-- **Dependencies.** `sesmax-core` has no runtime dependencies until phase C1 adds its base install (JAX, Equinox, diffrax, lineax, finitevolX, spectraldiffx, geonnax, vardax, pipekit). An optional dependency goes behind an extra (`[da]`, `[flows]`, `[xarray]`, `[checkpoint]`) and an in-function import that raises an `ImportError` naming the extra.
+- **Dependencies.** `sesmax-core`'s base install is somax's at 9cb19b3: JAX, jaxtyping, Equinox, diffrax, lineax, optimistix, einops, paramax, finitevolX, spectraldiffx, pipekit (with pipekit-cycle and pipekit-jax) and geonnax; git dependencies are direct references in `packages/sesmax-core/pyproject.toml`, kept in step with the overrides in the root `pyproject.toml`. An optional dependency goes behind an extra (`[da]` for filterax and vardax, `[flows]`, `[xarray]`, `[checkpoint]`) and an import that raises an `ImportError` naming the extra.
 - **Nobody imports sesmax yet.** When other projects build on it, list them here and keep their imports working: a rename or removal of a public name then goes through a deprecation (the old name keeps working with a `DeprecationWarning` that names the replacement for at least one release).
 
 ## What it is built on
@@ -77,6 +77,17 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 
 - Code copied from somax keeps its behaviour. A copy changes only its imports and the renames listed in the design doc (`SomaxModel` → `Model`, `SomaxModelOp` → `ModelOp`, `SomaxDynamics` → `FilteraxDynamics`, `SomaxForwardModel` → `VardaxForwardModel`), and names the somax commit it came from in the commit message.
 - The somax tests that cover a moved module move with it and pass with only the same import and rename changes.
+
+### Moving code from somax
+
+Phase C1 copies somax's core at commit `9cb19b3` (issues #9 to #34). Every moved file is checked against its source with the import rewriter:
+
+```bash
+diff <(git -C ../somax show 9cb19b3:somax/_src/core/types.py | sed -f scripts/somax_imports.sed) \
+     packages/sesmax-core/src/sesmax_core/_src/types.py
+```
+
+The diff may show only the changes allowed above (imports, the four renames, docstrings that say "somax", behaviour-neutral lint or type fixes). The somax tests for the module are copied to the same relative path under `packages/sesmax-core/tests/`. The commit message names the source: `Moved from somax 9cb19b3: somax/_src/core/types.py`.
 
 ### The public API
 
@@ -157,10 +168,12 @@ The markers are registered in `pyproject.toml` (`strict_markers = true`):
 - **`@pytest.mark.integration`:** end-to-end workflows, optional
   dependencies, external tools.
 
-CI ("Tests", `ci.yml`) runs every tier with coverage on Python 3.12 and 3.13
-(`uv run pytest -v`). Select the fast tier with
-`uv run pytest -m "not slow and not integration"`; when the slow tiers grow,
-give them a CI job of their own rather than dropping them.
+Every test whose name starts with `test_grad` is tagged `slow` automatically
+(`packages/sesmax-core/tests/conftest.py`, as in somax). CI ("Tests",
+`ci.yml`) runs the fast tier with coverage on Python 3.12 and 3.13
+(`uv run pytest -v -m "not slow"`); `full-tests.yml` runs every tier on
+demand and weekly. Select the fast tier locally with
+`uv run pytest -m "not slow and not integration"`.
 
 ### Tests that assert on random draws
 
