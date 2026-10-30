@@ -277,3 +277,28 @@ class TestTheDiffusiveSetHasNoGroupsToPreserve:
         """Documented, and pinned so the exclusion is deliberate."""
         scales = self.scales()
         assert scales.nondimensional().rossby != pytest.approx(scales.rossby)
+
+
+class TestNondimensionalNonRotating:
+    """``nondimensional`` of an advective set with ``f0 = 0`` (review on #40).
+
+    The advective set allows ``f0 = 0`` (a non-rotating model), but somax's
+    ``nondimensional`` evaluated the Rossby and Burger numbers, which divide
+    by ``f0``, and raised ``ZeroDivisionError``. It now uses the equivalent
+    ``f0' = f0 L / U`` and ``g' = g H / U**2``.
+    """
+
+    def test_zero_coriolis_gives_unit_scales(self):
+        nd = Scales.advective(L=2.0, U=0.5, f0=0.0, H=4.0).nondimensional()
+        assert (nd.L, nd.U, nd.H, nd.f0, nd.T) == (1.0, 1.0, 1.0, 0.0, 1.0)
+        assert nd.froude == pytest.approx(
+            Scales.advective(L=2.0, U=0.5, f0=0.0, H=4.0).froude, rel=1e-12
+        )
+
+    @pytest.mark.parametrize("f0", [1e-4, -1e-4, 2.5])
+    def test_rotating_sets_keep_their_groups(self, f0):
+        s = Scales.advective(L=1e5, U=0.1, f0=f0, H=500.0)
+        nd = s.nondimensional()
+        for group in ("rossby", "burger", "froude", "lamb"):
+            assert getattr(nd, group) == pytest.approx(getattr(s, group), rel=1e-12)
+        assert nd.eta / nd.H == pytest.approx(s.eta / s.H, rel=1e-12)

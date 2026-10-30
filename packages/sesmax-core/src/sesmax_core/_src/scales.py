@@ -449,12 +449,16 @@ class Scales(eqx.Module):
             A ``Scales`` of the same ``kind`` with unit scales, and
             with the dimensionless groups its family has.
         """
-        burger = self.burger
         if self.kind == "advective":
-            # f0' = 1/Ro is what keeps the Rossby number, so the
-            # gravity that keeps the Burger number scales with it.
-            f0 = 1.0 / self.rossby
-            return Scales.advective(L=1.0, U=1.0, f0=f0, H=1.0, g=burger * f0**2)
+            # f0' = 1/Ro = f0 L / U keeps the Rossby number, and the gravity
+            # that keeps the Burger number is then g' = Bu f0'^2 = g H / U^2.
+            # Written without Ro and Bu, which divide by f0: the advective
+            # set allows f0 = 0 (a non-rotating model).
+            f0 = self.f0 * self.L / self.U
+            return Scales.advective(
+                L=1.0, U=1.0, f0=f0, H=1.0, g=self.g * self.H / self.U**2
+            )
+        burger = self.burger
         if self.kind == "inertial":
             return Scales.inertial(L=1.0, f0=1.0, H=1.0, rossby=self.rossby, g=burger)
         if self.kind == "diffusive":
