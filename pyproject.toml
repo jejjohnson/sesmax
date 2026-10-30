@@ -1,34 +1,28 @@
 [project]
-name = "mypackage"
-version = "0.1.7"
-description = "My short description for my project."
+name = "sesmax-workspace"
+version = "0.0.0"
+description = "sesmax workspace root (not published; the shipped packages are under packages/)."
 authors = [
-    {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
+    {name = "J. Emmanuel Johnson", email = "jemanjohnson34@gmail.com"},
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-keywords = []
 requires-python = ">=3.12"
-classifiers = [
-    "Topic :: Scientific/Engineering",
-    "Topic :: Software Development :: Libraries",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Natural Language :: English",
-    "License :: OSI Approved :: MIT License",
-    "Intended Audience :: Science/Research",
-    "Development Status :: 2 - Pre-Alpha",
-]
+classifiers = ["Private :: Do Not Upload"]
 dependencies = []
 
-[project.urls]
-Repository = "https://github.com/jejjohnson/mypackage"
+[tool.uv.workspace]
+members = ["packages/*"]
 
-[project.scripts]
-mypackage = "mypackage.cli:main"
+[tool.uv.sources]
+sesmax = { workspace = true }
+sesmax-core = { workspace = true }
 
 [dependency-groups]
 dev = [
+    # Workspace members are dev-installed so the tests can import them.
+    "sesmax",
+    "sesmax-core",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pre-commit>=4.6.0",
@@ -67,11 +61,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mypackage"]
+# The workspace root ships no code; the wheels are built from packages/*.
+bypass-selection = true
 
 [tool.ruff]
 target-version = "py312"
 line-length = 88
+# First-party packages, for import sorting.
+src = ["packages/*/src"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
@@ -84,6 +81,7 @@ lines-after-imports = 2
 [tool.ruff.lint.per-file-ignores]
 # Tests deliberately construct invalid inputs and assert on the failure.
 "tests/**" = ["B011"]
+"packages/*/tests/**" = ["B011"]
 
 [tool.ruff.format]
 # Format the code inside ``Examples:`` doctest blocks like real source.
@@ -94,30 +92,41 @@ docstring-code-line-length = 72
 python-version = "3.12"
 
 [tool.pytest.ini_options]
-# `src/mypackage` is a testpath so that --doctest-modules collects the
-# ``Examples:`` blocks in every Google-style docstring. They are executable
-# documentation: if an example in the docs goes stale, CI fails.
-testpaths = ["tests", "src/mypackage"]
+# Each package's tests, the workspace tests (docs build, capability index), and
+# each package's sources, so that --doctest-modules collects the ``Examples:``
+# blocks in every Google-style docstring. They are executable documentation:
+# if an example in the docs goes stale, CI fails.
+testpaths = [
+    "tests",
+    "packages/sesmax-core/tests",
+    "packages/sesmax-core/src/sesmax_core",
+]
 # Test tiers (see "Test tiers" in AGENTS.md). CI runs every tier.
 strict_markers = true
+xfail_strict = true
+filterwarnings = ["error", "ignore::DeprecationWarning"]
 markers = [
     "slow: takes over ~1 s; deselect with -m 'not slow'",
     "integration: end-to-end workflows, optional dependencies, external tools",
 ]
+# importlib mode lets two packages each have a tests/test_public_api.py.
 addopts = """\
+    --import-mode=importlib \
     --doctest-modules \
-    --cov=src/mypackage \
+    --cov=sesmax_core \
+    --cov=sesmax \
     --cov-report=term-missing \
     --cov-report=xml:coverage.xml\
 """
 
 [tool.coverage.run]
-source = ["src/mypackage"]
-omit = ["tests/*"]
+omit = ["tests/*", "packages/*/tests/*"]
 
 [tool.coverage.report]
 show_missing = true
-fail_under = 90
+# Very low to start (SX-6 in docs/design/workspace_and_core.md); raised in
+# follow-ups as the moved code gains tests.
+fail_under = 30
 exclude_also = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",

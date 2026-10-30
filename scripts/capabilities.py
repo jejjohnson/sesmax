@@ -1,10 +1,11 @@
-"""Generate, or check, the capability index: every public name in the package.
+"""Generate, or check, the capability index: every public name in the workspace.
 
-``docs/api/capabilities.md`` lists each public object of the package once, at
-its public home (the top-level package first, then any public submodule that
-exports something the top level does not), grouped by the module that defines
-it, with the first sentence of its docstring. Agents and people search it
-before writing a helper ("Reuse before you write" in ``AGENTS.md``).
+``docs/api/capabilities.md`` lists each public object of the workspace's
+packages once, at its public home (each top-level package first, then any
+public submodule that exports something the top level does not), grouped by
+the module that defines it, with the first sentence of its docstring.
+Agents and people search it before writing a helper ("Reuse before you
+write" in ``AGENTS.md``).
 
 Usage::
 
@@ -14,9 +15,9 @@ Usage::
 ``tests/test_capabilities.py`` runs the check, so a public API change that
 skips ``make capabilities`` fails the test suite.
 
-The script needs no editing when the template is adopted: the import package
-is read from ``pyproject.toml`` and the public submodules are discovered. Two
-settings are yours to fill in:
+The script needs no editing when a package joins the workspace: the import
+packages are read from each ``packages/*/pyproject.toml`` and the public
+submodules are discovered. Two settings are yours to fill in:
 
 - ``UPSTREAM``: libraries this package builds on whose public API belongs in
   the index too (so nobody re-implements them here). Empty by default. Their
@@ -47,12 +48,12 @@ ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "docs" / "api" / "capabilities.md"
 
 
-def _package_name() -> str:
+def _import_name(pyproject: Path) -> str:
     """The import package, as the wheel build declares it in ``pyproject.toml``.
 
     Falls back to the distribution name with dashes turned into underscores.
     """
-    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
     wheel = data.get("tool", {}).get("hatch", {}).get("build", {})
     packages = wheel.get("targets", {}).get("wheel", {}).get("packages", [])
     if packages:
@@ -60,11 +61,17 @@ def _package_name() -> str:
     return data["project"]["name"].replace("-", "_")
 
 
-PACKAGE = _package_name()
+# The workspace's import packages, in order. The code-free umbrella ``sesmax``
+# exports nothing, so it is left out.
+PACKAGES: list[str] = sorted(
+    name
+    for name in map(_import_name, sorted(ROOT.glob("packages/*/pyproject.toml")))
+    if name != "sesmax"
+)
 
 # Libraries the package builds on, as {distribution: [public modules]}, with a
 # one-paragraph blurb each, e.g. {"numpy": ["numpy"]}.
-# template-example: empty because the example package is dependency-free.
+# Empty until sesmax-core has code and dependencies (phase C1).
 UPSTREAM: dict[str, list[str]] = {}
 UPSTREAM_BLURB: dict[str, str] = {}
 
@@ -143,14 +150,17 @@ def _module_title(name: str) -> str:
 
 
 def public_modules() -> list[str]:
-    """The package, then every submodule with no ``_``-prefixed path component."""
-    package = importlib.import_module(PACKAGE)
-    found = [
-        info.name
-        for info in pkgutil.walk_packages(package.__path__, prefix=f"{PACKAGE}.")
-        if not any(part.startswith("_") for part in info.name.split("."))
-    ]
-    return [PACKAGE, *sorted(found)]
+    """Each package, then its submodules with no ``_``-prefixed path component."""
+    modules: list[str] = []
+    for name in PACKAGES:
+        package = importlib.import_module(name)
+        found = [
+            info.name
+            for info in pkgutil.walk_packages(package.__path__, prefix=f"{name}.")
+            if not any(part.startswith("_") for part in info.name.split("."))
+        ]
+        modules += [name, *sorted(found)]
+    return modules
 
 
 def collect() -> tuple[dict[str, list[tuple]], list[str]]:
@@ -171,7 +181,12 @@ def collect() -> tuple[dict[str, list[tuple]], list[str]]:
                 continue
             seen.add(id(obj))
             index[module_name].append(
-                (name, _kind(obj), _summary(obj, home=PACKAGE), _origin(obj))
+                (
+                    name,
+                    _kind(obj),
+                    _summary(obj, home=module_name.split(".")[0]),
+                    _origin(obj),
+                )
             )
     clashes = []
     for name, homes in sorted(owners.items()):
@@ -212,7 +227,7 @@ def _package_part() -> tuple[list[str], int]:
         groups: dict[str, list[tuple]] = defaultdict(list)
         for row in rows:
             origin = row[3]
-            local = origin.split(".")[0] == PACKAGE
+            local = origin.split(".")[0] == module_name.split(".")[0]
             groups[origin if local else "re-exported"].append(row)
         if len(groups) == 1:
             out += _table(sorted(rows))
@@ -257,13 +272,16 @@ def render() -> str:
         "",
         "<!-- Generated by scripts/capabilities.py — do not edit by hand. -->",
         "",
-        f"Every public name in `{PACKAGE}` ({total} of them), each listed once at",
-        "its public home and grouped by the module that defines it, with the",
-        f"first sentence of its docstring{upstream}. Search this page before",
-        "writing a helper: if what you need is here, compose it; if it is almost",
-        "here, extend it where it lives. Regenerate with `make capabilities`",
-        "after changing a public API (`tests/test_capabilities.py` checks it is",
-        "current).",
+        (
+            f"Every public name in {', '.join(f'`{p}`' for p in PACKAGES)}"
+            f" ({total} of them), each listed once at its public home and"
+            " grouped by the module that defines it, with the first sentence of"
+            f" its docstring{upstream}. Search this page before writing a"
+            " helper: if what you need is here, compose it; if it is almost"
+            " here, extend it where it lives. Regenerate with"
+            " `make capabilities` after changing a public API"
+            " (`tests/test_capabilities.py` checks it is current)."
+        ),
         "",
         *package_part,
     ]

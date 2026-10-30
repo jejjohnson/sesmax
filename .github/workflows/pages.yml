@@ -35,7 +35,7 @@ jobs:
         run: npm install -g mystmd
 
       - name: Install docs dependencies
-        run: uv sync --group docs
+        run: uv sync --all-packages --group docs
 
       # BASE_URL is the project-pages subpath. mystmd prepends it to its own
       # links, and scripts/build_docs.py uses it when rewriting the API

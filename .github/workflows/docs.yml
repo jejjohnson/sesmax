@@ -27,7 +27,7 @@ jobs:
         run: npm install -g mystmd
 
       - name: Install docs dependencies
-        run: uv sync --group docs
+        run: uv sync --all-packages --group docs
 
       # Builds both halves, assembles them into public/, repairs the
       # cross-generator references, and fails if any internal link — in either

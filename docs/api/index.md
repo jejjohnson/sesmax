@@ -1,32 +1,18 @@
 # API Reference
 
-Everything listed in `mypackage.__all__` is importable from the top level:
+Each workspace package is imported by its own name. Everything listed in a package's `__all__` is importable from its top level:
 
 ```python
-import mypackage as mp
-
-mp.summarize(...)  # same object as mypackage.stats.summarize
+import sesmax_core
 ```
 
-The submodules below are an implementation detail you are welcome to reach
-into, but never have to. The [capability index](capabilities.md) lists every
-public name on one page, with a one-line summary each.
+The [capability index](capabilities.md) lists every public name on one page, with a one-line summary each.
 
-## Modules
-
-| Module | Contents |
-|---|---|
-| [Statistics](stats.md) | `summarize`, `Summary`, `quantile`, `zscores`, `RunningStats` |
-| [Smoothing](smoothing.md) | `moving_average`, `exponential_moving_average`, `median_filter`, `Padding` |
-| [Transforms](transforms.md) | `Standardize`, `MinMaxScale`, `Clip`, `MovingAverage`, `Pipeline`, `chain` |
-| [Utilities](utils.md) | `as_floats`, `require_non_empty`, `require_positive`, `Window`, `timer` |
-| [Protocols](typing.md) | `Series`, `Transform`, `Fittable` |
-| [Exceptions](exceptions.md) | `MypackageError`, `ValidationError`, `EmptySeriesError`, `NotFittedError` |
-| [CLI](cli.md) | `main`, `build_parser` |
+`sesmax_core` is empty until phase C1 of the workspace and core design, which moves the core machinery from somax; each public module then gets its own page here.
 
 ## Package overview
 
-::: mypackage
+::: sesmax_core
     options:
       members: false
       show_root_heading: false

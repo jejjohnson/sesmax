@@ -1,6 +1,6 @@
 ---
 name: reuse-reviewer
-description: Read-only reviewer that checks a diff for re-implemented functionality — new helpers, validators, statistics, filters, padding rules, buffers, transforms, pipeline logic, exceptions or CLI parsing that duplicate a public name in docs/api/capabilities.md or a shared private helper listed in AGENTS.md. Use proactively on any change that adds functions, classes or modules, before committing or during code review.
+description: Read-only reviewer that checks a diff for re-implemented functionality — stencils, solvers, steppers, bases, linear algebra or pytree plumbing that duplicate a public name in docs/api/capabilities.md, an upstream library of the stack, or a shared private helper listed in AGENTS.md. Use proactively on any change that adds functions, classes or modules, before committing or during code review.
 tools: Read, Grep, Glob, Bash
 ---
 
@@ -25,29 +25,17 @@ in `AGENTS.md`.
      `scripts/capabilities.py` lists any);
    - the private helpers in the "Reuse before you write" table of
      `AGENTS.md`;
-   - a grep of `src/` for the key operation (`fsum`, `sorted(`, `deque(`,
-     `float(`, the error-message text).
+   - a grep of `packages/*/src/` for the key operation or formula.
 3. Also flag, wherever they appear in the diff:
-   <!-- template-example: these are the example package's usual re-implementations; replace them with your package's. -->
-   - hand-written coercion or validation (`[float(v) for v in series]`,
-     `if not series`, `if window <= 0`, an `isinstance(x, int)` check) →
-     `as_floats`, `require_non_empty`, `require_positive`;
-   - a mean, variance, standard deviation, quantile, median or z-score →
-     `summarize` / `Summary`, `quantile`, `zscores`, `RunningStats`;
-   - a rolling mean or median, an exponential smoother, end padding or
-     reflection → `moving_average`, `median_filter`,
-     `exponential_moving_average`, `Padding` and `smoothing._pad`;
-   - a `deque(maxlen=…)` buffer → `Window`;
-   - standardising, min–max scaling, clamping, or a loop applying steps in
-     order → `Standardize`, `MinMaxScale`, `Clip`, `Pipeline` / `chain`;
-   - a base class or registry for transforms → the structural `Transform`
-     protocol;
-   - a new exception class for invalid input or a missing `fit` →
-     `ValidationError`, `EmptySeriesError`, `NotFittedError`;
-   - number parsing or stream handling in the CLI → `cli._read_values`, the
-     `run`-style injected streams of `main`;
-   - a public name that duplicates another public name for a different
-     object (`tests/test_capabilities.py` will fail on it).
+   - a finite-difference stencil, a C-grid interpolation, a vorticity, divergence or kinetic-energy formula → finitevolX;
+   - a spectral derivative or a Helmholtz / Poisson solve → spectraldiffx;
+   - a hand-written time-stepping loop or Runge–Kutta scheme → diffrax (and the core's steppers once they exist);
+   - `jnp.linalg.inv`, `solve` or a Cholesky on a covariance → lineax or gaussx;
+   - a basis (RBF, Fourier, wavelet, EOF) built by hand → vardax's bases;
+   - flattening a state pytree to a vector by hand → `jax.flatten_util.ravel_pytree` (and the core's DA adapters once they exist);
+   - a public name that duplicates another public name for a different object (`tests/test_capabilities.py` will fail on it).
+
+   This list grows with the code: when sesmax-core receives somax's machinery (phase C1 of `docs/design/workspace_and_core.md`), its usual re-implementations join it.
 
 ## Report
 

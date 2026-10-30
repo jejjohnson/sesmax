@@ -56,10 +56,10 @@ create "area:code"        "c2e0c6" "Source-code changes (catch-all fallback)"
 echo "Creating Dependabot / misc labels..."
 create "dependencies" "ededed" "Pull requests that update a dependency file"
 
-echo "Creating layer:* labels (edit to match your project's layer stack)..."
-create "layer:0-primitives" "fef2c0" "Layer 0 — pure primitives"
-create "layer:1-components" "fbca04" "Layer 1 — components / services"
-create "layer:2-models"     "d4c5f9" "Layer 2 — public API / wrappers"
+echo "Creating layer:* labels (the workspace tiers)..."
+create "layer:0-core"       "fef2c0" "Tier 0 — sesmax-core"
+create "layer:1-components" "fbca04" "Tier 1 — a component (ocean, atmosphere, land, ice)"
+create "layer:2-coupler"    "d4c5f9" "Tier 2 — the coupler"
 
 echo "Creating wave:* labels (edit to match your release plan)..."
 # Plain `wave:N` scheme — simple and matches the label format referenced in

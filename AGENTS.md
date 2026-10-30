@@ -4,81 +4,43 @@ Standing instructions for **every** coding agent working in this repository
 (Claude Code, Copilot, Codex, Gemini, …). This is the single source of truth:
 `CLAUDE.md` and `.github/copilot-instructions.md` point here.
 
-> **This repository is a template.** Passages that describe the bundled
-> example package, `mypackage`, start with a `<!-- template-example: … -->`
-> comment (`# template-example: …` in code and config). Each marker covers
-> the section it opens, down to the next heading of the same level, unless
-> it names a smaller scope. Marked passages are true of the example and must
-> be rewritten from your own code when you adopt the template (the
-> `adopt-template` skill walks through it; `grep -rn "template-example" .`
-> lists them). Everything unmarked is a permanent rule.
-
 ## What this repo is
 
-<!-- template-example: describe your package and its module map. -->
+sesmax ("simple Earth-system models in JAX") is a uv workspace of packages whose models are cheap, differentiable forward models to use as priors in short-window data assimilation (a window of hours to weeks). The plan, the phases and what moves here from [somax](https://github.com/jejjohnson/somax) are in [`docs/design/workspace_and_core.md`](docs/design/workspace_and_core.md); read it before changing the layout.
 
-An opinionated Python package template (Python 3.12+, uv, ruff, ty, pytest,
-mystmd and MkDocs, release-please) that ships a real worked example,
-`mypackage`: a **dependency-free** library of descriptive statistics,
-smoothing filters and composable transforms over one-dimensional numeric
-series, with an `argparse` console script. It exists so every tool here has
-real code to operate on: mkdocstrings renders its docstrings, ty checks its
-annotations, the coverage gate measures its branches, and every docstring
-example runs as a doctest.
+People build on the core, so **the core is a library of primitives**: new code composes what is here, and anything genuinely new lands where the next person will find and reuse it.
 
-People build on a package like this, so **the package is a library of
-primitives**: new code composes what is here, and anything genuinely new
-lands where the next person will find and reuse it.
+Each distribution lives in `packages/<dist>/` with its own `pyproject.toml`, `src/<import>/`, tests, README and CHANGELOG. The workspace root (`sesmax-workspace`) is never published. Imports only point down the tiers:
 
-It is one package, `src/mypackage/`. The public API is
-`mypackage.__all__`, re-exported from `src/mypackage/__init__.py`, plus the
-`mypackage.cli` module (`main`, `build_parser`). Imports only point down
-this table:
+| Tier | Distribution | Import | Holds | Status |
+|---|---|---|---|---|
+| — | `sesmax` | `sesmax` | code-free umbrella that installs the packages | scaffolded |
+| 2 | `sesmax-couple` | `sesmax_couple` | flux exchange, regridding, coupled runs | later |
+| 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, ocean diagnostics, scenarios | phase C2 |
+| 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing, DA adapters, monitors, I/O | empty until phase C1 |
 
-| Module | Owns |
-|---|---|
-| `_typing.py` | PEP 695 `type Series = Sequence[float]`; the runtime-checkable `Transform` and `Fittable` protocols |
-| `exceptions.py` | `MypackageError` and its subclasses `ValidationError` (also a `ValueError`), `EmptySeriesError`, `NotFittedError` (also a `RuntimeError`) |
-| `utils.py` | The boundary validators `as_floats`, `require_non_empty`, `require_positive`; the generic `Window[T]` ring buffer; `timer` / `Elapsed` |
-| `stats.py` | `summarize` → frozen `Summary`, `quantile`, `zscores`, streaming `RunningStats` (Welford) |
-| `smoothing.py` | `moving_average`, `exponential_moving_average`, `median_filter`, the `Padding` boundary strategies |
-| `transforms.py` | `Standardize`, `MinMaxScale` (fitted), `Clip`, `MovingAverage` (stateless), `Pipeline`, `chain` |
-| `cli.py` | The `mypackage` console script (`summarize`, `smooth` subcommands), wired through `[project.scripts]` |
+The public API of each package is its top-level `__all__`, plus its public submodules.
 
 ### Boundaries
 
-<!-- template-example: this list only; replace it with your runtime dependencies, who builds on the package, and what it must never import. -->
-
-- **No runtime dependencies** (`dependencies = []` in `pyproject.toml`):
-  everything is the standard library. A new runtime dependency needs
-  discussion; an optional one goes behind an extra and an in-function import
-  that names the extra when it is missing.
-- **The CLI is a thin shell.** `cli.py` parses arguments and formats output;
-  the computation lives in the library modules, which never import `cli`.
-
-Whatever the package, dependencies point one way. When other projects build
-on it, list them here and keep their imports working: a rename or removal of
-a public name goes through a deprecation (the old name keeps working with a
-`DeprecationWarning` that names the replacement for at least one release).
+- **Tiers.** A package imports only packages in a lower tier; `sesmax_core` imports no component and nothing from `somax` (`tests/test_workspace.py` reads the sources and fails otherwise). Two components never import each other: what they share goes into the core, and what couples them goes into the coupler.
+- **Dependencies.** `sesmax-core` has no runtime dependencies until phase C1 adds its base install (JAX, Equinox, diffrax, lineax, finitevolX, spectraldiffx, geonnax, vardax, pipekit). An optional dependency goes behind an extra (`[da]`, `[flows]`, `[xarray]`, `[checkpoint]`) and an in-function import that raises an `ImportError` naming the extra.
+- **Nobody imports sesmax yet.** When other projects build on it, list them here and keep their imports working: a rename or removal of a public name then goes through a deprecation (the old name keeps working with a `DeprecationWarning` that names the replacement for at least one release).
 
 ## What it is built on
 
-<!-- template-example: one row per library your package uses, with the rule it brings. -->
+Each foundation brings a rule. Breaking one runs fine on your example and fails in someone else's pipeline or in CI.
 
-Each foundation brings a rule. Breaking one runs fine on your example and
-fails in someone else's pipeline or in CI.
-
-| Foundation | The package uses it for | The rule it brings |
+| Foundation | Used for | The rule it brings |
 |---|---|---|
-| **Python ≥ 3.12 standard library** | PEP 695 `type` aliases and generics (`class Window[T]`), `typing.Self`, `enum.StrEnum`, `math.fsum`, `statistics.median` | No runtime dependency for what the standard library already does. |
-| **`dataclasses`** | `Summary`, every transform, `RunningStats`, `Elapsed` | `slots=True` always; `frozen=True` for values and stateless objects; a fitted transform keeps what it learned in `init=False` fields with a trailing underscore (`mean_`) defaulting to `None`; validation in `__post_init__`. |
-| **`typing.Protocol`** (`runtime_checkable`) | `Transform`, `Fittable` | Structural, not nominal: no base class, no registry. `isinstance` only checks that the attribute exists, so code that relies on a protocol also checks the attribute is callable (as `Pipeline.__post_init__` does). |
-| **`argparse`** | `mypackage.cli` | Output goes to the injected streams, `main` returns an exit status instead of calling `sys.exit`. |
-| **pytest + `--doctest-modules`** | The suite and every docstring `Examples:` block | An example's expected output is what the code prints; a stale example is a failing test. |
+| **uv workspace** | one lock file and one environment for every package | `make install` (`uv sync --all-packages --all-groups`); a new package is a directory under `packages/`, a `[tool.uv.sources]` entry and a `dev` group entry in the root `pyproject.toml`, and a release-please entry. |
+| **JAX and Equinox** (from phase C1) | every model, term and step | A step is a pure function of state, parameters and forcing that `jit`, `grad` and `vmap` go through; models and states are `eqx.Module`s; shapes and flags are static fields, physical parameters are leaves. |
+| **The stack** (finitevolX, spectraldiffx, diffrax, lineax, gaussx, vardax, filterax) | stencils, spectral solves, time stepping, linear algebra, bases, assimilation | Compose them; never re-implement a stencil, a solver or a basis here. |
+| **pytest + `--doctest-modules`** | the suites and every docstring `Examples:` block | An example's expected output is what the code prints; a stale example is a failing test. |
 
 ## Reuse before you write
 
-Before writing a helper, a validator, a statistic, a filter or a transform,
+Before writing a helper, a stencil, a solver, a basis or a model building block,
 find out whether it exists:
 
 1. **Search the capability index.**
@@ -86,166 +48,75 @@ find out whether it exists:
    public name once, at its public home, grouped by the module that defines
    it, with a one-line summary. It is generated (`make capabilities`) and
    checked by `tests/test_capabilities.py`, so it is current.
-2. **Search the private helpers** in the table below: several invariants
-   live in exactly one place each.
+2. **Search the stack** in the table below: the upstream libraries already
+   own most numerical building blocks.
 3. **If it is missing, add it to the module that owns the concept**, at the
    lowest layer every caller can reach, not inline in the one caller you
-   have today; a helper two modules need goes into `utils.py`.
+   have today; a helper two components need goes into `sesmax-core`.
 4. **One object, one name.** A name means one thing across the package and
    its submodules (`tests/test_capabilities.py`); a deliberate exception is
    listed with its reason in `ALLOWED_SHARED_NAMES` in
    `scripts/capabilities.py`.
 
-<!-- template-example: this table maps hand-rolled code to the example's names; rebuild it for your package. -->
-
 | You are about to write… | Use instead |
 |---|---|
-| `[float(v) for v in series]`, an emptiness check, an `if window <= 0` guard | `as_floats`, `require_non_empty`, `require_positive` (`mypackage.utils`); they raise `ValidationError` / `EmptySeriesError` with the uniform `'name' must …` message |
-| A mean, variance, min / max or median loop | `summarize` (→ `Summary`, with `std`, `spread`, `to_dict()`); `quantile`; `zscores`; one value at a time, `RunningStats` |
-| `math.fsum(values) / len(values)` that must survive overflow | `stats._mean` (rescales by a power of two when the sum overflows) |
-| A rolling mean, rolling median or exponential smoother | `moving_average`, `median_filter`, `exponential_moving_average` |
-| Padding a series at its ends | the `Padding` strategies (`edge`, `zero`, `reflect`, `none`) through `smoothing._pad`, `_reflect_index`; `_validate_window`, `_as_padding` for the arguments |
-| A `collections.deque(maxlen=…)` buffer | `Window[T]` |
-| `(x - mean) / std`, min–max scaling, clamping | `Standardize` (with `inverse`), `MinMaxScale`, `Clip` |
-| A list of steps applied in order, a base class for "things with `apply`" | `Pipeline`, `chain`, a pipeline composed with the `or` operator (`Pipeline.__or__`); satisfy the `Transform` protocol structurally |
-| A new exception for bad input or a missing `fit` | `ValidationError`, `EmptySeriesError`, `NotFittedError` |
-| `time.perf_counter()` bookkeeping | `timer()` → `Elapsed` |
-| Reading numbers from a file or stdin for the CLI, a non-negative-int option | `cli._read_values` (finite values only), `cli._non_negative_int` |
+| A finite-difference stencil, a C-grid interpolation, a vorticity, divergence or kinetic-energy formula | finitevolX |
+| A spectral derivative, a Helmholtz or Poisson solve | spectraldiffx |
+| A time-stepping loop or a Runge–Kutta scheme | diffrax (and the core's steppers from phase C1) |
+| `jnp.linalg.inv`, `solve` or a Cholesky on a covariance | lineax, gaussx |
+| An RBF, Fourier, wavelet or EOF basis | vardax's bases |
+| Flattening a state pytree into a vector | `jax.flatten_util.ravel_pytree` (and the core's DA adapters from phase C1) |
+
+This table grows with the code: phase C1 adds the core's own names.
 
 ## The contracts
 
-<!-- template-example: the contracts below are the example's extension points; replace them with your package's. -->
+Everything composes because it keeps these contracts; the tests in "What enforces them" check most of them. The contracts for models, terms, forcing and the DA adapters arrive with the code in phase C1, written from what somax already does.
 
-Everything composes because it keeps these contracts; the tests in "What
-enforces them" check most of them.
+### Migrated code
 
-### 1. Public functions
-
-- **Validate once, at the boundary.** A public function coerces and checks
-  its inputs through the `utils` validators (`require_non_empty(series)`,
-  `require_positive(window, name="window")`) and raises `ValidationError`
-  (or `EmptySeriesError`) whose message names the argument:
-  `'window' must be a positive integer, got 0`. Internal helpers assume
-  well-formed data.
-- **Pure.** Return a **new** `list[float]` and never mutate the input (the
-  `SMOOTHERS` tests in `tests/test_smoothing.py`, `test_does_not_mutate_input`
-  in the stats and transforms tests). Any `collections.abc.Sequence` of
-  numbers is accepted (`Series`).
-- **Honest numerics.** `math.fsum` for sums; an overflow becomes `inf`, not an
-  exception, when the true result is not representable (see `summarize`);
-  degenerate input (a constant series to standardise, `ddof` ≥ the count)
-  raises `ValidationError` rather than returning `nan`.
-- **Documented.** Google-style docstring with the formula (`$…$` / `$$…$$`,
-  rendered by MathJax in the API reference), `Args:`, `Returns:`, `Raises:`
-  and an executable `Examples:` block.
-
-### 2. Transforms
-
-- A transform satisfies `Transform`: `apply(series) -> list[float]`,
-  returning a new list. No base class.
-- **Stateless** (`Clip`, `MovingAverage`): `@dataclass(frozen=True,
-  slots=True)`; `fit` returns `self` unchanged; `fit_apply` is `apply`.
-- **Fitted** (`Standardize`, `MinMaxScale`): `@dataclass(slots=True)`;
-  learned state in `init=False` trailing-underscore fields defaulting to
-  `None`; `fit(series)` validates, sets them and returns `self` (so it
-  chains); `apply` before `fit` raises `NotFittedError("<Name> is not
-  fitted; call .fit(series) first")`, never a silent identity; `fit_apply`
-  is `fit(series).apply(series)`.
-- Constructor arguments that can be checked without data are validated in
-  `__post_init__` (`ValidationError`), as `MinMaxScale`, `Clip` and
-  `MovingAverage` do; the rest are checked by `fit`.
-- `Pipeline` fits each step on the previous step's output, calls `fit` only
-  when the step has a callable one, and rejects a step without a callable
-  `apply`; `|` returns a new pipeline.
-
-### 3. The CLI
-
-- A subcommand is a subparser in `build_parser()` plus a
-  `_run_<name>(args, out, stdin) -> int` handler registered in the
-  `handlers` dict in `main`.
-- Write only to the injected `out` stream; read numbers through
-  `_read_values`; validate options with an `argparse` `type=` (as
-  `_non_negative_int` does), so a bad option is a usage error (exit 2).
-- Library errors propagate as `MypackageError`, which `main` reports as
-  `error: …` on `err` with exit status 1 (`EXIT_ERROR`); `OSError` likewise.
-  Never call `sys.exit` or `print` in a handler.
-
-### 4. Exceptions
-
-- Every error derives from `MypackageError` **and** the closest
-  standard-library exception, so `except ValueError` keeps working. A new
-  error goes into `exceptions.py`, is exported, and joins the parametrised
-  lists in `tests/test_exceptions.py`.
+- Code copied from somax keeps its behaviour. A copy changes only its imports and the renames listed in the design doc (`SomaxModel` → `Model`, `SomaxModelOp` → `ModelOp`, `SomaxDynamics` → `FilteraxDynamics`, `SomaxForwardModel` → `VardaxForwardModel`), and names the somax commit it came from in the commit message.
+- The somax tests that cover a moved module move with it and pass with only the same import and rename changes.
 
 ### The public API
 
-- Export a public name from its module's `__all__` and from
-  `src/mypackage/__init__.py` (import and `__all__`); both stay sorted (ruff's
-  `RUF022` and `test_all_is_sorted_and_unique` agree on the order).
-- A new module declares a sorted `__all__`, joins `SUBMODULES` in
-  `tests/test_public_api.py`, and gets its own page in `docs/api/` (a
-  `::: mypackage.<module>` block), a `nav` entry in `mkdocs.yml` and a row in
-  `docs/api/index.md`; a name on an existing module's page is picked up by
-  its `:::` block.
+- Export a public name from its module's `__all__` and from the package's `__init__.py` (import and `__all__`); both stay sorted (ruff's `RUF022` and `test_all_is_sorted_and_unique` agree on the order).
+- A new public module declares a sorted `__all__`, joins `SUBMODULES` in its package's `tests/test_public_api.py`, and gets its own page in `docs/api/` (a `::: sesmax_core.<module>` block), a `nav` entry in `mkdocs.yml` and a row in `docs/api/index.md`.
 - Run `make capabilities` after any public API change.
-- Link prose to the API by the **top-level** name
-  (``[`summarize`](xref:api#mypackage.summarize)``), see "Documentation".
+- Link prose to the API by the **top-level** name (``[`Name`](xref:api#sesmax_core.Name)``), see "Documentation".
 
 ## What enforces them
 
-Most rules here are tests, so CI tells you when one breaks. Read a test's
-docstring before changing what it checks.
-
-<!-- template-example: the test files and registries are the example's; list your own. -->
+Most rules here are tests, so CI tells you when one breaks. Read a test's docstring before changing what it checks.
 
 | Test | Enforces |
 |---|---|
-| `tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of modules; every submodule declares a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
+| `packages/*/tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of public modules; every submodule declares a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
+| `tests/test_workspace.py` | The tiers (the core imports no component and nothing from somax); the umbrella holds no code; each `__version__` matches its `pyproject.toml` |
 | `tests/test_capabilities.py` | `docs/api/capabilities.md` is current; no name is bound to two different objects |
-| `--doctest-modules` on `src/mypackage` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
-| `tests/test_smoothing.py` (`SMOOTHERS`) | Smoothers never mutate their input, return a new list, leave constants unchanged |
-| `tests/test_transforms.py` (`TestProtocols`, `TestPipeline`) | Every transform satisfies `Transform` (fitted ones `Fittable`); `NotFittedError` before `fit`; sequential fitting; no mutation |
-| `tests/test_exceptions.py` | The hierarchy: every error is a `MypackageError` and its stdlib base |
-| `tests/test_cli.py` | Injected streams, exit codes 0 / 1 / 2, finite-only input, the `[project.scripts]` entry point |
 | `tests/test_build_docs.py` | The two-tool docs pipeline: inventory parsing, anchor repair, link checking, the inventory port and the absolute nav URL in `docs/myst.yml`, the files copied to the site root (`ROOT_FILES`) |
-| `tests/test_plugin_skill.py` | The downstream plugin's worked example runs and its quoted numbers hold; every name the plugin skill and reviewer mention exists |
-| `[tool.coverage.report] fail_under = 90` | Coverage of `src/mypackage` in every coverage-enabled run (CI, `make test-cov`) |
+| The `bare-install` job in `ci.yml` | Each package installs and imports alone, with no workspace around it |
+| `--doctest-modules` on each package's sources (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
+| `filterwarnings = ["error", …]` | A warning in a test is a failure (deprecation warnings excepted) |
+| `[tool.coverage.report] fail_under = 30` | Coverage of the packages in every coverage-enabled run (CI, `make test-cov`); deliberately low to start, raised as the moved code gains tests |
 | `strict_markers = true` | Only the registered tier markers (`slow`, `integration`) exist |
-| ruff (`select = E, F, I, UP, B, SIM, RUF`), ty | Lint (the whole repo, notebook code cells included), format, types on `src/mypackage` and `scripts` |
+| ruff (`select = E, F, I, UP, B, SIM, RUF`), ty | Lint (the whole repo, notebook code cells included), format, types on `packages/*/src` and `scripts` |
 
 ## Recipes
 
-Step-by-step recipes for the common jobs live as plain Markdown in
-`.claude/skills/<name>/SKILL.md` (Claude Code loads them automatically; any
-agent can read and follow them), and two read-only review checklists in
-`.claude/agents/`:
-
-<!-- template-example: this table only; `add-function`, `add-transform`, `add-cli-command` and `mypackage-review` are the example package's, replace them with your extension points. -->
+Step-by-step recipes for the common jobs live as plain Markdown in `.claude/skills/<name>/SKILL.md` (Claude Code loads them automatically; any agent can read and follow them), and two read-only review checklists in `.claude/agents/`:
 
 | Job | Recipe |
 |---|---|
-| Turn a fresh copy of the template into your project | `adopt-template` |
-| Add a public function, class or module | `add-function` |
-| Add a transform (the `Transform` protocol) | `add-transform` |
-| Add a CLI subcommand or option | `add-cli-command` |
+| Finish adopting the template (the agent files and extension-point skills, in phase C1) | `adopt-template` |
 | Add or update a guide page (MyST prose) | `add-guide-page` |
 | Add or update an example notebook | `add-notebook` |
 | Verify before a PR | `pre-pr-check` |
-| Review a change | `mypackage-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `correctness-reviewer.md`) |
+| Review a change | `sesmax-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `correctness-reviewer.md`) |
 | Write a squash commit message | `squash-commit` |
 | Open or link GitHub issues | `create-gh-issue`, `link-gh-issues` (templates in `.github/ISSUE_TEMPLATE/`; `make gh-labels`, `gh-sub`, `gh-block`, `gh-show`) |
 
-<!-- template-example: this paragraph only; the plugin describes the example package. -->
-
-Downstream users get the package's guidance through the Claude Code plugin
-in `plugins/mypackage/` (published by `.claude-plugin/marketplace.json`) and
-`docs/llms.txt` (copied to the site root by `ROOT_FILES` in
-`scripts/build_docs.py`); see `docs/agents.md`. When the public API or the
-headline usage changes, update
-`plugins/mypackage/skills/series-analysis-with-mypackage/` too:
-`tests/test_plugin_skill.py` runs its worked example, checks the numbers its
-prose quotes, and checks that every `mp.X` / `mypackage.X` it and the plugin
-reviewer name still exists.
+Phase C1 adds one recipe per extension point of the core (`add-term`, `add-forcing-basis`, `add-monitor`, `add-da-adapter`).
 
 ## Working in the repo
 
@@ -253,26 +124,26 @@ Always run Python tools through `uv run` (never the system Python); `git`,
 `ls` and other non-Python commands need no `uv run`.
 
 ```bash
-make install              # uv sync --all-groups + pre-commit hooks
+make install              # uv sync --all-packages --all-groups + pre-commit hooks
 make test                 # every test + doctests, no coverage (fast)
-make test-cov             # the same with coverage and the 90 % gate (what CI runs)
+make test-cov             # the same with coverage and its gate (what CI runs)
 make lint                 # ruff check .   (entire repo)
 make format               # ruff format . && ruff check --fix .
-make typecheck            # ty check src/mypackage scripts (what CI runs)
+make typecheck            # ty check packages/*/src scripts (what CI runs)
 make capabilities         # regenerate docs/api/capabilities.md
 make docs                 # build both docs halves into public/ and check every link
 make docs-check           # strict validation of both halves, no themed render
 make docs-api             # MkDocs API reference only (mkdocs build --strict)
 make docs-serve           # build, then serve public/ at :8000
 make precommit            # every pre-commit hook on every file
-make build                # wheel + sdist into dist/
+make build                # a wheel + sdist per package into dist/
 ```
 
-`addopts` turns coverage on, and a partial run never reaches the 90 % gate,
+`addopts` turns coverage on, and a partial run may not reach the coverage gate,
 so pass `--no-cov` when running part of the suite:
 
 ```bash
-uv run pytest --no-cov tests/test_stats.py::TestSummarize::test_known_values -v
+uv run pytest --no-cov tests/test_workspace.py -v
 ```
 
 ### Test tiers
@@ -293,10 +164,7 @@ give them a CI job of their own rather than dropping them.
 
 ### Tests that assert on random draws
 
-<!-- template-example: this paragraph only. The example draws no random numbers; its tests use fixed fixtures in tests/conftest.py. -->
-
-`mypackage` draws no random numbers; its tests use the fixed series in
-`tests/conftest.py`.
+The workspace draws no random numbers yet. Models, ensembles and DA tests will:
 
 - **Incidental randomness** (any draw would do): seed it
   (`random.Random(0)`, `numpy.random.default_rng(0)`, a fixed key) so a
@@ -313,10 +181,10 @@ All of these must pass, from the repo root:
 1. `make test`: zero failures (doctests included).
 2. `uv run --group lint ruff check .`: the **entire** repo, which includes
    `tests/`, `scripts/` and the code cells of `docs/notebooks/*.ipynb`.
-   Never lint a subdirectory: `ruff check src/mypackage/` misses errors CI
+   Never lint a subdirectory: `ruff check packages/sesmax-core/` misses errors CI
    catches.
 3. `uv run --group lint ruff format --check .`
-4. `make typecheck` (`ty check src/mypackage scripts`, as CI runs it).
+4. `make typecheck` (`ty check packages/*/src scripts`, as CI runs it).
 5. After changing a public API: `make capabilities`, and the `docs/api`
    page.
 6. After changing docs, docstrings, `mkdocs.yml` or `docs/myst.yml`:
@@ -354,13 +222,17 @@ the code; when you fix a bug or add a feature, add the test that checks it.
   affects a shared branch.
 - Commit messages and PR titles follow
   [Conventional Commits](https://www.conventionalcommits.org/) with a
-  lowercase subject (`feat(stats): add …`); CI validates PR titles
+  lowercase subject (`feat(core): add …`); CI validates PR titles
   (`conventional-commits.yml`). Types: `feat`, `fix`, `docs`, `style`,
   `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Breaking
   changes use `!` and a `BREAKING CHANGE:` footer.
-- Releases are cut by release-please (`release-please-config.json`): it
-  bumps the version and writes `CHANGELOG.md` from the `feat`, `fix`,
-  `perf` and `revert` commits; don't bump versions by hand.
+- Releases are cut by release-please (`release-please-config.json`), one
+  component per package with tags such as `sesmax-core-v0.1.0`: it bumps
+  each package's version and writes its `packages/<dist>/CHANGELOG.md` from
+  the `feat`, `fix`, `perf` and `revert` commits; don't bump versions by
+  hand. `sesmax-core` carries `"release-as": "0.1.0"` for its first release;
+  remove it once that release is cut. The umbrella `sesmax` joins
+  release-please with `sesmax-ocean` in phase C2.
 - **Never replace or remove an existing PR title or description.** An agent
   called for a small follow-up tends to write a fresh description scoped to
   its own work and silently discard the rest: read the existing description
@@ -421,8 +293,8 @@ clone of the theme.
 - **Prose is MyST Markdown**, not MkDocs-Material syntax: `:::{note}`,
   `:::{tab-set}`, `:::{dropdown}` directives, not `!!!` / `===` / `???`.
 - **Link to the API** with the `xref:` protocol and the **top-level**
-  exported name: ``[`summarize`](xref:api#mypackage.summarize)``, not
-  `mypackage.stats.summarize` (mystmd lowercases `$`-abbreviated anchors;
+  exported name: ``[`Name`](xref:api#sesmax_core.Name)``, not
+  `sesmax_core.module.Name` (mystmd lowercases `$`-abbreviated anchors;
   see `docs/README.md`). A missing target fails `myst build --strict`.
 - **URLs are flat**: a page's URL is its basename, with `_` turned into `-`
   (`guide/quickstart.md` → `/quickstart/`,

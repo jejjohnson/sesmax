@@ -21,6 +21,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
+        # The dev group installs every workspace package (as editable members).
         run: uv sync --group dev
       - name: Run tests with coverage
         run: uv run pytest -v
@@ -36,3 +37,23 @@ jobs:
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
+
+  # Each package installed alone, from its own directory, with no workspace
+  # around it: proves its base install is complete and that it imports no
+  # package above its tier (docs/design/workspace_and_core.md).
+  bare-install:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        package:
+          - {dist: sesmax-core, module: sesmax_core}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Import ${{ matrix.package.module }} from a bare install
+        run: >-
+          uv run --isolated --no-project
+          --with ./packages/${{ matrix.package.dist }}
+          python -c "import ${{ matrix.package.module }}"

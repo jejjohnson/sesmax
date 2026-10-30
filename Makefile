@@ -1,5 +1,5 @@
 # =============================================================================
-# pypackage_template Makefile
+# sesmax workspace Makefile
 # =============================================================================
 #
 # PREREQUISITES:
@@ -9,7 +9,7 @@
 #
 # QUICK START:
 #   make help          # Show all available commands
-#   make install       # Install all dependency groups
+#   make install       # Install every package and dependency group
 #   make test          # Run tests
 #   make lint          # Lint with ruff
 #   make format        # Format with ruff
@@ -30,13 +30,14 @@ endif
 # Calculated variables
 # ---------------------------------------------------------------------------
 GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-PKG_VERSION := $(shell grep -E '^version\s*=' pyproject.toml 2>/dev/null \
+PKG_VERSION := $(shell grep -E '^version\s*=' packages/sesmax-core/pyproject.toml 2>/dev/null \
 	| sed -E 's/.*"([^"]+)".*/\1/' || echo "unknown")
 
 # ---------------------------------------------------------------------------
 # Paths (override via .env or command line)
 # ---------------------------------------------------------------------------
-PKGROOT ?= src/mypackage
+# Every package's sources, type-checked together.
+PKGROOT ?= packages/sesmax-core/src packages/sesmax/src
 # Additional paths to type-check alongside the package.
 TYPECHECK_EXTRA ?= scripts
 
@@ -74,7 +75,7 @@ check-env-%:
 # ===========================================================================
 
 help: ## 📚 Show this help menu
-	@printf "$(YELLOW)🐍 pypackage_template$(RESET)\n"
+	@printf "$(YELLOW)🐍 sesmax workspace$(RESET)\n"
 	@printf "%s\n" "-----------------------------------------------------------"
 	@awk 'BEGIN {FS = ":.*##"; printf ""} \
 	     /^[a-zA-Z_-]+:.*?##/ { printf "  $(BLUE)%-18s$(RESET) %s\n", $$1, $$2 } \
@@ -84,16 +85,16 @@ help: ## 📚 Show this help menu
 version: ## 📋 Display package version and git hash
 	@printf "$(YELLOW)📋 Version Info$(RESET)\n"
 	@printf "%s\n" "-----------------------------------------------------------"
-	@printf "$(GREEN)Package : $(PKG_VERSION)$(RESET)\n"
+	@printf "$(GREEN)sesmax-core: $(PKG_VERSION)$(RESET)\n"
 	@printf "$(BLUE)Git hash: $(GIT_HASH)$(RESET)\n"
 
 # ===========================================================================
 ##@ Setup
 # ===========================================================================
 
-install: ## 📦 Install all dependency groups via uv + pre-commit hooks
+install: ## 📦 Install every workspace package and dependency group + pre-commit hooks
 	@printf "$(YELLOW)>>> Installing all dependencies...$(RESET)\n"
-	uv sync --all-groups
+	uv sync --all-packages --all-groups
 	uv run pre-commit install
 	@printf "$(GREEN)>>> ✅ Installation complete!$(RESET)\n"
 
@@ -153,9 +154,9 @@ precommit: ## 🪝 Run pre-commit hooks on all files
 ##@ Build
 # ===========================================================================
 
-build: ## 🏗️  Build Python wheel and sdist
+build: ## 🏗️  Build a wheel and sdist for every workspace package
 	@printf "$(YELLOW)>>> Building package...$(RESET)\n"
-	uv build
+	uv build --all-packages
 	@printf "$(GREEN)>>> ✅ Build complete — see dist/$(RESET)\n"
 
 clean: ## 🗑️  Remove build artefacts and cache directories
