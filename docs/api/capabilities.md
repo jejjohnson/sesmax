@@ -13,6 +13,12 @@ Every public name in `sesmax_core` (31 of them), each listed once at its public 
 | `Model` | class | Abstract base class defining the sesmax model contract. |
 | `TermModel` | class | A :class:`Model` whose RHS is an assembled :class:`Term` tree. |
 
+### ``OperatorTerm`` — use any pipekit ``Operator`` / ``Graph`` as a :class:`Term`. (`sesmax_core._src.operator_term`)
+
+| Name | Kind | What it does |
+|---|---|---|
+| `OperatorTerm` | class | Lift a pipekit operator into the :class:`Term` algebra. |
+
 ### Integrate a model in transformed state coordinates. (`sesmax_core._src.scaled`)
 
 | Name | Kind | What it does |
@@ -87,9 +93,3 @@ Every public name in `sesmax_core` (31 of them), each listed once at its public 
 |---|---|---|
 | `imex_solver` | function | Build a ``KenCarp3`` IMEX solver with a matrix-free implicit stage. |
 | `imex_stepsize_controller` | function | Build an adaptive PID controller for an IMEX solve. |
-
-## `sesmax_core.terms`
-
-| Name | Kind | What it does |
-|---|---|---|
-| `OperatorTerm` | class | Lift a pipekit operator into the :class:`Term` algebra. |
