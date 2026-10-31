@@ -6,8 +6,10 @@ the model base classes, the term algebra, non-dimensionalisation and
 standardisation (``Scales``, ``StateAffine``, ``ScaledModel``), the
 layered-fluid pieces (``ModalTransform``, the Helmholtz caches), and forcing
 with its reduced-order bases. The data-assimilation adapters, the flowjax
-bridge, monitors, rollouts and I/O are in their own submodules, some behind
-an extra (``[da]``, ``[flows]``, ``[xarray]``, ``[checkpoint]``).
+bridge, monitors and rollouts are in their own submodules, some behind an
+extra (``[da]``, ``[flows]``); the I/O functions and the checkpointer are
+also top-level and import xarray or orbax only when called (``[xarray]``,
+``[checkpoint]``).
 
 A model is an :class:`equinox.Module` whose ``vector_field`` is a pure
 function of time, state and parameters, so ``jax.jit``, ``jax.grad`` and
@@ -61,6 +63,17 @@ from sesmax_core._src.gfd.helmholtz import (
     PeriodicHelmholtzCache,
 )
 from sesmax_core._src.gfd.modal import ModalTransform, StratificationProfile
+from sesmax_core._src.io import (
+    append_to_dataset,
+    apply_scale_metadata,
+    dataset_to_state,
+    load_dataset,
+    save_dataset,
+    scales_attrs,
+    snapshots_to_dataset,
+    state_to_dataset,
+    transform_attrs,
+)
 from sesmax_core._src.model import Model, TermModel
 from sesmax_core._src.scaled import ScaledModel
 from sesmax_core._src.scales import Scales
@@ -137,16 +150,23 @@ __all__ = [
     "__version__",
     "add_to",
     "add_vector_to",
+    "append_to_dataset",
+    "apply_scale_metadata",
     "as_parameter",
     "build_diffrax_terms",
     "control_filter",
+    "dataset_to_state",
     "explicit",
     "frozen",
     "implicit",
     "interval",
+    "load_dataset",
     "matern_spectral_density",
     "partition",
     "positive",
+    "save_dataset",
+    "scales_attrs",
+    "snapshots_to_dataset",
     "spatial_from_divfree",
     "spatial_from_eof",
     "spatial_from_fourier",
@@ -155,8 +175,10 @@ __all__ = [
     "spatial_from_rbf",
     "spatial_from_spherical_rbf",
     "spatial_from_wavelet",
+    "state_to_dataset",
     "tile_in_time",
     "trainable_mask",
+    "transform_attrs",
 ]
 
 

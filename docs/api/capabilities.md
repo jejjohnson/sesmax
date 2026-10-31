@@ -72,6 +72,20 @@ Every public name in `sesmax_core` (111 of them), each listed once at its public
 | `ModalTransform` | class | Precomputed layer-to-mode and mode-to-layer transforms. |
 | `StratificationProfile` | class | Discrete vertical stratification for a layered ocean model. |
 
+### xarray + zarr IO for sesmax model states and snapshots. (`sesmax_core._src.io.xarray`)
+
+| Name | Kind | What it does |
+|---|---|---|
+| `append_to_dataset` | function | Append a Dataset to an existing zarr store along a dimension. |
+| `apply_scale_metadata` | function | Attach scale / transform metadata to an exported Dataset. |
+| `dataset_to_state` | function | Reconstruct a single State from an xarray Dataset. |
+| `load_dataset` | function | Open a zarr store as an xarray Dataset. |
+| `save_dataset` | function | Persist a Dataset to a zarr store. |
+| `scales_attrs` | function | Flat Dataset attrs describing the scale set a run used. |
+| `snapshots_to_dataset` | function | Convert a time-stacked PyTree of states to an xarray Dataset. |
+| `state_to_dataset` | function | Convert a single model State to an xarray Dataset. |
+| `transform_attrs` | function | Per-variable ``loc`` / ``scale`` attrs for an affine transform. |
+
 ### Base model contract for all sesmax models. (`sesmax_core._src.model`)
 
 | Name | Kind | What it does |
@@ -187,20 +201,6 @@ Every public name in `sesmax_core` (111 of them), each listed once at its public
 | `guard_ceiling` | function | Return ``x`` unchanged, raising in-JIT if ``\|x\|`` exceeds ``ceil``. |
 | `guard_finite` | function | Return ``x`` unchanged, raising in-JIT if it holds any NaN/Inf. |
 | `guard_positive` | function | Return ``x`` unchanged, raising in-JIT if any element ``<= floor``. |
-
-## `sesmax_core.io`
-
-| Name | Kind | What it does |
-|---|---|---|
-| `append_to_dataset` | function | Append a Dataset to an existing zarr store along a dimension. |
-| `apply_scale_metadata` | function | Attach scale / transform metadata to an exported Dataset. |
-| `dataset_to_state` | function | Reconstruct a single State from an xarray Dataset. |
-| `load_dataset` | function | Open a zarr store as an xarray Dataset. |
-| `save_dataset` | function | Persist a Dataset to a zarr store. |
-| `scales_attrs` | function | Flat Dataset attrs describing the scale set a run used. |
-| `snapshots_to_dataset` | function | Convert a time-stacked PyTree of states to an xarray Dataset. |
-| `state_to_dataset` | function | Convert a single model State to an xarray Dataset. |
-| `transform_attrs` | function | Per-variable ``loc`` / ``scale`` attrs for an affine transform. |
 
 ## `sesmax_core.monitor`
 

@@ -36,3 +36,16 @@ def test_unknown_attribute_still_raises() -> None:
         assert "NotAName" in str(err)
     else:
         raise AssertionError("expected AttributeError")
+
+
+def test_io_functions_are_top_level_and_xarray_stays_lazy() -> None:
+    import sesmax_core.io
+
+    assert sesmax_core.state_to_dataset is sesmax_core.io.state_to_dataset
+    code = (
+        "import sys, sesmax_core\n"
+        "loaded = {m.split('.')[0] for m in sys.modules}\n"
+        "stray = loaded & {'xarray', 'zarr', 'orbax'}\n"
+        "assert not stray, stray\n"
+    )
+    subprocess.run([sys.executable, "-c", code], check=True)
