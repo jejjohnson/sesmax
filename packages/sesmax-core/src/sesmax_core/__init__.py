@@ -4,7 +4,8 @@
 commit ``9cb19b3``): the state and parameter types, the parameter
 constraints, the model base classes, the term algebra, and
 non-dimensionalisation and standardisation (``Scales``, ``StateAffine``,
-``ScaledModel``). The forcing, data-assimilation adapters, monitors and I/O
+``ScaledModel``), and the layered-fluid pieces (``ModalTransform``, the
+Helmholtz caches). The forcing, data-assimilation adapters, monitors and I/O
 join as the rest of phase C1 of ``docs/design/workspace_and_core.md``
 lands.
 
@@ -17,6 +18,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from sesmax_core._src.gfd.helmholtz import (
+    DirichletHelmholtzCache,
+    HelmholtzCache,
+    MultimodalHelmholtzCache,
+    NeumannHelmholtzCache,
+    PeriodicHelmholtzCache,
+)
+from sesmax_core._src.gfd.modal import ModalTransform, StratificationProfile
 from sesmax_core._src.model import Model, TermModel
 from sesmax_core._src.scaled import ScaledModel
 from sesmax_core._src.scales import Scales
@@ -54,15 +63,22 @@ __version__ = "0.0.0"  # x-release-please-version
 __all__ = [
     "Compose",
     "Diagnostics",
+    "DirichletHelmholtzCache",
+    "HelmholtzCache",
+    "ModalTransform",
     "Model",
+    "MultimodalHelmholtzCache",
+    "NeumannHelmholtzCache",
     "OperatorTerm",
     "Params",
+    "PeriodicHelmholtzCache",
     "PhysConsts",
     "Scaled",
     "ScaledModel",
     "Scales",
     "State",
     "StateAffine",
+    "StratificationProfile",
     "Sum",
     "Term",
     "TermFn",
