@@ -86,5 +86,7 @@ nav:
   - Training rollouts: train.md
   - Monitors: monitor.md
   - Operators: operators.md
+  - Data assimilation: da.md
+  - Flows: flows.md
   - Guards: guards.md
   - Test problems: testing.md

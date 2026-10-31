@@ -18,7 +18,9 @@ import sesmax_core
 
 # Every public submodule; a new one joins this list and gets an API doc page.
 SUBMODULES: list[str] = [
+    "da",
     "domain",
+    "flows",
     "forcing",
     "gfd",
     "guards",
