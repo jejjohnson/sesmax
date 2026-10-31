@@ -106,7 +106,7 @@ if TYPE_CHECKING:
     from sesmax_core._src.operator_term import OperatorTerm
 
 
-__version__ = "0.0.0"  # x-release-please-version
+__version__ = "0.1.0"  # x-release-please-version
 
 __all__ = [
     "BasisForcing",
