@@ -108,6 +108,13 @@ class TestEnergyGrowthMonitor:
         v = mon.on_chunk_end(_FakeModel(invs={"total_energy": 50.0}), None, _info())
         assert v.terminate
 
+    def test_hard_factor_below_the_warning_factor_still_terminates(self) -> None:
+        """Growth past hard_factor stops the run even under factor (review)."""
+        mon = EnergyGrowthMonitor(hard_factor=2.0)  # warning factor stays 10
+        mon.on_run_start(_FakeModel(invs={"total_energy": 1.0}), None, spec=None)
+        v = mon.on_chunk_end(_FakeModel(invs={"total_energy": 5.0}), None, _info())
+        assert v.terminate
+
     def test_stable_energy_no_warning(self) -> None:
         mon = EnergyGrowthMonitor(factor=10.0)
         mon.on_run_start(_FakeModel(invs={"total_energy": 1.0}), None, spec=None)
