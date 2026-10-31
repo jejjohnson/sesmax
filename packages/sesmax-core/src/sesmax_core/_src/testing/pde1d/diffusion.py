@@ -1,0 +1,162 @@
+"""1D diffusion equation: du/dt = nu * d2u/dx2."""
+
+from __future__ import annotations
+
+from typing import Any, ClassVar
+
+import equinox as eqx
+import jax.numpy as jnp
+from finitevolx import CartesianGrid1D, Difference1D, Mask1D
+from jaxtyping import Array, PyTree
+
+from sesmax_core._src.model import Model
+from sesmax_core._src.scales import Scales
+from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
+
+
+class Diffusion1DParams(Params):
+    """Differentiable parameters for 1D diffusion.
+
+    Args:
+        nu: Kinematic viscosity (diffusion coefficient).
+    """
+
+    nu: Array
+
+
+class Diffusion1DState(State):
+    """State for 1D diffusion.
+
+    Args:
+        u: Scalar field on T-points, shape ``(Nx,)`` including ghost cells.
+    """
+
+    u: Array
+
+    # ``u`` here is a T-point scalar, not a C-grid velocity: it is the
+    # transported quantity, and the velocity is a separate coefficient.
+    # Its amplitude comes from the initial condition, so there is no
+    # scale for it in ``Scales`` and the nondimensionalisation leaves
+    # it alone rather than dividing it by ``U``.
+    scale_kinds: ClassVar[dict[str, str]] = {"u": "tracer"}
+    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
+
+
+class Diffusion1DDiagnostics(Diagnostics):
+    """Diagnostics for 1D diffusion.
+
+    Args:
+        energy: Integrated energy 0.5 * sum(u^2).
+    """
+
+    energy: Array
+
+
+class Diffusion1D(Model):
+    r"""1D diffusion equation on an Arakawa C-grid.
+
+    Solves ``du/dt = nu * d²u/dx²`` where ``nu`` is a learnable
+    viscosity visible to ``jax.grad``.
+
+    Args:
+        params: Differentiable parameters (viscosity ``nu``).
+        grid: 1D Arakawa C-grid.
+        diff: Difference operators.
+        mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
+        periodic: Whether to use periodic boundary conditions.
+    """
+
+    params: Diffusion1DParams
+    grid: CartesianGrid1D = eqx.field(static=True)
+    diff: Difference1D
+    mask: Mask1D | None
+    periodic: bool = eqx.field(static=True, default=True)
+
+    def vector_field(
+        self, t: float, state: PyTree, args: PyTree | None = None
+    ) -> Diffusion1DState:
+        r"""Compute tendency: du/dt = nu * d²u/dx²."""
+        du_dt = self.params.nu * self.diff.laplacian(state.u)
+        return Diffusion1DState(u=du_dt)
+
+    def apply_boundary_conditions(self, state: PyTree) -> Diffusion1DState:
+        """Apply boundary conditions to the state."""
+        u = state.u
+        if self.periodic:
+            u = u.at[0].set(u[-2])
+            u = u.at[-1].set(u[1])
+        else:
+            # Dirichlet: u = 0 at boundaries
+            u = u.at[0].set(-u[1])
+            u = u.at[-1].set(-u[-2])
+        return Diffusion1DState(u=u)
+
+    def diagnose(self, state: PyTree) -> Diffusion1DDiagnostics:
+        """Compute energy diagnostic."""
+        energy = 0.5 * jnp.sum(state.u[1:-1] ** 2) * self.grid.dx
+        return Diffusion1DDiagnostics(energy=energy)
+
+    @staticmethod
+    def from_nondimensional(
+        *,
+        nx: int = 100,
+        **create_kw: Any,
+    ) -> tuple[Diffusion1D, Scales]:
+        r"""Build the model at unit scales instead of SI coefficients.
+
+        Non-dimensional form
+        --------------------
+        Diffusive scale set (:meth:`sesmax_core.Scales.diffusive`) with
+        ``L = kappa = 1``, so ``T = L**2/kappa = 1`` and the equation
+        reads ``d_t u = laplacian(u)``. Pure diffusion has no velocity
+        scale, so this scaling leaves no free dimensionless number:
+        every diffusion problem is the same problem once rescaled, and
+        only the grid and the initial condition remain to be chosen.
+
+
+        Args:
+            nx: Interior grid cells.
+            **create_kw: Forwarded to :meth:`create` (``periodic``, ``mask``).
+
+        Returns:
+            ``(model, scales)``. ``scales.dt_from_cfl(C, nx)`` gives a
+            step in the same time unit.
+        """
+        model = Diffusion1D.create(
+            nx=nx,
+            Lx=1.0,
+            nu=1.0,
+            **create_kw,
+        )
+        return model, Scales.diffusive(L=1.0, kappa=1.0)
+
+    @staticmethod
+    def create(
+        nx: int = 100,
+        Lx: float = 2.0,
+        nu: float = 0.01,
+        periodic: bool = True,
+        mask: Mask1D | None = None,
+    ) -> Diffusion1D:
+        """Convenience factory.
+
+        Args:
+            nx: Number of interior grid cells.
+            Lx: Domain length.
+            nu: Kinematic viscosity.
+            periodic: Use periodic BCs if True, Dirichlet if False.
+            mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
+
+        Returns:
+            A ``Diffusion1D`` model instance.
+        """
+        grid = CartesianGrid1D.from_interior(nx, Lx)
+        params = Diffusion1DParams(nu=as_parameter(nu))
+        diff = Difference1D(grid=grid, mask=mask)
+        return Diffusion1D(
+            params=params,
+            grid=grid,
+            diff=diff,
+            mask=mask,
+            periodic=periodic,
+        )

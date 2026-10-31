@@ -1,0 +1,186 @@
+"""1D linear convection: du/dt + c du/dx = 0."""
+
+from __future__ import annotations
+
+import math
+from typing import Any, ClassVar
+
+import equinox as eqx
+import jax.numpy as jnp
+from finitevolx import CartesianGrid1D, Difference1D, Interpolation1D, Mask1D
+from jaxtyping import Array, PyTree
+
+from sesmax_core._src.model import Model
+from sesmax_core._src.scales import Scales
+from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
+
+
+class LinearConvection1DParams(Params):
+    """Differentiable parameters for 1D linear convection.
+
+    Args:
+        c: Wave speed.
+    """
+
+    c: Array
+
+
+class LinearConvection1DState(State):
+    """State for 1D linear convection.
+
+    Args:
+        u: Scalar field on T-points, shape ``(Nx,)`` including ghost cells.
+    """
+
+    u: Array
+
+    # ``u`` here is a T-point scalar, not a C-grid velocity: it is the
+    # transported quantity, and the velocity is a separate coefficient.
+    # Its amplitude comes from the initial condition, so there is no
+    # scale for it in ``Scales`` and the nondimensionalisation leaves
+    # it alone rather than dividing it by ``U``.
+    scale_kinds: ClassVar[dict[str, str]] = {"u": "tracer"}
+    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
+
+
+class LinearConvection1DDiagnostics(Diagnostics):
+    """Diagnostics for 1D linear convection.
+
+    Args:
+        energy: Integrated energy 0.5 * sum(u^2).
+    """
+
+    energy: Array
+
+
+class LinearConvection1D(Model):
+    """1D linear convection equation on an Arakawa C-grid.
+
+    Solves ``du/dt + c * du/dx = 0`` where ``c`` is a learnable wave
+    speed visible to ``jax.grad``.
+
+    Args:
+        params: Differentiable parameters (wave speed ``c``).
+        grid: 1D Arakawa C-grid.
+        diff: Difference operators.
+        interp: Interpolation operators.
+        mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
+        periodic: Whether to use periodic boundary conditions.
+    """
+
+    params: LinearConvection1DParams
+    grid: CartesianGrid1D = eqx.field(static=True)
+    diff: Difference1D
+    interp: Interpolation1D
+    mask: Mask1D | None
+    periodic: bool = eqx.field(static=True, default=True)
+
+    def vector_field(
+        self, t: float, state: PyTree, args: PyTree | None = None
+    ) -> LinearConvection1DState:
+        """Compute tendency: du/dt = -c * du/dx."""
+        # Flux form: -d(c * u)/dx at T-points
+        # 1. Interpolate u to U-points, multiply by c
+        flux = self.params.c * self.interp.T_to_U(state.u)
+        # 2. Backward difference of flux: U -> T
+        du_dt = -self.diff.diff_x_U_to_T(flux)
+        return LinearConvection1DState(u=du_dt)
+
+    def apply_boundary_conditions(self, state: PyTree) -> LinearConvection1DState:
+        """Apply boundary conditions to the state."""
+        u = state.u
+        if self.periodic:
+            u = u.at[0].set(u[-2])
+            u = u.at[-1].set(u[1])
+        else:
+            # Dirichlet: zero at boundaries
+            u = u.at[0].set(-u[1])
+            u = u.at[-1].set(-u[-2])
+        return LinearConvection1DState(u=u)
+
+    def diagnose(self, state: PyTree) -> LinearConvection1DDiagnostics:
+        """Compute energy diagnostic."""
+        energy = 0.5 * jnp.sum(state.u[1:-1] ** 2) * self.grid.dx
+        return LinearConvection1DDiagnostics(energy=energy)
+
+    @staticmethod
+    def from_nondimensional(
+        *,
+        nx: int = 100,
+        direction: float = 1.0,
+        **create_kw: Any,
+    ) -> tuple[LinearConvection1D, Scales]:
+        r"""Build the model at unit scales instead of SI coefficients.
+
+        Non-dimensional form
+        --------------------
+        Advective scale set (:meth:`sesmax_core.Scales.advective`) with
+        ``L = 1`` and the wave speed as the velocity scale, so ``T = 1``
+        and the equation reads ``d_t u + c d_x u = 0`` with ``|c| = 1``.
+
+        Scaling out the *speed* leaves no free dimensionless number,
+        but it does not remove the sign: left-going and right-going
+        propagation are different problems, and only the magnitude is
+        a unit choice. The Courant number is a time-step choice rather
+        than a property of the problem, so use ``scales.dt_from_cfl``.
+
+
+        Args:
+            nx: Interior grid cells.
+            direction: Propagation direction; normalised to unit speed,
+                so any positive value means rightward and any negative
+                value leftward.
+            **create_kw: Forwarded to :meth:`create` (``periodic``,
+                ``mask``).
+
+        Returns:
+            ``(model, scales)``. ``scales.dt_from_cfl(C, nx)`` gives a
+            step in the same time unit.
+        """
+        context = "LinearConvection1D.from_nondimensional"
+        if not math.isfinite(direction) or direction == 0.0:
+            raise ValueError(
+                f"{context}: direction must be a finite non-zero number; got "
+                f"{direction!r}. Zero has no direction to normalise, and the "
+                f"equation would be trivial."
+            )
+        model = LinearConvection1D.create(
+            nx=nx,
+            Lx=1.0,
+            c=math.copysign(1.0, direction),
+            **create_kw,
+        )
+        return model, Scales.advective(L=1.0, U=1.0)
+
+    @staticmethod
+    def create(
+        nx: int = 100,
+        Lx: float = 2.0,
+        c: float = 1.0,
+        periodic: bool = True,
+        mask: Mask1D | None = None,
+    ) -> LinearConvection1D:
+        """Convenience factory.
+
+        Args:
+            nx: Number of interior grid cells.
+            Lx: Domain length.
+            c: Wave speed.
+            periodic: Use periodic BCs if True, Dirichlet if False.
+            mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
+
+        Returns:
+            A ``LinearConvection1D`` model instance.
+        """
+        grid = CartesianGrid1D.from_interior(nx, Lx)
+        params = LinearConvection1DParams(c=as_parameter(c))
+        diff = Difference1D(grid=grid, mask=mask)
+        interp = Interpolation1D(grid=grid, mask=mask)
+        return LinearConvection1D(
+            params=params,
+            grid=grid,
+            diff=diff,
+            interp=interp,
+            mask=mask,
+            periodic=periodic,
+        )
