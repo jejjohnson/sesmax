@@ -88,5 +88,7 @@ nav:
   - Operators: operators.md
   - Data assimilation: da.md
   - Flows: flows.md
+  - I/O: io.md
+  - Checkpointing: checkpoint.md
   - Guards: guards.md
   - Test problems: testing.md

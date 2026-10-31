@@ -26,6 +26,8 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Operators](operators.md) | `ModelOp`, `OperatorTerm` |
 | [Data assimilation](da.md) (`[da]`) | `FilteraxDynamics`, `VardaxForwardModel`, `SubsampleObs`, `state_to_vector`, `make_ensemble` |
 | [Flows](flows.md) (`[flows]`) | `StateAffineBijection`, `to_flowjax`, `learned_prior` |
+| [I/O](io.md) (`[xarray]`) | `state_to_dataset`, `dataset_to_state`, `snapshots_to_dataset`, `append_to_dataset`, `save_dataset`, `load_dataset`, `scales_attrs`, `transform_attrs`, `apply_scale_metadata` |
+| [Checkpointing](checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
 | [Guards](guards.md) | `guard_finite`, `guard_positive`, `guard_ceiling` |
 | [Test problems](testing.md) | `Lorenz63`, `Lorenz96`, `Lorenz96t` and their state, parameter and diagnostic classes |
 
