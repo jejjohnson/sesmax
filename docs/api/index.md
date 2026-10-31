@@ -25,6 +25,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Monitors](monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
 | [Operators](operators.md) | `ModelOp`, `OperatorTerm` |
 | [Guards](guards.md) | `guard_finite`, `guard_positive`, `guard_ceiling` |
+| [Test problems](testing.md) | `Lorenz63`, `Lorenz96`, `Lorenz96t` and their state, parameter and diagnostic classes |
 
 ## Package overview
 

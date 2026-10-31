@@ -151,10 +151,13 @@ class EnergyGrowthMonitor(BaseMonitor):
         if prev is None or cur is None or abs(prev) == 0.0:
             return MonitorVerdict()
         growth = abs(cur) / abs(prev)
-        if growth <= self.factor:
+        hard = self.hard_factor is not None and growth > self.hard_factor
+        # The hard limit is checked on its own, so a hard_factor below the
+        # warning factor still terminates.
+        if growth <= self.factor and not hard:
             return MonitorVerdict()
         msg = f"energy grew {growth:.1f}x from previous chunk"
-        if self.hard_factor is not None and growth > self.hard_factor:
+        if hard:
             return MonitorVerdict(
                 metrics={"energy_growth": growth},
                 messages=(msg,),
