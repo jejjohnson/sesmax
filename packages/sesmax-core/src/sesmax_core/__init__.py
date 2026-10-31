@@ -5,9 +5,9 @@ commit ``9cb19b3``): the state and parameter types and their constraints,
 the model base classes, the term algebra, non-dimensionalisation and
 standardisation (``Scales``, ``StateAffine``, ``ScaledModel``), the
 layered-fluid pieces (``ModalTransform``, the Helmholtz caches), and forcing
-with its reduced-order bases. The data-assimilation adapters, monitors and
-I/O join as the rest of phase C1 of ``docs/design/workspace_and_core.md``
-lands.
+with its reduced-order bases. The data-assimilation adapters, the flowjax
+bridge, monitors, rollouts and I/O are in their own submodules, some behind
+an extra (``[da]``, ``[flows]``, ``[xarray]``, ``[checkpoint]``).
 
 A model is an :class:`equinox.Module` whose ``vector_field`` is a pure
 function of time, state and parameters, so ``jax.jit``, ``jax.grad`` and
@@ -32,6 +32,7 @@ from sesmax_core._src.basis import (
     add_vector_to,
     control_filter,
 )
+from sesmax_core._src.checkpoint import SimulationCheckpointer
 from sesmax_core._src.forcing import (
     ConstantForcing,
     ForcingProtocol,
@@ -120,6 +121,7 @@ __all__ = [
     "ScaledModel",
     "Scales",
     "SeasonalWindForcing",
+    "SimulationCheckpointer",
     "SpatialBasis",
     "State",
     "StateAffine",

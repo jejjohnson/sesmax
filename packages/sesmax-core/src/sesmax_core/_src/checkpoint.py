@@ -1,0 +1,119 @@
+"""Simulation checkpointing via orbax-checkpoint."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import equinox as eqx
+from jaxtyping import PyTree
+
+
+def _orbax() -> Any:
+    """Import orbax-checkpoint, or say which extra installs it."""
+    try:
+        import orbax.checkpoint
+    except ImportError as exc:
+        raise ImportError(
+            "SimulationCheckpointer requires orbax-checkpoint, an optional "
+            "dependency. Install it with `pip install sesmax-core[checkpoint]` "
+            "(or `uv sync --extra checkpoint`)."
+        ) from exc
+    return orbax.checkpoint
+
+
+class SimulationCheckpointer(eqx.Module):
+    """Manages periodic checkpointing during long simulations.
+
+    Uses orbax-checkpoint for JAX-native pytree serialization.
+    Compatible with DVC for versioning checkpoint files.
+
+    Attributes:
+        checkpoint_dir: Directory for checkpoint files.
+        checkpoint_interval: Number of steps between saves.
+    """
+
+    checkpoint_dir: str = eqx.field(static=True)
+    checkpoint_interval: int = eqx.field(static=True)
+
+    def save(self, step: int, state: PyTree, model: eqx.Module) -> Path:
+        """Save a checkpoint to disk.
+
+        Only the array leaves of ``model.params`` go to disk. A
+        constrained parameter built with :func:`~sesmax_core.positive` keeps
+        its transform as an ordinary pytree leaf, and Orbax has no
+        handler for a Python function; the structure around the arrays
+        is rebuilt from the target model on restore anyway, so nothing
+        is lost by leaving it behind.
+
+        Args:
+            step: Current simulation step.
+            state: Model state pytree.
+            model: Model instance (only ``model.params`` is saved).
+
+        Returns:
+            Path to the saved checkpoint directory.
+        """
+        ocp = _orbax()
+
+        path = Path(self.checkpoint_dir) / f"step_{step:08d}"
+        arrays, _ = eqx.partition(model.params, eqx.is_array)
+        with ocp.StandardCheckpointer() as checkpointer:
+            checkpointer.save(
+                path,
+                {"state": state, "params": arrays, "step": step},
+            )
+            checkpointer.wait_until_finished()
+        return path
+
+    def restore(
+        self,
+        step: int,
+        target_state: PyTree,
+        target_model: eqx.Module,
+    ) -> tuple[PyTree, PyTree, int]:
+        """Restore a checkpoint from disk.
+
+        Args:
+            step: Step number to restore.
+            target_state: A state pytree with the expected structure
+                (used as the restore target).
+            target_model: A model instance whose ``params`` structure
+                matches the saved checkpoint.
+
+        The saved parameters are the array leaves only (see
+        :meth:`save`); they are recombined with the target model's
+        non-array leaves, so a restored constrained parameter comes
+        back as a working wrapper rather than as a bare array.
+
+        Returns:
+            Tuple of (restored_state, restored_params, restored_step).
+        """
+        ocp = _orbax()
+
+        path = Path(self.checkpoint_dir) / f"step_{step:08d}"
+        arrays, static = eqx.partition(target_model.params, eqx.is_array)
+        with ocp.StandardCheckpointer() as checkpointer:
+            ckpt = checkpointer.restore(
+                path,
+                target={"state": target_state, "params": arrays, "step": 0},
+            )
+        return ckpt["state"], eqx.combine(ckpt["params"], static), ckpt["step"]
+
+    def should_save(self, step: int) -> bool:
+        """Check whether a checkpoint should be saved at this step."""
+        return step > 0 and step % self.checkpoint_interval == 0
+
+    def latest_step(self) -> int | None:
+        """Find the latest checkpoint step, or None if no checkpoints exist."""
+        ckpt_dir = Path(self.checkpoint_dir)
+        if not ckpt_dir.exists():
+            return None
+        steps = []
+        for p in ckpt_dir.iterdir():
+            if p.is_dir() and p.name.startswith("step_"):
+                try:
+                    steps.append(int(p.name.split("_")[1]))
+                except ValueError:
+                    continue
+        return max(steps) if steps else None
