@@ -29,7 +29,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [I/O](io.md) (`[xarray]`) | `state_to_dataset`, `dataset_to_state`, `snapshots_to_dataset`, `append_to_dataset`, `save_dataset`, `load_dataset`, `scales_attrs`, `transform_attrs`, `apply_scale_metadata` |
 | [Checkpointing](checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
 | [Guards](guards.md) | `guard_finite`, `guard_positive`, `guard_ceiling` |
-| [Test problems](testing.md) | `Lorenz63`, `Lorenz96`, `Lorenz96t`; `LinearConvection1D`, `NonlinearConvection1D`, `Diffusion1D`, `Burgers1D` and their 2D versions; `Burgers2DTermModel`, `Burgers2DOp`; `IncompressibleNS2D`; `PoissonSolver2D`, `LaplaceSolver2D`, `HelmholtzSolver2D`; and their state, parameter and diagnostic classes |
+| [Test problems](testing.md) | `Lorenz63`, `Lorenz96`, `Lorenz96t`; `LinearConvection1D`, `NonlinearConvection1D`, `Diffusion1D`, `Burgers1D` and their 2D versions; `Burgers2DTermModel`, `Burgers2DOp`; `IncompressibleNS2D`; `PoissonSolver2D`, `LaplaceSolver2D`, `HelmholtzSolver2D`; `LinearShallowWater1D`, `NonlinearShallowWater1D`, `LinearShallowWater2D`, `LinearSWM2DTermModel` and its terms; `gravity_wave_1d`, `inertial_oscillation_1d`, `geostrophic_adjustment_2d`; and their state, parameter and diagnostic classes |
 
 ## Package overview
 
