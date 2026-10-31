@@ -83,4 +83,7 @@ nav:
   - Layered fluids: gfd.md
   - Domains: domain.md
   - Solvers: solvers.md
+  - Training rollouts: train.md
+  - Monitors: monitor.md
+  - Operators: operators.md
   - Guards: guards.md
