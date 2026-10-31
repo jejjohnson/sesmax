@@ -87,3 +87,4 @@ nav:
   - Monitors: monitor.md
   - Operators: operators.md
   - Guards: guards.md
+  - Test problems: testing.md

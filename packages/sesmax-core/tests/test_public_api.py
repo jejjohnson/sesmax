@@ -27,6 +27,7 @@ SUBMODULES: list[str] = [
     "scales",
     "solvers",
     "terms",
+    "testing",
     "train",
 ]
 
