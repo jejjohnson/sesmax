@@ -78,6 +78,7 @@ nav:
   - Capability index: capabilities.md
   - Types and models: core.md
   - Terms: terms.md
+  - Forcing: forcing.md
   - Scales: scales.md
   - Layered fluids: gfd.md
   - Domains: domain.md
