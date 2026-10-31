@@ -5,7 +5,9 @@ systems used as data-assimilation testbeds, and the PDE test problems of
 the "12 steps to Navier-Stokes" on finitevolX stencils (1D and 2D
 convection, diffusion and Burgers, the Laplace, Poisson and Helmholtz
 solvers, 2D incompressible Navier-Stokes). The core's own tests run on
-them; the linear shallow-water models join as they move from somax.
+them. The linear shallow-water models (1D and 2D, monolithic and as terms)
+and the 1D nonlinear one, with the gravity-wave, inertial-oscillation and
+geostrophic-adjustment cases, are the linear geophysical test problems.
 
 - :class:`Lorenz63`: three variables, ``dx/dt = sigma (y - x)``,
   ``dy/dt = x (rho - z) - y``, ``dz/dt = x y - beta z``.
@@ -25,6 +27,11 @@ them; the linear shallow-water models join as they move from somax.
 
 from __future__ import annotations
 
+from sesmax_core._src.testing.gfd_testcases import (
+    geostrophic_adjustment_2d,
+    gravity_wave_1d,
+    inertial_oscillation_1d,
+)
 from sesmax_core._src.testing.lorenz63 import (
     L63Diagnostics,
     L63Params,
@@ -83,6 +90,28 @@ from sesmax_core._src.testing.pde2d import (
     NSVorticityState,
     PoissonSolver2D,
 )
+from sesmax_core._src.testing.swm import (
+    LinearShallowWater1D,
+    LinearShallowWater2D,
+    LinearSW1DDiagnostics,
+    LinearSW1DParams,
+    LinearSW1DPhysConsts,
+    LinearSW1DState,
+    LinearSW2DDiagnostics,
+    LinearSW2DParams,
+    LinearSW2DPhysConsts,
+    LinearSW2DState,
+    LinearSWM2DTermModel,
+    LinearSWMCoriolis,
+    LinearSWMDiffusion,
+    LinearSWMDrag,
+    LinearSWMGravityWave,
+    NonlinearShallowWater1D,
+    NonlinearSW1DDiagnostics,
+    NonlinearSW1DParams,
+    NonlinearSW1DPhysConsts,
+    NonlinearSW1DState,
+)
 
 
 __all__ = [
@@ -125,6 +154,21 @@ __all__ = [
     "LinearConvection2DDiagnostics",
     "LinearConvection2DParams",
     "LinearConvection2DState",
+    "LinearSW1DDiagnostics",
+    "LinearSW1DParams",
+    "LinearSW1DPhysConsts",
+    "LinearSW1DState",
+    "LinearSW2DDiagnostics",
+    "LinearSW2DParams",
+    "LinearSW2DPhysConsts",
+    "LinearSW2DState",
+    "LinearSWM2DTermModel",
+    "LinearSWMCoriolis",
+    "LinearSWMDiffusion",
+    "LinearSWMDrag",
+    "LinearSWMGravityWave",
+    "LinearShallowWater1D",
+    "LinearShallowWater2D",
     "Lorenz63",
     "Lorenz96",
     "Lorenz96t",
@@ -137,5 +181,13 @@ __all__ = [
     "NonlinearConvection2D",
     "NonlinearConvection2DDiagnostics",
     "NonlinearConvection2DState",
+    "NonlinearSW1DDiagnostics",
+    "NonlinearSW1DParams",
+    "NonlinearSW1DPhysConsts",
+    "NonlinearSW1DState",
+    "NonlinearShallowWater1D",
     "PoissonSolver2D",
+    "geostrophic_adjustment_2d",
+    "gravity_wave_1d",
+    "inertial_oscillation_1d",
 ]
