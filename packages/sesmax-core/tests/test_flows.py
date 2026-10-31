@@ -17,7 +17,6 @@ import pytest
 from jax.flatten_util import ravel_pytree
 from jaxtyping import Array, Float
 
-from sesmax_core._src.da.flatten import state_to_vector
 from sesmax_core._src.scales import Scales
 from sesmax_core._src.state_affine import StateAffine
 from sesmax_core._src.types import State
@@ -103,6 +102,10 @@ class TestAdapter:
 
     def test_layout_matches_the_da_bridge(self, bijection, transform, state):
         """One vector must feed both a DA filter and a flow."""
+        # The DA package imports filterax; skip unless the [da] extra is there.
+        pytest.importorskip("filterax")
+        from sesmax_core._src.da.flatten import state_to_vector
+
         from_da, _ = state_to_vector(state, transform)
         flat, _ = ravel_pytree(state)
         from_flow, _ = bijection.transform_and_log_det(flat)
