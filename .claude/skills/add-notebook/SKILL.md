@@ -29,11 +29,24 @@ read it first. This is the checklist.
 
    ```bash
    uv run --group docs jupytext --to notebook docs/notebooks/<name>.py
+   mkdir -p /tmp/nb-kernel
    uv run --group docs jupyter nbconvert --to notebook --execute \
-     docs/notebooks/<name>.ipynb --inplace --ExecutePreprocessor.timeout=180
+     docs/notebooks/<name>.ipynb --inplace --ExecutePreprocessor.timeout=600 \
+     --KernelManager.transport=ipc --KernelManager.ip=/tmp/nb-kernel/kernel
    ```
 
-4. Delete the `.py`; the executed `.ipynb` is the source of truth. To fix
+   The kernel runs on IPC sockets because, on a shared machine, other
+   processes probe local TCP ports, and the kernel then writes
+   `DELIM not in msg_list` tracebacks into the cells' outputs. The socket
+   path must be absolute (a relative one is resolved in the notebook's
+   directory by the kernel and the repository root by the client).
+4. Check the outputs: no `error` outputs, every code cell executed, and no
+   `stderr` streams. ipykernel's IOPub pipe always binds a `127.0.0.1` TCP
+   port, so a probe there still prints `Bad pipe message: %s [...]` to
+   stderr; drop a stderr output only if every line of it is such a line,
+   and say so in the PR. Any other stderr is a real problem to fix.
+
+5. Delete the `.py`; the executed `.ipynb` is the source of truth. To fix
    something later, regenerate the `.py` (`jupytext --to py:percent`),
    edit, re-convert and **re-execute**; never hand-edit committed source
    cells.
