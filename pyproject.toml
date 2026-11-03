@@ -98,6 +98,8 @@ lines-after-imports = 2
 # Tests deliberately construct invalid inputs and assert on the failure.
 "tests/**" = ["B011"]
 "packages/*/tests/**" = ["B011"]
+# Notebook comments carry unicode equations (the house style), e.g. "u₀ = exp(−z²/2)".
+"docs/notebooks/**" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.format]
 # Format the code inside ``Examples:`` doctest blocks like real source.
