@@ -16,6 +16,7 @@ from finitevolx import (
     streamfunction_from_vorticity,
 )
 from jaxtyping import Array, Float, PyTree
+from spectraldiffx import solve_helmholtz_2d
 
 from sesmax_core._src._validation import require_positive
 from sesmax_core._src.model import Model
@@ -28,12 +29,20 @@ class NSVorticityState(State):
 
     Args:
         omega: Vorticity field on T-points, shape ``(Ny, Nx)``.
+        flux: Volume flux through the channel per unit depth,
+            ``Q = psi(Ly) - psi(0)``, a scalar. Only ``problem="channel"``
+            evolves it; the other problems carry it at zero.
     """
 
     omega: Array
+    flux: Array = eqx.field(default_factory=lambda: jnp.zeros(()))
 
-    # ``omega`` is this family's spelling of vorticity.
-    scale_kinds: ClassVar[dict[str, str]] = {"omega": "vorticity"}
+    # ``omega`` is this family's spelling of vorticity; the flux is a
+    # difference of streamfunction values.
+    scale_kinds: ClassVar[dict[str, str]] = {
+        "omega": "vorticity",
+        "flux": "streamfunction",
+    }
     # Vorticity is carried at T-points, not the C-grid corner.
     mask_locations: ClassVar[dict[str, str]] = {"omega": "h"}
 
@@ -157,6 +166,10 @@ GHIA_RE100_V = jnp.array(
 )
 
 
+#: The transform of the streamfunction solve for each problem.
+_POISSON_BC: dict[str, str] = {"cavity": "dst", "periodic": "fft", "channel": "mixed"}
+
+
 class IncompressibleNS2D(Model):
     r"""2D incompressible Navier-Stokes (vorticity-streamfunction).
 
@@ -169,12 +182,27 @@ class IncompressibleNS2D(Model):
     :math:`u = \partial\psi/\partial y`,
     :math:`v = -\partial\psi/\partial x`.
 
-    Supports two canonical benchmarks:
+    Supports three problems:
 
-    - **Lid-driven cavity**: Dirichlet BCs (``poisson_bc="dst"``),
-      no-slip walls with moving lid at the top.
-    - **Channel flow**: Periodic in x, no-slip walls in y
-      (``poisson_bc="dst"``), driven by a body force.
+    - **Lid-driven cavity** (``problem="cavity"``): no-slip walls on all
+      four sides, the top one sliding at ``u_lid``; psi = 0 on the walls
+      (``poisson_bc="dst"``).
+    - **Doubly periodic box** (``problem="periodic"``): no walls; the
+      ghost ring wraps in x and y (``poisson_bc="fft"``). Taylor-Green
+      vortices are an exact solution here.
+    - **Re-entrant channel** (``problem="channel"``): periodic in x,
+      stationary no-slip walls at y = 0 and y = Ly
+      (``poisson_bc="mixed"``), driven by a uniform pressure gradient
+      ``G = -(1/rho) dp/dx``. Psi is 0 on the bottom wall and equals the
+      state's flux ``Q`` on the top wall, and ``Q`` follows the
+      x-averaged momentum budget
+      ``dQ/dt = G Ly - nu (mean omega_top - mean omega_bottom)``.
+      The steady state is Poiseuille flow,
+      ``u = (G / 2 nu) y (Ly - y)`` with ``Q = G Ly**3 / (12 nu)``.
+
+    The cavity and channel set the wall vorticity with Thom's formula
+    on the wall nodes of the streamfunction solve (rows and columns 0
+    and -2; -1 is a ghost).
 
     Args:
         params: Differentiable parameters (viscosity ``nu``).
@@ -183,10 +211,14 @@ class IncompressibleNS2D(Model):
         interp: Interpolation operators.
         advection: Advection operator.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
-        problem: Problem type (``"cavity"`` or ``"channel"``).
-        poisson_bc: Spectral solver BC type for Poisson inversion.
-        u_lid: Lid velocity for cavity flow (default 1.0).
-        body_force: Constant vorticity source for channel flow.
+        problem: ``"cavity"``, ``"periodic"`` or ``"channel"``.
+        poisson_bc: Spectral solver BC type for Poisson inversion
+            (``"dst"``, ``"fft"`` or ``"mixed"``; set by the problem).
+        u_lid: Lid velocity for cavity flow (default 1.0); the other
+            problems ignore it.
+        body_force: Constant vorticity source, added in every problem.
+        pressure_gradient: Uniform driving ``G = -(1/rho) dp/dx`` of the
+            channel; the other problems ignore it.
         method: Advection reconstruction method.
     """
 
@@ -201,12 +233,83 @@ class IncompressibleNS2D(Model):
     u_lid: float = eqx.field(static=True, default=1.0)
     body_force: float = eqx.field(static=True, default=0.0)
     method: str = eqx.field(static=True, default="upwind1")
+    pressure_gradient: float = eqx.field(static=True, default=0.0)
 
-    def _solve_psi(self, omega: Array) -> Float[Array, "Ny Nx"]:
-        """Recover streamfunction from vorticity via Poisson solve."""
+    def _solve_psi(
+        self, omega: Array, flux: Array | float = 0.0
+    ) -> Float[Array, "Ny Nx"]:
+        """Recover the streamfunction from vorticity, nabla^2 psi = -omega.
+
+        The cavity solves with psi = 0 on the walls. The periodic box
+        and the channel fill the ghost ring as well, so the velocity
+        stencils at the domain edges read periodic neighbours.
+        """
+        if self.problem == "periodic":
+            psi = streamfunction_from_vorticity(
+                -omega, self.grid.dx, self.grid.dy, bc="fft"
+            )
+            return enforce_periodic(psi)
+        if self.problem == "channel":
+            return self._solve_channel_psi(omega, flux)
         return streamfunction_from_vorticity(
             -omega, self.grid.dx, self.grid.dy, bc=self.poisson_bc
         )
+
+    def _solve_channel_psi(
+        self, omega: Array, flux: Array | float
+    ) -> Float[Array, "Ny Nx"]:
+        """Channel streamfunction: periodic in x, psi = 0 and Q on the walls.
+
+        The wall nodes are rows 0 and -2; the unknowns are rows
+        ``1:-2`` and the periodic columns ``1:-1``.
+        """
+        n_cols = self.grid.Nx - 2
+        rhs = -omega[1:-2, 1:-1]
+        bottom = jnp.zeros(n_cols, dtype=omega.dtype)
+        top = jnp.full(n_cols, flux, dtype=omega.dtype)
+        interior = solve_helmholtz_2d(
+            rhs,
+            self.grid.dx,
+            self.grid.dy,
+            bc_x="periodic",
+            bc_y="dirichlet",
+            bc_y_values=(bottom, top),
+        )
+        psi = jnp.zeros_like(omega)
+        psi = psi.at[1:-2, 1:-1].set(interior)
+        # Wall nodes, and the ghost row above the top wall at the wall value.
+        psi = psi.at[-2:, :].set(jnp.asarray(flux, dtype=omega.dtype))
+        # Periodic ghost columns.
+        psi = psi.at[:, 0].set(psi[:, -2])
+        return psi.at[:, -1].set(psi[:, 1])
+
+    def _wrap(self, field: Array) -> Array:
+        """Fill the periodic ghosts of a field the stencils left at zero.
+
+        finitevolX's interpolations write only the interior, so on a
+        periodic axis the edge stencils would average with a zero ghost.
+        T-, U- and V-point arrays share the same-index rule, so one copy
+        serves all three.
+        """
+        if self.problem == "periodic":
+            return enforce_periodic(field)
+        if self.problem == "channel":
+            field = field.at[:, 0].set(field[:, -2])
+            return field.at[:, -1].set(field[:, 1])
+        return field
+
+    def _flux_tendency(self, omega: Array) -> Array:
+        """dQ/dt = G Ly - nu (mean omega_top - mean omega_bottom).
+
+        The x-averaged momentum budget integrated across the channel:
+        on a stationary no-slip wall du/dy = -omega and uv = 0.
+        """
+        if self.problem != "channel":
+            return jnp.zeros((), dtype=omega.dtype)
+        wall_top = jnp.mean(omega[-2, 1:-1])
+        wall_bottom = jnp.mean(omega[0, 1:-1])
+        forcing = self.pressure_gradient * self.grid.Ly
+        return forcing - self.params.nu * (wall_top - wall_bottom)
 
     def _velocity_from_psi(
         self, psi: Float[Array, "Ny Nx"]
@@ -222,39 +325,48 @@ class IncompressibleNS2D(Model):
         """Compute vorticity tendency."""
         omega = state.omega
         # 1. Poisson inversion: nabla^2 psi = -omega
-        psi = self._solve_psi(omega)
+        psi = self._solve_psi(omega, state.flux)
         # 2. Velocity from streamfunction
         u_V, v_U = self._velocity_from_psi(psi)
         # Interpolate to T-points for scalar advection
-        u_T = self.interp.V_to_T(u_V)
-        v_T = self.interp.U_to_T(v_U)
+        u_T = self._wrap(self.interp.V_to_T(self._wrap(u_V)))
+        v_T = self._wrap(self.interp.U_to_T(self._wrap(v_U)))
         # Interpolate to face points for transport
-        u_on_U = self.interp.T_to_U(u_T)
-        v_on_V = self.interp.T_to_V(v_T)
-        # 3. Advection of vorticity
-        adv = self.advection(omega, u_on_U, v_on_V, method=self.method)
+        u_on_U = self._wrap(self.interp.T_to_U(u_T))
+        v_on_V = self._wrap(self.interp.T_to_V(v_T))
+        # 3. Advection of vorticity; the periodic box and the channel
+        # read the periodic ghost columns, so their edge faces are open.
+        wall = "closed" if self.problem == "cavity" else "open"
+        adv = self.advection(omega, u_on_U, v_on_V, method=self.method, wall=wall)
         # 4. Diffusion
         diff = self.params.nu * self.diff.laplacian(omega)
-        # 5. Body force (channel flow)
+        # 5. Body force
         domega_dt = adv + diff + self.body_force
-        return NSVorticityState(omega=domega_dt)
+        return NSVorticityState(omega=domega_dt, flux=self._flux_tendency(omega))
 
     def apply_boundary_conditions(self, state: PyTree) -> NSVorticityState:
         """Apply vorticity boundary conditions.
 
         For cavity flow (``problem="cavity"``): Thom's formula at all walls.
-        For channel flow (``problem="channel"``): periodic in x, walls in y.
+        For the periodic box (``problem="periodic"``): a periodic ghost
+        ring. For the channel (``problem="channel"``): periodic columns,
+        and Thom's formula on the walls with psi = 0 below and Q above.
         """
         omega = state.omega
-        if self.problem == "channel":
-            # Periodic in x, no-slip walls in y
+        if self.problem == "periodic":
             omega = enforce_periodic(omega)
-            psi = self._solve_psi(omega)
+        elif self.problem == "channel":
+            # Periodic columns first, so the solve sees a periodic source.
+            omega = omega.at[:, 0].set(omega[:, -2])
+            omega = omega.at[:, -1].set(omega[:, 1])
+            psi = self._solve_psi(omega, state.flux)
             dy2 = self.grid.dy**2
-            # The DST solve puts the walls (psi = 0) on rows 0 and -2;
-            # row -1 is a ghost outside the domain.
+            # Walls on rows 0 (psi = 0) and -2 (psi = Q); row -1 is a ghost.
+            # Bottom: omega = 2 (psi_wall - psi[1]) / dy^2
             omega = omega.at[0, :].set(-2.0 * psi[1, :] / dy2)
-            omega = omega.at[-2, :].set(-2.0 * psi[-3, :] / dy2)
+            # Top: omega = 2 (psi_wall - psi[-3]) / dy^2
+            omega = omega.at[-2, :].set(2.0 * (state.flux - psi[-3, :]) / dy2)
+            omega = omega.at[-1, :].set(omega[-2, :])
         else:
             # Cavity: all walls are no-slip
             psi = self._solve_psi(omega)
@@ -272,14 +384,14 @@ class IncompressibleNS2D(Model):
             omega = omega.at[:, 0].set(-2.0 * psi[:, 1] / dx2)
             # Right wall (x=Lx): omega = -2*psi[:,-3]/dx^2
             omega = omega.at[:, -2].set(-2.0 * psi[:, -3] / dx2)
-        return NSVorticityState(omega=omega)
+        return NSVorticityState(omega=omega, flux=state.flux)
 
     def diagnose(self, state: PyTree) -> NSDiagnostics:
         """Compute velocity, streamfunction, KE, and enstrophy."""
-        psi = self._solve_psi(state.omega)
+        psi = self._solve_psi(state.omega, state.flux)
         u_V, v_U = self._velocity_from_psi(psi)
-        u_T = self.interp.V_to_T(u_V)
-        v_T = self.interp.U_to_T(v_U)
+        u_T = self._wrap(self.interp.V_to_T(self._wrap(u_V)))
+        v_T = self._wrap(self.interp.U_to_T(self._wrap(v_U)))
         interior_u = u_T[1:-1, 1:-1]
         interior_v = v_T[1:-1, 1:-1]
         interior_w = state.omega[1:-1, 1:-1]
@@ -357,6 +469,7 @@ class IncompressibleNS2D(Model):
         body_force: float = 0.0,
         method: str = "upwind1",
         mask: Mask2D | None = None,
+        pressure_gradient: float = 0.0,
     ) -> IncompressibleNS2D:
         """Convenience factory.
 
@@ -366,23 +479,36 @@ class IncompressibleNS2D(Model):
             Lx: Domain length in x.
             Ly: Domain length in y.
             nu: Kinematic viscosity.
-            problem: ``"cavity"`` (Dirichlet) or ``"channel"`` (periodic x).
+            problem: ``"cavity"`` (closed box, moving lid),
+                ``"periodic"`` (doubly periodic) or ``"channel"``
+                (periodic in x, walls in y).
             u_lid: Lid velocity for cavity flow.
-            body_force: Constant vorticity source for channel flow.
+            body_force: Constant vorticity source, in every problem.
             method: Advection reconstruction method.
             mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
+                The periodic box and the channel take no mask.
+            pressure_gradient: Uniform driving ``G = -(1/rho) dp/dx`` of
+                the channel.
 
         Returns:
             An ``IncompressibleNS2D`` model instance.
+
+        Raises:
+            ValueError: If ``problem`` is unknown, or a mask is given for
+                the periodic box or the channel.
         """
+        if problem not in _POISSON_BC:
+            raise ValueError(
+                f"problem must be one of {sorted(_POISSON_BC)}, got {problem!r}"
+            )
+        if mask is not None and problem != "cavity":
+            raise ValueError(f"problem={problem!r} does not take a mask")
         grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
         params = NSParams(nu=as_parameter(nu))
         diff = Difference2D(grid=grid, mask=mask)
         interp = Interpolation2D(grid=grid, mask=mask)
         advection = FVXAdvection2D(grid=grid, mask=mask)
-        # Both cavity and channel use DST (Dirichlet psi=0 at walls).
-        # Channel periodicity in x is enforced via vorticity BCs.
-        poisson_bc = "dst"
+        poisson_bc = _POISSON_BC[problem]
         return IncompressibleNS2D(
             params=params,
             grid=grid,
@@ -395,4 +521,5 @@ class IncompressibleNS2D(Model):
             u_lid=u_lid,
             body_force=body_force,
             method=method,
+            pressure_gradient=pressure_gradient,
         )

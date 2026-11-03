@@ -170,3 +170,127 @@ class TestIncompressibleNS2D:
         v_dev = np.interp(np.asarray(GHIA_RE100_X), nodes, v_centre) - GHIA_RE100_V
         assert float(np.abs(u_dev).max()) < 0.03
         assert float(np.abs(v_dev).max()) < 0.03
+
+    def test_unknown_problem_is_rejected(self):
+        with pytest.raises(ValueError, match="problem must be one of"):
+            IncompressibleNS2D.create(nx=8, ny=8, problem="annulus")
+
+    def test_cavity_carries_a_zero_flux(self):
+        """The flux leaf exists in every problem but only the channel moves it."""
+        model = IncompressibleNS2D.create(nx=8, ny=8, nu=0.1)
+        state = model.apply_boundary_conditions(
+            NSVorticityState(omega=jnp.ones((10, 10)))
+        )
+        assert float(model.vector_field(0.0, state).flux) == 0.0
+
+    def test_periodic_box_wraps_the_ghost_ring(self):
+        """No walls: the ghost ring copies the opposite interior edge."""
+        model = IncompressibleNS2D.create(nx=8, ny=8, nu=0.1, problem="periodic")
+        omega = jnp.arange(100.0).reshape(10, 10)
+        state = model.apply_boundary_conditions(NSVorticityState(omega=omega))
+        assert jnp.allclose(state.omega[1:-1, 0], omega[1:-1, -2])
+        assert jnp.allclose(state.omega[1:-1, -1], omega[1:-1, 1])
+        assert jnp.allclose(state.omega[0, 1:-1], omega[-2, 1:-1])
+        assert jnp.allclose(state.omega[1:-1, 1:-1], omega[1:-1, 1:-1])
+
+    def test_channel_wall_vorticity_uses_the_flux(self):
+        """From rest with Q > 0, Thom's formula gives the shear of psi = Q y / Ly."""
+        model = IncompressibleNS2D.create(
+            nx=8, ny=8, Lx=2.0, Ly=1.0, nu=0.1, problem="channel"
+        )
+        state = model.apply_boundary_conditions(
+            NSVorticityState(omega=jnp.zeros((10, 10)), flux=jnp.asarray(0.5))
+        )
+        dy = model.grid.dy
+        # psi[1] = Q dy / Ly and psi[-3] = Q (Ly - dy) / Ly at zero interior omega
+        assert jnp.allclose(state.omega[0, 1:-1], -2.0 * 0.5 * dy / dy**2, rtol=1e-5)
+        assert jnp.allclose(state.omega[-2, 1:-1], 2.0 * 0.5 * dy / dy**2, rtol=1e-5)
+
+    def test_channel_stays_uniform_in_x(self):
+        """A pressure-driven channel from rest has no x-dependence to grow."""
+        model = IncompressibleNS2D.create(
+            nx=8, ny=8, Lx=2.0, Ly=1.0, nu=0.1, problem="channel", pressure_gradient=1.0
+        )
+        state = model.apply_boundary_conditions(
+            NSVorticityState(omega=jnp.zeros((10, 10)), flux=jnp.asarray(0.5))
+        )
+        tendency = model.vector_field(0.0, state)
+        interior = tendency.omega[1:-2, 1:-1]
+        assert jnp.allclose(interior, interior[:, :1], atol=1e-5)
+        assert float(tendency.flux) == pytest.approx(
+            1.0 * 1.0
+            - 0.1
+            * (
+                float(jnp.mean(state.omega[-2, 1:-1]))
+                - float(jnp.mean(state.omega[0, 1:-1]))
+            ),
+            rel=1e-5,
+        )
+
+    def test_channel_and_box_take_no_mask(self):
+        from finitevolx import CartesianGrid2D, Mask2D
+
+        grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+        mask = Mask2D.from_dimensions(grid.Ny, grid.Nx)
+        with pytest.raises(ValueError, match="does not take a mask"):
+            IncompressibleNS2D.create(nx=8, ny=8, problem="periodic", mask=mask)
+
+    @pytest.mark.slow
+    def test_periodic_taylor_green_decays_at_the_viscous_rate(self):
+        """omega = 2k sin(kx) sin(ky) e^(-2 nu k^2 t) is exact on the periodic box.
+
+        The 0.03 bound on the RMS error and 2e-3 on the amplitude ratio are
+        about twice what a 32x32 upwind3 run measures (0.013 and 4e-4).
+        """
+        n, nu, t1 = 32, 0.01, 0.5
+        model = IncompressibleNS2D.create(
+            nx=n, ny=n, nu=nu, problem="periodic", method="upwind3"
+        )
+        k = 2.0 * jnp.pi
+        x = jnp.arange(n + 2) * model.grid.dx
+        grid_x, grid_y = jnp.meshgrid(x, x)
+        omega0 = 2.0 * k * jnp.sin(k * grid_x) * jnp.sin(k * grid_y)
+        sol = model.integrate(
+            NSVorticityState(omega=omega0),
+            t0=0.0,
+            t1=t1,
+            dt=0.001,
+            saveat=dfx.SaveAt(t1=True),
+        )
+        decay = float(jnp.exp(-2.0 * nu * k**2 * t1))
+        error = (sol.ys.omega[0] - omega0 * decay)[1:-1, 1:-1]
+        ratio = float(jnp.max(jnp.abs(sol.ys.omega[0][1:-1, 1:-1])) / (2.0 * k))
+        assert float(jnp.sqrt(jnp.mean(error**2))) < 0.03
+        assert abs(ratio - decay) < 2e-3
+
+    @pytest.mark.slow
+    def test_channel_reaches_poiseuille(self):
+        """From rest, the channel settles to u = (G / 2 nu) y (Ly - y).
+
+        At t = 10 (ten viscous times Ly^2 / nu) a 32x32 run measures a flux
+        error of 0.2% and a velocity RMS error of 5e-5 against a peak of
+        1.25; the bounds are 1% and 1e-3.
+        """
+        n, G, nu, Ly = 32, 1.0, 0.1, 1.0
+        model = IncompressibleNS2D.create(
+            nx=n, ny=n, Lx=2.0, Ly=Ly, nu=nu, problem="channel", pressure_gradient=G
+        )
+        sol = model.integrate(
+            NSVorticityState(omega=jnp.zeros((n + 2, n + 2))),
+            t0=0.0,
+            t1=10.0,
+            dt=0.002,
+            saveat=dfx.SaveAt(t1=True),
+            max_steps=10_000,
+        )
+        final = NSVorticityState(omega=sol.ys.omega[0], flux=sol.ys.flux[0])
+        psi = model.diagnose(model.apply_boundary_conditions(final)).psi
+        exact_flux = G * Ly**3 / (12.0 * nu)
+        assert abs(float(final.flux) - exact_flux) / exact_flux < 0.01
+        y = jnp.arange(1, n) * model.grid.dy
+        u_centred = (psi[2 : n + 1, 1:-1] - psi[0 : n - 1, 1:-1]) / (
+            2.0 * model.grid.dy
+        )
+        u_exact = (G / (2.0 * nu)) * y * (Ly - y)
+        rms = jnp.sqrt(jnp.mean((u_centred - u_exact[:, None]) ** 2))
+        assert float(rms) < 1e-3
