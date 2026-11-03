@@ -28,6 +28,18 @@ project:
     - title: Test problems
       children:
         - file: notebooks/step01_linear_convection_1d.ipynb
+        - file: notebooks/step02_nonlinear_convection_1d.ipynb
+        - file: notebooks/step03_diffusion_1d.ipynb
+        - file: notebooks/step04_burgers_1d.ipynb
+        - file: notebooks/step05_linear_convection_2d.ipynb
+        - file: notebooks/step06_nonlinear_convection_2d.ipynb
+        - file: notebooks/step07_diffusion_2d.ipynb
+        - file: notebooks/step08_burgers_2d.ipynb
+        - file: notebooks/step09_laplace_2d.ipynb
+        - file: notebooks/step10_poisson_2d.ipynb
+        - file: notebooks/step11_helmholtz_2d.ipynb
+        - file: notebooks/step12_cavity_flow.ipynb
+        - file: notebooks/step13_channel_flow.ipynb
     - title: Design
       children:
         - file: design/workspace_and_core.md
