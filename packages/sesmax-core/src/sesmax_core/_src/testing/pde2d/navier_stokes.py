@@ -251,23 +251,27 @@ class IncompressibleNS2D(Model):
             omega = enforce_periodic(omega)
             psi = self._solve_psi(omega)
             dy2 = self.grid.dy**2
+            # The DST solve puts the walls (psi = 0) on rows 0 and -2;
+            # row -1 is a ghost outside the domain.
             omega = omega.at[0, :].set(-2.0 * psi[1, :] / dy2)
-            omega = omega.at[-1, :].set(-2.0 * psi[-2, :] / dy2)
+            omega = omega.at[-2, :].set(-2.0 * psi[-3, :] / dy2)
         else:
             # Cavity: all walls are no-slip
             psi = self._solve_psi(omega)
             dx2 = self.grid.dx**2
             dy2 = self.grid.dy**2
+            # The DST solve puts the walls (psi = 0) on rows and columns
+            # 0 and -2; row and column -1 are ghosts outside the domain.
             # Bottom wall (y=0): omega = -2*psi[1]/dy^2
             omega = omega.at[0, :].set(-2.0 * psi[1, :] / dy2)
-            # Top wall (y=Ly): omega = -2*psi[-2]/dy^2 - 2*u_lid/dy
-            omega = omega.at[-1, :].set(
-                -2.0 * psi[-2, :] / dy2 - 2.0 * self.u_lid / self.grid.dy
+            # Top wall (y=Ly): omega = -2*psi[-3]/dy^2 - 2*u_lid/dy
+            omega = omega.at[-2, :].set(
+                -2.0 * psi[-3, :] / dy2 - 2.0 * self.u_lid / self.grid.dy
             )
             # Left wall (x=0): omega = -2*psi[:,1]/dx^2
             omega = omega.at[:, 0].set(-2.0 * psi[:, 1] / dx2)
-            # Right wall (x=Lx): omega = -2*psi[:,-2]/dx^2
-            omega = omega.at[:, -1].set(-2.0 * psi[:, -2] / dx2)
+            # Right wall (x=Lx): omega = -2*psi[:,-3]/dx^2
+            omega = omega.at[:, -2].set(-2.0 * psi[:, -3] / dx2)
         return NSVorticityState(omega=omega)
 
     def diagnose(self, state: PyTree) -> NSDiagnostics:
