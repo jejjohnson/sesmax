@@ -5,8 +5,16 @@ from __future__ import annotations
 import diffrax as dfx
 import equinox as eqx
 import jax.numpy as jnp
+import numpy as np
+import pytest
 
 from sesmax_core import Diagnostics, Model, Params, State
+from sesmax_core._src.testing.pde2d.navier_stokes import (
+    GHIA_RE100_U,
+    GHIA_RE100_V,
+    GHIA_RE100_X,
+    GHIA_RE100_Y,
+)
 from sesmax_core.testing import (
     IncompressibleNS2D,
     NSDiagnostics,
@@ -118,3 +126,47 @@ class TestIncompressibleNS2D:
         omega_final = sol.ys.omega[0]
         # Vorticity should be non-zero (lid drives flow)
         assert float(jnp.max(jnp.abs(omega_final[1:-1, 1:-1]))) > 0.01
+
+    def test_lid_vorticity_on_wall_row(self):
+        """Thom's formula sets the lid's vorticity on the wall row, not the ghost.
+
+        The DST solve puts psi = 0 on rows and columns 0 and -2 (the walls);
+        from rest psi is zero everywhere, so the lid row holds -2 u_lid / dy.
+        """
+        model = IncompressibleNS2D.create(nx=16, ny=16, nu=0.1, u_lid=1.0)
+        omega0 = jnp.zeros((model.grid.Ny, model.grid.Nx))
+        state = model.apply_boundary_conditions(NSVorticityState(omega=omega0))
+        lid = -2.0 * model.u_lid / model.grid.dy
+        assert jnp.allclose(state.omega[-2, 1:-2], lid)
+        assert jnp.allclose(state.omega[-1, :], 0.0)
+        assert jnp.allclose(state.omega[1:-2, -1], 0.0)
+
+    @pytest.mark.slow
+    def test_cavity_matches_ghia_re100(self):
+        """At Re = 100 the steady centreline velocities match Ghia et al. (1982).
+
+        psi, u and v live on the X nodes j * dy, j = 0..ny (walls at 0 and ny);
+        the wall values come from the boundary conditions. The 0.03 bound is
+        three times the deviation of a 32x32 upwind run at t = 10 (about 0.01).
+        """
+        n = 32
+        model = IncompressibleNS2D.create(nx=n, ny=n, nu=0.01, u_lid=1.0)
+        omega0 = jnp.zeros((model.grid.Ny, model.grid.Nx))
+        sol = model.integrate(
+            NSVorticityState(omega=omega0),
+            t0=0.0,
+            t1=10.0,
+            dt=0.002,
+            saveat=dfx.SaveAt(t1=True),
+            max_steps=10_000,
+        )
+        diag = model.diagnose(NSVorticityState(omega=sol.ys.omega[0]))
+        nodes = np.arange(n + 1) / n
+        u_centre = np.array(diag.u[: n + 1, n // 2])
+        u_centre[0], u_centre[-1] = 0.0, model.u_lid
+        v_centre = np.array(diag.v[n // 2, : n + 1])
+        v_centre[0], v_centre[-1] = 0.0, 0.0
+        u_dev = np.interp(np.asarray(GHIA_RE100_Y), nodes, u_centre) - GHIA_RE100_U
+        v_dev = np.interp(np.asarray(GHIA_RE100_X), nodes, v_centre) - GHIA_RE100_V
+        assert float(np.abs(u_dev).max()) < 0.03
+        assert float(np.abs(v_dev).max()) < 0.03
