@@ -25,7 +25,8 @@ from sesmax_core._src.types import State
 # class variables (``mask_locations``) steer StateAffine. Three classes of the
 # somax suite run on toy-model states (TestFieldNamesAreOnlyAHint,
 # TestNonlinearOneDimensionalCoriolisPartner,
-# TestTransportedScalarsKeepTheirAmplitude) and move with sesmax_core.testing.
+# TestTransportedScalarsKeepTheirAmplitude); they import those from
+# sesmax_core.testing.
 
 
 class BarotropicQGState(State):
@@ -613,6 +614,154 @@ class TestSampleMomentsSurviveHalfPrecision:
 
         grad = jax.grad(scale_of)(jnp.full((8, 4, 4), 2.0))
         assert bool(jnp.all(jnp.isfinite(grad)))
+
+
+class TestFieldNamesAreOnlyAHint:
+    """A field's name does not fix its scaling or its staggering.
+
+    ``h`` is a total thickness in the nonlinear shallow-water models
+    and a height anomaly in the linear ones; ``u`` is a C-grid velocity
+    in the ocean models and a T-point scalar in the pde family. Each
+    state says which it means.
+    """
+
+    def scales(self):
+        return Scales.advective(L=1.0e6, U=0.1, f0=1.0e-4, H=500.0)
+
+    def test_linear_shallow_water_height_is_not_offset(self):
+        """A resting linear state is zero, and must map to zero."""
+        from sesmax_core._src.testing.swm.linear_2d import LinearSW2DState
+
+        transform = StateAffine.from_scales(LinearSW2DState, self.scales())
+        assert float(transform.loc.h) == 0.0
+
+    def test_nonlinear_shallow_water_height_still_is(self):
+        """The default is unchanged for states that do mean thickness."""
+        transform = StateAffine.from_scales(NonlinearSW2DState, self.scales())
+        assert float(transform.loc.h) == pytest.approx(self.scales().H)
+
+    def test_a_resting_linear_state_maps_to_zero(self):
+        from sesmax_core._src.testing.swm.linear_2d import LinearSW2DState
+
+        transform = StateAffine.from_scales(LinearSW2DState, self.scales())
+        rest = LinearSW2DState(
+            h=jnp.zeros((4, 4)), u=jnp.zeros((4, 4)), v=jnp.zeros((4, 4))
+        )
+        np.testing.assert_allclose(np.asarray(transform.forward(rest).h), 0.0)
+
+    def test_navier_stokes_vorticity_is_recognised(self):
+        """``omega`` is this family's spelling; it must not warn."""
+        from sesmax_core._src.testing.pde2d.navier_stokes import NSVorticityState
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            transform = StateAffine.from_scales(NSVorticityState, self.scales())
+        assert float(transform.scale.omega) == pytest.approx(self.scales().vorticity)
+
+    def test_collocated_velocities_use_the_t_point_mask(self):
+        """Burgers keeps u and v at T-points, so mask.u would be wrong."""
+        from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
+
+        assert Burgers2DState.mask_locations == {"u": "h", "v": "h"}
+
+    def test_qg_potential_vorticity_uses_the_t_point_mask(self):
+        assert BarotropicQGState.mask_locations == {"q": "h"}
+
+    def test_the_declared_mask_is_the_one_actually_used(self):
+        """Not just declared: a dry T-cell must be excluded in practice."""
+        from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
+
+        wet = np.ones((6, 6), dtype=bool)
+        wet[2:4, 2:4] = False
+        mask = Mask2D.from_mask(jnp.asarray(wet))
+
+        samples = jnp.asarray(np.ones((5, 6, 6)))
+        # Poison the dry cells; with the T-point mask they are excluded
+        # and the wet-cell mean stays exactly 1.
+        samples = samples.at[:, 2:4, 2:4].set(1.0e6)
+        transform = StateAffine.from_samples(
+            Burgers2DState(u=samples, v=samples), mask=mask
+        )
+        assert float(jnp.max(transform.loc.u)) == pytest.approx(1.0, rel=1e-6)
+
+    def test_metadata_does_not_become_a_state_field(self):
+        """The ClassVars are metadata, not leaves."""
+        from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
+
+        transform = StateAffine.from_scales(Burgers2DState, self.scales())
+        assert not hasattr(transform.loc, "mask_locations_leaf")
+        assert len(jax.tree_util.tree_leaves(transform.loc)) == 2
+
+
+class TestNonlinearOneDimensionalCoriolisPartner:
+    """``NonlinearSW1DState.v`` is a T-point field, like the linear one."""
+
+    def test_it_declares_the_t_point_mask(self):
+        from sesmax_core._src.testing.swm.nonlinear_1d import NonlinearSW1DState
+
+        assert NonlinearSW1DState.mask_locations == {"v": "h"}
+
+    def test_it_matches_the_linear_state(self):
+        from sesmax_core._src.testing.swm.linear_1d import LinearSW1DState
+        from sesmax_core._src.testing.swm.nonlinear_1d import NonlinearSW1DState
+
+        assert (
+            NonlinearSW1DState.mask_locations["v"]
+            == LinearSW1DState.mask_locations["v"]
+        )
+
+    def test_u_keeps_the_staggered_mask(self):
+        """Only ``v`` is collocated; ``u`` really is at U-points."""
+        from sesmax_core._src.testing.swm.nonlinear_1d import NonlinearSW1DState
+
+        assert "u" not in NonlinearSW1DState.mask_locations
+
+
+class TestTransportedScalarsKeepTheirAmplitude:
+    """``u`` in the pde family is the transported field, not a velocity.
+
+    Its amplitude comes from the initial condition, so there is no
+    scale for it in ``Scales``; dividing it by ``U`` would make the
+    nondimensional state depend on a velocity that belongs to the
+    equation's coefficient instead.
+    """
+
+    SCALAR_STATES = (
+        "sesmax_core._src.testing.pde1d.linear_convection.LinearConvection1DState",
+        "sesmax_core._src.testing.pde1d.diffusion.Diffusion1DState",
+        "sesmax_core._src.testing.pde2d.linear_convection.LinearConvection2DState",
+        "sesmax_core._src.testing.pde2d.diffusion.Diffusion2DState",
+    )
+
+    @staticmethod
+    def _load(path):
+        import importlib
+
+        module, name = path.rsplit(".", 1)
+        return getattr(importlib.import_module(module), name)
+
+    @pytest.mark.parametrize("path", SCALAR_STATES)
+    def test_the_scale_is_one_whatever_the_velocity_scale(self, path):
+        state_cls = self._load(path)
+        fast = Scales.advective(L=1e6, U=10.0, f0=1e-4, H=1000.0)
+        slow = Scales.advective(L=1e6, U=0.01, f0=1e-4, H=1000.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert float(StateAffine.from_scales(state_cls, fast).scale.u) == 1.0
+            assert float(StateAffine.from_scales(state_cls, slow).scale.u) == 1.0
+
+    @pytest.mark.parametrize("path", SCALAR_STATES)
+    def test_it_is_declared_rather_than_unknown(self, path):
+        """An unknown kind would give scale 1 too — but with a warning."""
+        assert self._load(path).scale_kinds == {"u": "tracer"}
+
+    def test_burgers_velocities_are_still_velocities(self):
+        """The contrast: there ``u`` really is the transported velocity."""
+        from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
+
+        scales = Scales.advective(L=1e6, U=10.0, f0=1e-4, H=1000.0)
+        transform = StateAffine.from_scales(Burgers2DState, scales)
+        assert float(transform.scale.u) == pytest.approx(10.0)
 
 
 class ShapedState(State):
