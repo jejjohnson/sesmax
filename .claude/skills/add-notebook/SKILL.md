@@ -44,7 +44,11 @@ read it first. This is the checklist.
    `stderr` streams. ipykernel's IOPub pipe always binds a `127.0.0.1` TCP
    port, so a probe there still prints `Bad pipe message: %s [...]` to
    stderr; drop a stderr output only if every line of it is such a line,
-   and say so in the PR. Any other stderr is a real problem to fix.
+   and say so in the PR. The same goes for matplotlib's one-off
+   `findfont: Font family ['cmti10'] not found. Falling back to DejaVu Sans.`
+   (matplotlib 3.11 logs it on the first mathtext render while it sets up
+   the `cm` fallback fonts; the text still renders). Any other stderr is a
+   real problem to fix.
 
 5. Delete the `.py`; the executed `.ipynb` is the source of truth. To fix
    something later, regenerate the `.py` (`jupytext --to py:percent`),
