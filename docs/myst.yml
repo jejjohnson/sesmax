@@ -25,6 +25,9 @@ project:
     api: http://127.0.0.1:8910/
   toc:
     - file: index.md
+    - title: Test problems
+      children:
+        - file: notebooks/step01_linear_convection_1d.ipynb
     - title: Design
       children:
         - file: design/workspace_and_core.md
