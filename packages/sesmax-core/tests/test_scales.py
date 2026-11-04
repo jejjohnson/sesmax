@@ -228,7 +228,7 @@ class TestAdvectiveCoriolisValidation:
     """``f0`` may be zero or negative here, but never non-finite.
 
     Zero is a non-rotating model and a negative value is the southern
-    hemisphere, so :func:`_require_positive` would be too strict. NaN
+    hemisphere, so :func:`require_positive` would be too strict. NaN
     and infinity are still fatal: they make ``eta`` and every
     rotation-dependent group non-finite, and the object looks valid
     until something downstream divides by it.
@@ -302,3 +302,9 @@ class TestNondimensionalNonRotating:
         for group in ("rossby", "burger", "froude", "lamb"):
             assert getattr(nd, group) == pytest.approx(getattr(s, group), rel=1e-12)
         assert nd.eta / nd.H == pytest.approx(s.eta / s.H, rel=1e-12)
+
+
+def test_positive_inputs_name_scales_in_their_error():
+    """A rejected input says which object rejected it."""
+    with pytest.raises(ValueError, match=r"Scales: L must be a finite positive number"):
+        Scales.advective(L=-1.0, U=1.0)

@@ -19,6 +19,7 @@ from sesmax_core._src._validation import require_positive
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
 from sesmax_core._src.testing.pde1d._burgers_flux import burgers_tendency
+from sesmax_core._src.testing.pde1d._ghosts import fill_ghosts
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
 
 
@@ -98,14 +99,7 @@ class Burgers1D(Model):
 
     def apply_boundary_conditions(self, state: PyTree) -> Burgers1DState:
         """Apply boundary conditions to the state."""
-        u = state.u
-        if self.periodic:
-            u = u.at[0].set(u[-2])
-            u = u.at[-1].set(u[1])
-        else:
-            u = u.at[0].set(-u[1])
-            u = u.at[-1].set(-u[-2])
-        return Burgers1DState(u=u)
+        return Burgers1DState(u=fill_ghosts(state.u, periodic=self.periodic))
 
     def diagnose(self, state: PyTree) -> Burgers1DDiagnostics:
         """Compute energy diagnostic."""

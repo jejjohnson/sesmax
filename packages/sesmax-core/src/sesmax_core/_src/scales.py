@@ -30,6 +30,8 @@ from typing import Literal
 
 import equinox as eqx
 
+from sesmax_core._src._validation import require_positive
+
 
 ScaleKind = Literal["advective", "inertial", "planetary", "diffusive"]
 
@@ -97,7 +99,7 @@ class Scales(eqx.Module):
             ValueError: If ``L``, ``U``, ``H`` or ``g`` is not strictly
                 positive, or if ``f0`` is not finite.
         """
-        _require_positive(L=L, U=U, H=H, g=g)
+        require_positive("Scales", L=L, U=U, H=H, g=g)
         # ``f0`` is the one input this set does not require to be
         # positive — zero is a non-rotating model and a negative value
         # is the southern hemisphere — but non-finite is still fatal:
@@ -137,7 +139,7 @@ class Scales(eqx.Module):
             ValueError: If ``L``, ``H``, ``f0``, ``rossby`` or ``g`` is
                 not strictly positive.
         """
-        _require_positive(L=L, H=H, f0=f0, rossby=rossby, g=g)
+        require_positive("Scales", L=L, H=H, f0=f0, rossby=rossby, g=g)
         return cls(L=L, U=f0 * L * rossby, H=H, f0=f0, T=1.0 / f0, g=g, kind="inertial")
 
     @classmethod
@@ -171,7 +173,7 @@ class Scales(eqx.Module):
             ValueError: If ``a``, ``Omega``, ``H``, ``rossby`` or ``g``
                 is not strictly positive.
         """
-        _require_positive(a=a, Omega=Omega, H=H, rossby=rossby, g=g)
+        require_positive("Scales", a=a, Omega=Omega, H=H, rossby=rossby, g=g)
         return cls(
             L=a,
             U=2.0 * Omega * a * rossby,
@@ -212,7 +214,7 @@ class Scales(eqx.Module):
             ValueError: If ``L``, ``kappa`` or ``g`` is not strictly
                 positive.
         """
-        _require_positive(L=L, kappa=kappa, g=g)
+        require_positive("Scales", L=L, kappa=kappa, g=g)
         return cls(
             L=L,
             U=kappa / L,
@@ -342,12 +344,12 @@ class Scales(eqx.Module):
                 bound is asked for without a diffusivity on a
                 non-diffusive set.
         """
-        _require_positive(cfl=cfl)
+        require_positive("Scales", cfl=cfl)
         counts = (n_cells,) if isinstance(n_cells, int) else tuple(n_cells)
         if not counts:
             raise ValueError("dt_from_cfl: n_cells must name at least one axis.")
         for axis, count in enumerate(counts):
-            _require_positive(**{f"n_cells[{axis}]": float(count)})
+            require_positive("Scales", **{f"n_cells[{axis}]": float(count)})
 
         if extent is None:
             extents = (1.0,) * len(counts)
@@ -363,7 +365,7 @@ class Scales(eqx.Module):
                 f"names {len(counts)}."
             )
         for axis, value in enumerate(extents):
-            _require_positive(**{f"extent[{axis}]": value})
+            require_positive("Scales", **{f"extent[{axis}]": value})
 
         spacings = tuple(e / c for e, c in zip(extents, counts, strict=True))
 
@@ -409,7 +411,7 @@ class Scales(eqx.Module):
                         "is used). Only a diffusive scale set fixes it at 1."
                     )
                 diffusivity = 1.0
-            _require_positive(diffusivity=diffusivity)
+            require_positive("Scales", diffusivity=diffusivity)
             inverse_squares = sum(1.0 / spacing**2 for spacing in spacings)
             return cfl / (2.0 * diffusivity * inverse_squares)
         raise ValueError(
@@ -512,17 +514,8 @@ def _require_finite(**values: float) -> None:
     """Raise if any named value is not finite.
 
     For an input whose sign or zero is meaningful, so
-    :func:`_require_positive` would be too strict.
+    :func:`require_positive` would be too strict.
     """
     for name, value in values.items():
         if not math.isfinite(value):
             raise ValueError(f"Scales: {name} must be a finite number; got {value!r}.")
-
-
-def _require_positive(**values: float) -> None:
-    """Raise if any named value is not strictly positive or is not finite."""
-    for name, value in values.items():
-        if not math.isfinite(value) or value <= 0.0:
-            raise ValueError(
-                f"Scales: {name} must be a finite positive number; got {value!r}."
-            )
