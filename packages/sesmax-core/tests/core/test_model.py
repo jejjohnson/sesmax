@@ -5,11 +5,22 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 import diffrax as dfx
+import equinox as eqx
+import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy as np
 import pytest
 
-from sesmax_core import Model
+from sesmax_core import (
+    Model,
+    ScaledModel,
+    StateAffine,
+    TermFn,
+    TermModel,
+    implicit,
+    positive,
+)
 
 
 @runtime_checkable
@@ -149,3 +160,180 @@ def test_model_provides_forward_model_step_and_signature():
     model = ExponentialDecay(rate=1.0)
     assert isinstance(model, _ModelStepLike)
     assert model.state_signature is None
+
+
+def test_forward_model_step_matches_model_step_exactly():
+    """The forward model runs the same solve as ``Model.step``."""
+    model = ExponentialDecay(rate=0.7)
+    state = jnp.array([1.0, -2.0, 3.0])
+
+    final = model.as_forward_model(dt=0.5, dt0=0.5).step(state, 0.5)
+
+    np.testing.assert_array_equal(final, model.step(state, 0.5))
+
+
+def test_forward_model_substeps_match_integrate():
+    """``dt0`` sets the integrator step, separately from the window."""
+    model = ExponentialDecay(rate=0.7)
+    state = jnp.array([1.0, -2.0, 3.0])
+
+    final = model.as_forward_model(dt=0.5, dt0=0.05).step(state, 0.5)
+    expected = model.integrate(state, 0.0, 0.5, 0.05).ys[-1]
+
+    # Ten steps in single precision round differently by about 1e-7.
+    np.testing.assert_allclose(final, expected, rtol=1e-6)
+
+
+class ClampedDecay(ExponentialDecay):
+    """Decay with the first entry held at zero by its boundary condition."""
+
+    def apply_boundary_conditions(self, state):
+        return state.at[0].set(0.0)
+
+
+def test_forward_model_fills_boundaries_in_the_right_hand_side():
+    """Each evaluation sees filled boundaries, but the input isn't filled."""
+    model = ClampedDecay(rate=0.7)
+    state = jnp.array([1.0, -2.0, 3.0])
+
+    final = model.as_forward_model(dt=0.5, dt0=0.5).step(state, 0.5)
+
+    np.testing.assert_array_equal(final[1:], model.step(state, 0.5)[1:])
+    assert final[0] == state[0]
+
+
+def test_forward_model_on_a_filled_state_matches_model_step_exactly():
+    """Filling the input first recovers ``Model.step`` everywhere."""
+    model = ClampedDecay(rate=0.7)
+    state = jnp.array([1.0, -2.0, 3.0])
+    filled = model.apply_boundary_conditions(state)
+
+    final = model.as_forward_model(dt=0.5, dt0=0.5).step(filled, 0.5)
+
+    np.testing.assert_array_equal(final, model.step(state, 0.5))
+
+
+def test_forward_model_unwraps_constrained_parameters():
+    """A ``positive`` parameter gives what the plain value gives."""
+    state = jnp.array([1.0, -2.0, 3.0])
+    plain = ExponentialDecay(rate=jnp.asarray(0.7))
+    wrapped = ExponentialDecay(rate=positive(0.7))
+
+    final = wrapped.as_forward_model(dt=0.5, dt0=0.05).step(state, 0.5)
+    expected = plain.as_forward_model(dt=0.5, dt0=0.05).step(state, 0.5)
+
+    np.testing.assert_allclose(final, expected, rtol=1e-6)
+
+
+def test_forward_model_satisfies_the_pipekit_contract():
+    """It is a real ``pipekit_cycle.ForwardModel``, with its own ``dt``."""
+    from pipekit_cycle import ForwardModel
+
+    forward = ExponentialDecay(rate=0.7).as_forward_model(dt=0.5, dt0=0.05)
+
+    assert isinstance(forward, ForwardModel)
+    assert forward.dt == 0.5
+
+
+def test_forward_model_dynamics_integrates_between_times():
+    """``as_dynamics`` carries the absolute time, which ``step`` does not."""
+
+    class Ramp(Model):
+        def vector_field(self, t, state, args=None):
+            return t * jnp.ones_like(state)
+
+        def apply_boundary_conditions(self, state):
+            return state
+
+    model = Ramp()
+    state = jnp.array([1.0, -2.0, 3.0])
+    forward = model.as_forward_model(dt=0.5, dt0=0.5)
+
+    final = forward.as_dynamics()(state, 1.0, 1.5)
+
+    np.testing.assert_array_equal(final, model.step(state, 0.5, t0=1.0))
+    # x(1.5) = x(1) + (1.5² - 1²) / 2
+    np.testing.assert_allclose(final, state + 0.625, rtol=1e-6)
+
+
+def test_forward_model_reverse_gradient_reaches_parameters():
+    """The model is a leaf of the forward model, so a filtered grad finds it."""
+    state = jnp.array([1.0, -2.0, 3.0])
+    model = ExponentialDecay(rate=jnp.asarray(0.7))
+
+    def loss(candidate):
+        forward = candidate.as_forward_model(dt=0.5, dt0=0.05)
+        return jnp.sum(forward.step(state, 0.5) ** 2)
+
+    gradient = eqx.filter_grad(loss)(model).rate
+
+    # d/dk Σ x² e^(-2 k t) = -2 t Σ x² e^(-2 k t), up to the solver's error
+    exact = -2.0 * 0.5 * jnp.sum(state**2) * jnp.exp(-2.0 * 0.7 * 0.5)
+    np.testing.assert_allclose(gradient, exact, rtol=1e-3)
+
+
+def test_forward_model_forward_mode_needs_direct_adjoint():
+    """``jax.jvp`` works once the adjoint is ``DirectAdjoint``."""
+    model = ExponentialDecay(rate=0.7)
+    state = jnp.array([1.0, -2.0, 3.0])
+    forward = model.as_forward_model(dt=0.5, dt0=0.05, adjoint=dfx.DirectAdjoint())
+
+    final, tangent = jax.jvp(lambda s: forward.step(s, 0.5), (state,), (state,))
+
+    # The problem is linear, so the tangent along the state is the state's image.
+    np.testing.assert_allclose(tangent, final, rtol=1e-6)
+
+
+def test_term_model_forward_model_rejects_mixed_terms():
+    """One vector field can't hold an IMEX split, so it refuses one."""
+    decay = TermFn(lambda t, state, args=None: -state)
+    model = TermModel(terms=decay + implicit(decay))
+
+    with pytest.raises(ValueError, match="one ODETerm"):
+        model.as_forward_model(dt=0.5, dt0=0.05)
+
+
+def test_term_model_forward_model_accepts_a_single_kind():
+    """An all-explicit tree runs as ``Model.step`` does."""
+    decay = TermFn(lambda t, state, args=None: -0.7 * state)
+    model = TermModel(terms=decay)
+    state = jnp.array([1.0, -2.0, 3.0])
+
+    final = model.as_forward_model(dt=0.5, dt0=0.5).step(state, 0.5)
+
+    np.testing.assert_array_equal(final, model.step(state, 0.5))
+
+
+def test_scaled_model_forward_model_rejects_mixed_terms():
+    """Wrapping an IMEX model can't get it past the check."""
+    decay = TermFn(lambda t, state, args=None: -state)
+    inner = TermModel(terms=decay + implicit(decay))
+    transform = StateAffine.identity(jnp.zeros(3))
+    model = ScaledModel(inner=inner, transform=transform, time_scale=1.0)
+
+    with pytest.raises(ValueError, match="one ODETerm"):
+        model.as_forward_model(dt=0.5, dt0=0.05)
+
+
+def test_scaled_model_forward_model_matches_model_step():
+    """A scaled single-kind model runs in its transformed coordinates."""
+    inner = ExponentialDecay(rate=0.7)
+    state = jnp.array([1.0, -2.0, 3.0])
+    transform = StateAffine.identity(state)
+    model = ScaledModel(inner=inner, transform=transform, time_scale=2.0)
+
+    final = model.as_forward_model(dt=0.5, dt0=0.5).step(state, 0.5)
+
+    np.testing.assert_allclose(final, model.step(state, 0.5), rtol=1e-6)
+
+
+def test_forward_model_rejects_a_multi_term_model():
+    """An override of ``build_terms`` isn't silently replaced by one field."""
+
+    class TwoTermDecay(ExponentialDecay):
+        def build_terms(self):
+            drift = dfx.ODETerm(lambda t, state, args: -state)
+            return dfx.MultiTerm(drift, drift)
+
+    with pytest.raises(ValueError, match="one ODETerm"):
+        TwoTermDecay().as_forward_model(dt=0.5, dt0=0.05)

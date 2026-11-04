@@ -15,6 +15,8 @@ from jaxtyping import PyTree
 
 
 if TYPE_CHECKING:
+    from pipekit_jax import DiffraxForwardModel
+
     from sesmax_core._src.terms import Term
 
 
@@ -35,6 +37,20 @@ def _unwrapping(implementation: Callable[..., Any]) -> Callable[..., Any]:
 
     wrapper._somax_unwrapping = True
     return wrapper
+
+
+class _ModelVectorField(eqx.Module):
+    """A model's right-hand side, as a pytree the transforms can see through.
+
+    A closure would hide the model's leaves from ``eqx.filter_grad``.
+    """
+
+    model: Any
+
+    def __call__(self, t: float, state: PyTree, args: PyTree | None = None) -> PyTree:
+        model = paramax.unwrap(self.model)
+        state = model.apply_boundary_conditions(state)
+        return model.vector_field(t, state, args)
 
 
 class Model(eqx.Module):
@@ -188,6 +204,74 @@ class Model(eqx.Module):
         # ``SaveAt(t1=True)`` stacks a length-1 leading time axis onto
         # every leaf; drop it to recover a bare state pytree.
         return jtu.tree_map(lambda leaf: leaf[-1], sol.ys)
+
+    def as_forward_model(
+        self, *, dt: float, dt0: float, **settings: Any
+    ) -> DiffraxForwardModel:
+        """This model as a ``pipekit_jax.DiffraxForwardModel``.
+
+        That object holds the solver, step controller, adjoint and step budget
+        in one place, and satisfies ``pipekit_cycle.ForwardModel``. Its
+        ``as_dynamics()`` gives the ``(state, t0, t1)`` form filterax uses. The
+        model's boundary conditions and constrained parameters are handled as
+        they are in :meth:`build_terms`.
+
+        It differs from :meth:`step` in two ways. Its ``step`` integrates over
+        ``[0, dt]``, so a model with time-dependent forcing needs
+        ``as_dynamics()``. It also doesn't fill boundaries on the state it is
+        given, only in each evaluation of the right-hand side, so ghost cells in
+        the input stay as they are; pass
+        ``model.apply_boundary_conditions(state)`` to match :meth:`step` exactly.
+
+        Args:
+            dt: Window length that a cycle reads.
+            dt0: Integrator step.
+            **settings: Passed to ``DiffraxForwardModel``: ``solver``,
+                ``stepsize_controller``, ``adjoint``, ``max_steps``, and
+                ``diffusion`` with ``sde_key`` for an SDE. Use
+                ``adjoint=diffrax.DirectAdjoint()`` for a solver that
+                differentiates in forward mode.
+
+        Returns:
+            The forward model.
+
+        Raises:
+            ValueError: If :meth:`build_terms` gives anything but one
+                ``ODETerm``, as an IMEX split or an SDE does. A
+                ``DiffraxForwardModel`` holds one vector field, so it would
+                silently advance stiff terms explicitly or drop the noise.
+                Use :meth:`integrate` for those.
+
+        Examples:
+            A window through the forward model equals ``Model.step``:
+
+            >>> import jax.numpy as jnp
+            >>> from sesmax_core.testing import L96State, Lorenz96
+            >>> model = Lorenz96.create(F=8.0)
+            >>> state = L96State(x=jnp.linspace(-2.0, 2.0, 12))
+            >>> forward = model.as_forward_model(dt=0.05, dt0=0.05)
+            >>> final = forward.step(state, 0.05)
+            >>> bool(jnp.allclose(final.x, model.step(state, 0.05).x))
+            True
+
+            The form filterax uses:
+
+            >>> dynamics = forward.as_dynamics()
+            >>> dynamics(state, 0.0, 0.05).x.shape
+            (12,)
+        """
+        if not isinstance(self.build_terms(), dfx.ODETerm):
+            raise ValueError(
+                "as_forward_model: build_terms() does not give one ODETerm, and a "
+                "DiffraxForwardModel holds one vector field. Use integrate() with "
+                "the solver these terms need instead."
+            )
+        # Imported here because pipekit is kept out of `import sesmax_core`.
+        from pipekit_jax import DiffraxForwardModel
+
+        return DiffraxForwardModel(
+            vector_field=_ModelVectorField(self), dt=dt, dt0=dt0, **settings
+        )
 
     def diagnose(self, state: PyTree) -> PyTree:
         """Compute on-demand diagnostics from state.
