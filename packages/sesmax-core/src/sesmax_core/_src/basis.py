@@ -32,8 +32,11 @@ import abc
 from collections.abc import Callable
 
 import equinox as eqx
+import jax
+import jax.core
 import jax.numpy as jnp
 import jax.tree_util as jtu
+import numpy as np
 from jaxtyping import Array, Float, PyTree
 
 from sesmax_core._src.forcing import ForcingProtocol
@@ -138,6 +141,68 @@ class FourierInTime(TemporalBasis):
 
     def weights(self, t: float) -> Float[Array, " m"]:
         return jnp.cos(self.freqs * t + self.phases)
+
+
+class HatInTime(TemporalBasis):
+    """Piecewise-linear gate on knots, so the coefficients are values at the knots.
+
+    ``b_k(t)`` is the hat on knot ``t_k``: 1 at ``t_k``, 0 at its neighbours and
+    linear in between, so ``sum_k w_k b_k(t)`` is the linear interpolant of the
+    ``w_k``. Outside the knots the end values are held, as ``jnp.interp`` does.
+    The knots are fixed geometry (not part of the control); they are stored as
+    array leaves but excluded from gradients by :func:`control_filter`.
+
+    Attributes:
+        knots: Strictly increasing times ``t_k`` of shape ``(m,)``, which need
+            not be evenly spaced.
+
+    Raises:
+        ValueError: If ``knots`` is not one-dimensional and strictly increasing.
+
+    Examples:
+        Halfway between two knots, each carries half of the weight:
+
+        >>> import jax.numpy as jnp
+        >>> hats = HatInTime(knots=jnp.array([0.0, 1.0, 3.0]))
+        >>> hats.weights(0.5).tolist()
+        [0.5, 0.5, 0.0]
+
+        Past the last knot, its value is held:
+
+        >>> hats.weights(10.0).tolist()
+        [0.0, 0.0, 1.0]
+
+        In a forcing, the coefficients are the values at the knots:
+
+        >>> spatial = SpatialBasis.from_array(jnp.ones((2, 3)), std=jnp.ones(3))
+        >>> forcing = BasisForcing(
+        ...     coeffs=jnp.array([1.0, 2.0, 4.0]),
+        ...     spatial=spatial,
+        ...     temporal=hats,
+        ...     grid_shape=(2,),
+        ... )
+        >>> forcing(2.0).tolist()
+        [3.0, 3.0]
+    """
+
+    knots: Float[Array, " m"] = eqx.field(converter=jnp.asarray)
+
+    def __check_init__(self) -> None:
+        # Knots built inside a trace have no values to check.
+        if isinstance(self.knots, jax.core.Tracer):
+            return
+        # NumPy, because jnp would give tracers for constants inside a trace.
+        knots = np.asarray(self.knots)
+        if knots.ndim != 1 or bool(np.any(np.diff(knots) <= 0.0)):
+            raise ValueError(
+                "HatInTime: knots must be one-dimensional and strictly increasing; "
+                f"got {knots!r}."
+            )
+
+    def weights(self, t: float) -> Float[Array, " m"]:
+        unit_values = jnp.eye(self.knots.size, dtype=self.knots.dtype)
+        # b_k(t) is the interpolant of the values that are 1 at t_k and 0 elsewhere.
+        return jax.vmap(lambda values: jnp.interp(t, self.knots, values))(unit_values)
 
 
 class BasisForcing(ForcingProtocol):
