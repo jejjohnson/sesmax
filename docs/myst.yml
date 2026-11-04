@@ -58,6 +58,7 @@ project:
     - title: Data assimilation
       children:
         - file: notebooks/data_assimilation_etkf.ipynb
+        - file: notebooks/data_assimilation_4dvar.ipynb
     - title: Design
       children:
         - file: design/workspace_and_core.md
