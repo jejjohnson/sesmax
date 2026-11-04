@@ -19,6 +19,7 @@ from jaxtyping import Array, PyTree
 from sesmax_core._src._validation import require_positive
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
+from sesmax_core._src.testing.pde2d._advective_form import advective_tendency
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
 
 
@@ -87,12 +88,15 @@ class Burgers2D(Model):
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> Burgers2DState:
         r"""Compute tendency: advection + diffusion for (u, v)."""
-        # Transport velocities at faces
-        u_on_U = self.interp.T_to_U(state.u)
-        v_on_V = self.interp.T_to_V(state.v)
         # Advection
-        adv_u = self.advection(state.u, u_on_U, v_on_V, method=self.method)
-        adv_v = self.advection(state.v, u_on_U, v_on_V, method=self.method)
+        adv_u, adv_v = advective_tendency(
+            state.u,
+            state.v,
+            self.advection,
+            self.interp,
+            self.diff,
+            method=self.method,
+        )
         # Diffusion
         diff_u = self.params.nu * self.diff.laplacian(state.u)
         diff_v = self.params.nu * self.diff.laplacian(state.v)

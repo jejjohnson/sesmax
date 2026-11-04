@@ -46,6 +46,7 @@ from jaxtyping import Array, PyTree
 
 from sesmax_core._src.model import TermModel
 from sesmax_core._src.terms import IMPLICIT, Kind, Scaled, Term, implicit
+from sesmax_core._src.testing.pde2d._advective_form import advective_tendency
 from sesmax_core._src.testing.pde2d.burgers import Burgers2D, Burgers2DState
 from sesmax_core._src.types import as_parameter
 
@@ -61,20 +62,26 @@ class Burgers2DAdvection(Term):
     Args:
         advection: finitevolx C-grid advection operator.
         interp: finitevolx interpolation operator (T→U, T→V).
+        diff: finitevolx difference operator (for the divergence).
         method: Reconstruction method passed to the advection operator.
     """
 
     advection: FVXAdvection2D
     interp: Interpolation2D
+    diff: Difference2D
     method: str = eqx.field(static=True, default="upwind1")
 
     def __call__(
         self, t: float, state: Burgers2DState, args: PyTree | None = None
     ) -> Burgers2DState:
-        u_on_U = self.interp.T_to_U(state.u)
-        v_on_V = self.interp.T_to_V(state.v)
-        adv_u = self.advection(state.u, u_on_U, v_on_V, method=self.method)
-        adv_v = self.advection(state.v, u_on_U, v_on_V, method=self.method)
+        adv_u, adv_v = advective_tendency(
+            state.u,
+            state.v,
+            self.advection,
+            self.interp,
+            self.diff,
+            method=self.method,
+        )
         return Burgers2DState(u=adv_u, v=adv_v)
 
 
@@ -199,6 +206,7 @@ class Burgers2DTermModel(TermModel):
         advection = Burgers2DAdvection(
             advection=FVXAdvection2D(grid=grid, mask=mask),
             interp=Interpolation2D(grid=grid, mask=mask),
+            diff=Difference2D(grid=grid, mask=mask),
             method=method,
         )
         diffusion = Burgers2DDiffusion(
@@ -234,6 +242,7 @@ class Burgers2DTermModel(TermModel):
         advection = Burgers2DAdvection(
             advection=model.advection,
             interp=model.interp,
+            diff=model.diff,
             method=model.method,
         )
         diffusion = Burgers2DDiffusion(

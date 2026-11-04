@@ -9,6 +9,7 @@ import jax.numpy as jnp
 from finitevolx import (
     Advection2D as FVXAdvection2D,
     CartesianGrid2D,
+    Difference2D,
     Interpolation2D,
     Mask2D,
     enforce_periodic,
@@ -18,6 +19,7 @@ from jaxtyping import Array, PyTree
 from sesmax_core._src._validation import require_positive
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
+from sesmax_core._src.testing.pde2d._advective_form import advective_tendency
 from sesmax_core._src.types import Diagnostics, State
 
 
@@ -60,6 +62,7 @@ class NonlinearConvection2D(Model):
         grid: 2D Arakawa C-grid.
         advection: Advection operator.
         interp: Interpolation operators.
+        diff: Difference operators (for the divergence).
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
         method: Reconstruction method (default ``"upwind1"``).
     """
@@ -67,6 +70,7 @@ class NonlinearConvection2D(Model):
     grid: CartesianGrid2D = eqx.field(static=True)
     advection: FVXAdvection2D
     interp: Interpolation2D
+    diff: Difference2D
     mask: Mask2D | None
     method: str = eqx.field(static=True, default="upwind1")
 
@@ -74,12 +78,14 @@ class NonlinearConvection2D(Model):
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> NonlinearConvection2DState:
         """Compute tendency via upwind advection."""
-        # Interpolate T-point velocities to U/V face points for transport
-        u_on_U = self.interp.T_to_U(state.u)
-        v_on_V = self.interp.T_to_V(state.v)
-        # Advect each component
-        du_dt = self.advection(state.u, u_on_U, v_on_V, method=self.method)
-        dv_dt = self.advection(state.v, u_on_U, v_on_V, method=self.method)
+        du_dt, dv_dt = advective_tendency(
+            state.u,
+            state.v,
+            self.advection,
+            self.interp,
+            self.diff,
+            method=self.method,
+        )
         return NonlinearConvection2DState(u=du_dt, v=dv_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> NonlinearConvection2DState:
@@ -163,6 +169,12 @@ class NonlinearConvection2D(Model):
         grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
         advection = FVXAdvection2D(grid=grid, mask=mask)
         interp = Interpolation2D(grid=grid, mask=mask)
+        diff = Difference2D(grid=grid, mask=mask)
         return NonlinearConvection2D(
-            grid=grid, advection=advection, interp=interp, mask=mask, method=method
+            grid=grid,
+            advection=advection,
+            interp=interp,
+            diff=diff,
+            mask=mask,
+            method=method,
         )
