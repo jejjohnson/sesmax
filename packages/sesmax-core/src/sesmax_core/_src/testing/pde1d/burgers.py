@@ -6,12 +6,19 @@ from typing import Any, ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import Advection1D, CartesianGrid1D, Difference1D, Mask1D
+from finitevolx import (
+    Advection1D,
+    CartesianGrid1D,
+    Difference1D,
+    Interpolation1D,
+    Mask1D,
+)
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src._validation import require_positive
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
+from sesmax_core._src.testing.pde1d._burgers_flux import burgers_tendency
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
 
 
@@ -60,6 +67,7 @@ class Burgers1D(Model):
         grid: 1D Arakawa C-grid.
         diff: Difference operators (for diffusion).
         advection: Advection operator (for nonlinear convection).
+        interp: Interpolation operator (for the face velocity).
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
         method: Reconstruction method for advection (default ``"upwind1"``).
@@ -69,6 +77,7 @@ class Burgers1D(Model):
     grid: CartesianGrid1D = eqx.field(static=True)
     diff: Difference1D
     advection: Advection1D
+    interp: Interpolation1D
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
     method: str = eqx.field(static=True, default="upwind1")
@@ -77,7 +86,13 @@ class Burgers1D(Model):
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> Burgers1DState:
         r"""Compute tendency: du/dt = -u * du/dx + nu * d²u/dx²."""
-        advection_term = self.advection(state.u, state.u, method=self.method)
+        advection_term = burgers_tendency(
+            state.u,
+            self.advection,
+            self.interp,
+            periodic=self.periodic,
+            method=self.method,
+        )
         diffusion_term = self.params.nu * self.diff.laplacian(state.u)
         return Burgers1DState(u=advection_term + diffusion_term)
 
@@ -166,11 +181,13 @@ class Burgers1D(Model):
         params = Burgers1DParams(nu=as_parameter(nu))
         diff = Difference1D(grid=grid, mask=mask)
         advection = Advection1D(grid=grid, mask=mask)
+        interp = Interpolation1D(grid=grid, mask=mask)
         return Burgers1D(
             params=params,
             grid=grid,
             diff=diff,
             advection=advection,
+            interp=interp,
             mask=mask,
             periodic=periodic,
             method=method,

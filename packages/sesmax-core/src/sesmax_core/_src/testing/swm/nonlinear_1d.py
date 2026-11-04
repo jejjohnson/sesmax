@@ -113,12 +113,16 @@ class NonlinearShallowWater1D(Model):
         nu = self.params.lateral_viscosity
         kappa = self.params.bottom_drag
 
+        # The domain is periodic: a closed wall would write no tendency on the
+        # outermost cells. finitevolX requires closed walls with a mask.
+        wall = "closed" if self.mask is not None else "open"
+
         # Mass equation: dh/dt = -d(hu)/dx (via advection operator)
-        dh_dt = self.advection(h, u, method=self.method)
+        dh_dt = self.advection(h, u, method=self.method, wall=wall)
 
         # Momentum advection: -u * du/dx, implemented in conservative
         # flux form as -d(u^2 / 2)/dx using the existing advection operator.
-        du_adv = 0.5 * self.advection(u, u, method=self.method)
+        du_adv = 0.5 * self.advection(u, u, method=self.method, wall=wall)
 
         # Pressure gradient: -g * dh/dx
         pressure_grad = -g * self.diff.diff_x_T_to_U(h)

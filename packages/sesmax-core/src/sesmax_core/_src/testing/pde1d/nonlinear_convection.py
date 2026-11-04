@@ -6,11 +6,12 @@ from typing import Any, ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import Advection1D, CartesianGrid1D, Mask1D
+from finitevolx import Advection1D, CartesianGrid1D, Interpolation1D, Mask1D
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
+from sesmax_core._src.testing.pde1d._burgers_flux import burgers_tendency
 from sesmax_core._src.types import Diagnostics, State
 
 
@@ -45,6 +46,7 @@ class NonlinearConvection1D(Model):
     Args:
         grid: 1D Arakawa C-grid.
         advection: Advection operator.
+        interp: Interpolation operator.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
         method: Reconstruction method for advection (default ``"upwind1"``).
@@ -52,6 +54,7 @@ class NonlinearConvection1D(Model):
 
     grid: CartesianGrid1D = eqx.field(static=True)
     advection: Advection1D
+    interp: Interpolation1D
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
     method: str = eqx.field(static=True, default="upwind1")
@@ -59,8 +62,14 @@ class NonlinearConvection1D(Model):
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> NonlinearConvection1DState:
-        """Compute tendency: du/dt = -d(u*u)/dx via upwind flux."""
-        du_dt = self.advection(state.u, state.u, method=self.method)
+        """Compute tendency: du/dt = -d(u^2 / 2)/dx via upwind flux."""
+        du_dt = burgers_tendency(
+            state.u,
+            self.advection,
+            self.interp,
+            periodic=self.periodic,
+            method=self.method,
+        )
         return NonlinearConvection1DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> NonlinearConvection1DState:
@@ -135,9 +144,11 @@ class NonlinearConvection1D(Model):
         """
         grid = CartesianGrid1D.from_interior(nx, Lx)
         advection = Advection1D(grid=grid, mask=mask)
+        interp = Interpolation1D(grid=grid, mask=mask)
         return NonlinearConvection1D(
             grid=grid,
             advection=advection,
+            interp=interp,
             mask=mask,
             periodic=periodic,
             method=method,
