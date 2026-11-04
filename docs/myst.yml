@@ -23,10 +23,14 @@ project:
     - name: J. Emmanuel Johnson
   references:
     api: http://127.0.0.1:8910/
+  bibliography:
+    - references.bib
   toc:
     - file: index.md
     - title: Test problems
       children:
+        - file: notebooks/phase1_fundamentals.ipynb
+        - file: notebooks/phase2_spatial.ipynb
         - file: notebooks/step01_linear_convection_1d.ipynb
         - file: notebooks/step02_nonlinear_convection_1d.ipynb
         - file: notebooks/step03_diffusion_1d.ipynb
