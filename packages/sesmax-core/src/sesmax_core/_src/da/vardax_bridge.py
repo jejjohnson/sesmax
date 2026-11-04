@@ -22,6 +22,7 @@ ignore ``t0``), but a model with explicitly time-dependent forcing would have
 its later substeps evaluated at the wrong absolute time. Use this adapter with
 autonomous models; ``t0`` sets the (single) window start, not a per-substep
 clock.
+To estimate a time-varying forcing, use :class:`sesmax_core.da.WindowOperator`.
 
 Importing this module requires the ``da`` dependency group (``uv sync
 --group da``), which provides ``vardax``.
