@@ -23,11 +23,12 @@ def advective_tendency(
 ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
     """Advective tendencies of both velocity components on a periodic box.
 
-    ∂u/∂t = −(u ∂/∂x + v ∂/∂y) u = −∇·(u 𝐮) + u ∇·𝐮, and the same for v
+    du/dt = -(u d/dx + v d/dy) u = -div(u w) + u div(w), with w = (u, v);
+    the same for v
 
     finitevolX's advection operator computes the flux form ``-div(h u)``. The
     equations are in advective form and this flow is not divergence-free, so
-    the ``u ∇·𝐮`` term is added back. The result is not conservative, so a
+    the ``u div(w)`` term is added back. The result is not conservative, so a
     sharp front's speed is only as good as the viscosity that resolves it.
 
     A periodic box needs ``wall="open"``, because a closed wall writes no

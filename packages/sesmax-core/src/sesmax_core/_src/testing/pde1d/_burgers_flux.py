@@ -16,10 +16,10 @@ def burgers_tendency(
 ) -> Float[Array, " Nx"]:
     """Advective tendency of Burgers' equation in flux form.
 
-    ∂u/∂t = −∂(u² / 2)/∂x
+    du/dt = -d(u^2 / 2)/dx
 
     finitevolX's advection operator computes ``-d(h v)/dx`` with ``v`` at the
-    faces, so the flux ``u² / 2`` is half of ``h = u`` carried by ``v = u``
+    faces, so the flux ``u^2 / 2`` is half of ``h = u`` carried by ``v = u``
     interpolated to the faces.
 
     A periodic domain needs ``wall="open"``, because a closed wall writes no
