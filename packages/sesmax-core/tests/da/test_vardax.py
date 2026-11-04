@@ -212,10 +212,14 @@ def test_default_adjoint_supports_reverse_mode_only():
 
 @pytest.mark.slow
 def test_vardax_cycle_runs_a_window_through_the_adapter():
-    """One forecast and analysis of ``VarDACycle`` improves on the background."""
+    """A ``VarDACycle`` step beats a free forecast at the end of its window.
+
+    The cycle forecasts one step from the background, takes that as the start
+    of the window, and returns the analysis at the end of the window.
+    """
     model = Lorenz96.create(F=8.0, advection=False)
     truth, initial_truth, observed, background, background_cov, obs_cov = _window(
-        model, n_variables=12, n_steps=3, background_std=1.0
+        model, n_variables=12, n_steps=4, background_std=1.0
     )
     forward = VardaxForwardModel(model=model, template=truth, dt=0.05)
     strong = StrongFourDVar(
@@ -225,10 +229,12 @@ def test_vardax_cycle_runs_a_window_through_the_adapter():
         prior_cov_op=background_cov,
         obs_cov_op=obs_cov,
     )
+    # One sample per time of the window, which starts one step after the background.
+    window = [observed[index] for index in range(1, 5)]
 
     class WindowSource(Operator):
         def _apply(self, index):
-            return observed[None]
+            return window
 
         def get_config(self):
             return {}
@@ -241,5 +247,11 @@ def test_vardax_cycle_runs_a_window_through_the_adapter():
         n_steps=1,
     )
     analysis, state = cycle(background, DAState(obs_err_cov=obs_cov))
+
+    end_truth = initial_truth
+    free_forecast = background
+    for _ in range(4):
+        end_truth = forward.step(end_truth, 0.05)
+        free_forecast = forward.step(free_forecast, 0.05)
     assert state.cycle_count == 1
-    assert _rmse(analysis[0], initial_truth) < _rmse(background, initial_truth)
+    assert _rmse(analysis, end_truth) < _rmse(free_forecast, end_truth)
