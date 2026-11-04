@@ -18,6 +18,8 @@ Variational assimilation with `vardax`:
   per-substep time). Structured background / observation covariances come
   from `gaussx` operators (e.g. ``LowRankUpdate``), which are
   ``lineax``-compatible.
+  ``IncrementalFourDVar`` differentiates in forward mode, so it needs
+  ``adjoint=diffrax.DirectAdjoint()`` on the adapter.
 
 Shared bridge:
 
