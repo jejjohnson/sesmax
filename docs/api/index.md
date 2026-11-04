@@ -18,7 +18,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Scales](scales.md) | `Scales`, `StateAffine`, `ScaledModel` |
 | [Layered fluids](gfd.md) | `StratificationProfile`, `ModalTransform`, `HelmholtzCache` and its periodic, Dirichlet, Neumann and multimodal versions |
 | [Domains](domain.md) | `Domain`, `TimeDomain` |
-| [Solvers](solvers.md) | `imex_solver`, `imex_stepsize_controller` |
+| [Solvers](solvers.md) | `imex_solver`, `imex_stepsize_controller`, `stable_step` |
 | [Training rollouts](train.md) | `rollout`, `rollout_loss`, `state_mse`, `ModelStep` |
 | [Monitors](monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
 | [Operators](operators.md) | `ModelOp`, `OperatorTerm` |
