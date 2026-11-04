@@ -31,6 +31,7 @@ project:
       children:
         - file: notebooks/phase1_fundamentals.ipynb
         - file: notebooks/phase2_spatial.ipynb
+        - file: notebooks/phase3_chaos.ipynb
         - file: notebooks/step01_linear_convection_1d.ipynb
         - file: notebooks/step02_nonlinear_convection_1d.ipynb
         - file: notebooks/step03_diffusion_1d.ipynb
@@ -44,6 +45,12 @@ project:
         - file: notebooks/step11_helmholtz_2d.ipynb
         - file: notebooks/step12_cavity_flow.ipynb
         - file: notebooks/step13_channel_flow.ipynb
+        - file: notebooks/lorenz63_simulation.ipynb
+        - file: notebooks/lorenz96_simulation.ipynb
+        - file: notebooks/lorenz96t_simulation.ipynb
+        - file: notebooks/step14_gravity_waves_1d.ipynb
+        - file: notebooks/step15_shallow_water_1d.ipynb
+        - file: notebooks/step16_geostrophic_adjustment.ipynb
     - title: Design
       children:
         - file: design/workspace_and_core.md
