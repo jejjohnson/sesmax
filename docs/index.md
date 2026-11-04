@@ -47,7 +47,7 @@ ensemble = make_ensemble(state0, jax.random.key(1), size=32, std=0.1)  # (N_E, D
 dynamics = FilteraxDynamics(model=model, template=state0)
 ```
 
-The [test problems](notebooks/step01_linear_convection_1d.ipynb) work through the models one equation at a time.
+The tutorials work through the models one equation at a time: the [steps to Navier–Stokes](guide/steps_to_navier_stokes.md), [chaos and predictability](guide/chaos_and_predictability.md), and [rotating shallow water](notebooks/step14_gravity_waves_1d.ipynb).
 
 ## Installation
 
