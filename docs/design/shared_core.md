@@ -24,7 +24,7 @@ numbering:
 Proposed: design `sesmax-core` as the layer every time-stepping GeoModels repository can build on, with `sesmax-ocean` and plumax as its first two consumers, and add only what no library already owns: a temporal basis for time-resolved controls, a stable-step bound, a whole-window operator for source inversion, and a thin method that hands a model to `pipekit_jax.DiffraxForwardModel`.
 plumax designs against this API but does not switch over until the core and its stack are on PyPI.
 radtrax does not depend on the core.
-Status: proposed, for review. Nothing here is implemented, and no follow-up issue is filed yet.
+Status: proposed, for review. Nothing here is implemented, and the follow-up issues are filed, with #8 tracking them.
 
 ## What this page settles
 
@@ -223,9 +223,9 @@ The repetition is re-implementation under other names, which a body comparison c
 | Helmholtz and Poisson solves | spectraldiffx | the core's `HelmholtzCache` family, which only forwards to it | decide in C2: the caches exist to give one `solve` signature |
 | Spatial bases | geonnax `basis` | vardax's constructors and the core's `spatial_from_*`, both delegating to it | see below the table |
 | Stable step | nobody | plumax `stable_step_bound`; somax `check_cfl`; the core's `Scales.dt_from_cfl`, from scales | SC-4 |
-| Observation operators | vardax | pipekit-cycle has its own `CallableObs` and `LinearObs`; the core's `SubsampleObs` | #27; the two names are an ask for pipekit and vardax |
+| Observation operators | vardax | pipekit-cycle has its own `CallableObs` and `LinearObs`; the core's `SubsampleObs` | #27; the two names are [vardax#217](https://github.com/jejjohnson/vardax/issues/217) |
 | Whitening | gaussx | vardax `_whitener`; radtrax `WhiteningTransform`; the core's `BasisForcing.whiten` | check when vardax work reaches them; not compared |
-| Filter statistics | gaussx | filterax `kalman_gain` and `ensemble_covariance` delegate; its `gaspari_cohn`, `inflate_*` and `sigma_points` are written out | an ask for filterax; not compared numerically |
+| Filter statistics | gaussx | filterax `kalman_gain` and `ensemble_covariance` delegate; its `gaspari_cohn`, `inflate_*` and `sigma_points` are written out | filterax already tracks this in its #119 to #124; `gaspari_cohn` differs by up to 0.49 at the same arguments, so its `radius` and gaussx's `c` are not the same parameter |
 | Lorenz systems | none | `vardax.Lorenz63`, `vardax.Lorenz96`; `sesmax_core.testing` | accept: vardax cannot import sesmax, which sits above it |
 | Error classes | each package | vardax, plumax and radtrax each define `ParameterError`, `ShapeError` or `GridError` | accept: one base per package is the house style |
 
@@ -233,7 +233,7 @@ Three of these need more words.
 
 **Vertical modes.** The workspace design says finitevolX still has the eigensolver bug, and that is out of date. Rossby radii from the two agree to $7 \times 10^{-11}$ on three stratifications in double precision, so `ModalTransform` no longer needs its own eigensolve for correctness. On the first of those, its transforms equal finitevolX's to $10^{-16}$ after one overall factor of 0.1, so delegating would rescale modal coefficients, and the switch needs a decision and a test rather than a silent swap.
 
-**Spatial bases.** Decision SX-5 says to take vardax's bases, but vardax's constructors delegate to `geonnax.basis`, as the core's already do, so that adds a hop without removing a repeat. The decision is worth revisiting in #25.
+**Spatial bases.** Decision SX-5 said to take vardax's bases, but vardax's constructors delegate to `geonnax.basis`, as the core's already do, so that would add a hop without removing a repeat. The core stays on geonnax, and #25 and #26 are closed as not planned.
 
 **The core's own repeats.** `scales._require_positive` repeats `_validation.require_positive`, and among the test models, the same `apply_boundary_conditions` body appears in four 1D models and the same `diagnose` in the same four. Both are small cleanups.
 
@@ -243,12 +243,12 @@ This audit also changed this page's candidates: a first draft proposed an `Integ
 
 | ID | Candidate | Home | `sesmax-ocean` | plumax | radtrax |
 | --- | --- | --- | --- | --- | --- |
-| SC-1 | `Model.as_forward_model`, over `DiffraxForwardModel` | `sesmax_core.Model` | cycling DA | replaces `EulerianForwardModel` | no |
-| SC-2 | `HatInTime`, a temporal basis | `sesmax_core.forcing` | time-resolved wind control | emission time series | no |
-| SC-4 | `stable_step` | `sesmax_core.solvers` | runner preflight | `stable_step_bound` | no |
-| SC-5 | `WindowOperator` | `sesmax_core.da` | forcing estimation | `fourdvar.py` | no |
-| SC-6 | `wall="periodic"` | upstream, finitevolX | through the core | `advection.py` | no |
-| SC-7 | vertical advection and diffusion | upstream, finitevolX | later | `_vertical_ops.py` | no |
+| [SC-1](https://github.com/jejjohnson/sesmax/issues/85) | `Model.as_forward_model`, over `DiffraxForwardModel` | `sesmax_core.Model` | cycling DA | replaces `EulerianForwardModel` | no |
+| [SC-2](https://github.com/jejjohnson/sesmax/issues/86) | `HatInTime`, a temporal basis | `sesmax_core.forcing` | time-resolved wind control | emission time series | no |
+| [SC-4](https://github.com/jejjohnson/sesmax/issues/87) | `stable_step` | `sesmax_core.solvers` | runner preflight | `stable_step_bound` | no |
+| [SC-5](https://github.com/jejjohnson/sesmax/issues/88) | `WindowOperator` | `sesmax_core.da` | forcing estimation | `fourdvar.py` | no |
+| [SC-6](https://github.com/jejjohnson/finitevolX/issues/403) | `wall="periodic"` | upstream, finitevolX | through the core | `advection.py` | no |
+| [SC-7](https://github.com/jejjohnson/finitevolX/issues/404) | vertical advection and diffusion | upstream, finitevolX | later | `_vertical_ops.py` | no |
 
 SC-3, tracer transport terms in the core, is withdrawn; its section says why.
 None of the proposed names exists in the capability index today, and the concepts were checked against the libraries above.
@@ -621,12 +621,20 @@ Replacing `EulerianForwardModel` needs only a pipekit-jax dependency, so it coul
 | ID | Question | Leaning |
 | --- | --- | --- |
 | SC-Q1 | Does `ModalTransform` delegate to finitevolX, given their different normalisation? | Decide in C2, when the multilayer models it serves arrive |
-| SC-Q2 | Should #25 still take vardax's bases, since they delegate to geonnax anyway? | Keep the core on geonnax unless vardax's constructors add something the core needs |
-| SC-Q3 | Are SC-1 and SC-4 worth doing if plumax never switches? | Yes: the DA adapters and the ocean runner use them alone |
+| SC-Q2 | Are SC-1 and SC-4 worth doing if plumax never switches? | Yes: the DA adapters and the ocean runner use them alone |
 
 ## Relationships
 
 - Depends on: [the workspace and core design](workspace_and_core.md)
-- Changes: #28, #29, #73
-- Upstream asks, not filed: finitevolX (SC-6, SC-7); pipekit and vardax (`CallableObs`, `LinearObs`); filterax (`gaspari_cohn`, `inflate_*`, `sigma_points`)
-- Other repositories to change at S4: plumax; geostack's `docs/api/dependency_graph.md`
+- Changes: #28, #29, #73, and closes #25 and #26 as not planned
+- Tracked in: #8
+
+| Phase | Issue |
+| --- | --- |
+| S0 | [#84](https://github.com/jejjohnson/sesmax/issues/84) pins and PyPI ranges |
+| S1 | [#85](https://github.com/jejjohnson/sesmax/issues/85) SC-1, [#87](https://github.com/jejjohnson/sesmax/issues/87) SC-4, [#89](https://github.com/jejjohnson/sesmax/issues/89) the core's own repeats |
+| S2 | [#86](https://github.com/jejjohnson/sesmax/issues/86) SC-2 |
+| S3 | [#88](https://github.com/jejjohnson/sesmax/issues/88) SC-5 |
+| S4 | [plumax#231](https://github.com/jejjohnson/plumax/issues/231), [plumax#232](https://github.com/jejjohnson/plumax/issues/232) |
+| Upstream | [finitevolX#403](https://github.com/jejjohnson/finitevolX/issues/403), [finitevolX#404](https://github.com/jejjohnson/finitevolX/issues/404), then [#90](https://github.com/jejjohnson/sesmax/issues/90); [vardax#217](https://github.com/jejjohnson/vardax/issues/217) |
+| Layering | [geostack#120](https://github.com/jejjohnson/geostack/issues/120) |
