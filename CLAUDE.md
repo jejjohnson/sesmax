@@ -12,10 +12,8 @@ specific to Claude Code.
   `AGENTS.md` maps the usual hand-rolled code to what already exists.
 - **Skills** in `.claude/skills/` load on their own when a task matches
   their description (or run them as `/<name>`):
-  - finishing the template adoption in phase C1: `adopt-template`;
-  - building: `add-guide-page`, `add-notebook` (phase C1 adds the core's
-    extension points: `add-term`, `add-forcing-basis`, `add-monitor`,
-    `add-da-adapter`);
+  - building: `add-guide-page`, `add-notebook`, and the core's extension
+    points `add-term`, `add-forcing-basis`, `add-monitor`, `add-da-adapter`;
   - shipping: `pre-pr-check`, `sesmax-review`, `squash-commit`;
   - GitHub housekeeping: `create-gh-issue`, `link-gh-issues`.
 - **Subagents** (`.claude/agents/`), both read-only, both used by

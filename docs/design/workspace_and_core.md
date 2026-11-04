@@ -112,7 +112,7 @@ sesmax/
 
 ## Scaffolding: adopting the template as a workspace
 
-The template is written for one package in `src/`, so adoption has two parts: the usual rename and clean-out from the `adopt-template` skill, and the changes a workspace needs on top.
+The template is written for one package in `src/`, so adoption has two parts: the usual rename and clean-out, and the changes a workspace needs on top.
 
 The usual adoption steps apply as written.
 The example package (`stats`, `smoothing`, `transforms`, `utils`, the argparse CLI) and its tests, guide pages and notebooks are deleted, not kept as a reference, because nothing in sesmax resembles them.

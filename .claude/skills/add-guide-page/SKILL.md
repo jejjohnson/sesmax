@@ -15,7 +15,7 @@ two-tool build.
 - A project-level page (contributing, changelog, agents): `docs/<name>.md`,
   in the matching toc section.
 - An executable walkthrough is a notebook instead (`add-notebook`); an API
-  page under `docs/api/` is MkDocs, not MyST (`add-function`).
+  page under `docs/api/` is MkDocs, not MyST (`docs/api/index.md` lists them).
 - The basename must be unique across `docs/`, `docs/guide/` and
   `docs/notebooks/`: the page is served at `/<basename>/` (`_` → `-`), and
   frontmatter `slug:` is ignored.

@@ -20,7 +20,7 @@ packages are read from each ``packages/*/pyproject.toml`` and the public
 submodules are discovered. Two settings are yours to fill in:
 
 - ``UPSTREAM``: libraries this package builds on whose public API belongs in
-  the index too (so nobody re-implements them here). Empty by default. Their
+  the index too (so nobody re-implements them here). Their
   sections depend on the installed versions, which the index records; when
   those differ from the installed ones, only this package's part is compared.
 - ``ALLOWED_SHARED_NAMES``: names deliberately bound to different objects in
@@ -70,14 +70,53 @@ PACKAGES: list[str] = sorted(
 )
 
 # Libraries the package builds on, as {distribution: [public modules]}, with a
-# one-paragraph blurb each, e.g. {"numpy": ["numpy"]}.
-# Empty until sesmax-core has code and dependencies (phase C1).
-UPSTREAM: dict[str, list[str]] = {}
-UPSTREAM_BLURB: dict[str, str] = {}
+# one-paragraph blurb each.
+UPSTREAM: dict[str, list[str]] = {
+    "finitevolx": ["finitevolx"],
+    "spectraldiffx": ["spectraldiffx"],
+    "diffrax": ["diffrax"],
+    "lineax": ["lineax"],
+    "paramax": ["paramax"],
+    "pipekit": ["pipekit"],
+    "geonnax": ["geonnax.basis"],
+}
+UPSTREAM_BLURB: dict[str, str] = {
+    "finitevolx": (
+        "Finite-volume stencils on Arakawa C-grids: the grids, interpolation, "
+        "differences, advection, diffusion, boundary conditions and the elliptic "
+        "solves every grid-based model here calls."
+    ),
+    "spectraldiffx": (
+        "Spectral derivatives and the fast Poisson and Helmholtz solves, with "
+        "periodic, Dirichlet and Neumann boundaries per axis."
+    ),
+    "diffrax": (
+        "ODE and SDE integration: `Model.integrate` and `Model.step` run on "
+        "`diffrax.diffeqsolve`, and `build_diffrax_terms` returns its terms."
+    ),
+    "lineax": "Linear solves and linear operators; solve, never invert.",
+    "paramax": (
+        "Constrained and frozen parameters: `positive`, `interval` and `frozen` "
+        "wrap its parameterisations, and `Model` unwraps them per call."
+    ),
+    "pipekit": (
+        "Composable operators and pipelines: `ModelOp` and `OperatorTerm` are "
+        "the bridges to it."
+    ),
+    "geonnax": (
+        "Only `geonnax.basis` is used: the bases behind the `spatial_from_*` "
+        "constructors of the forcing bank."
+    ),
+}
 
 # Names two homes may bind to different objects, and why, e.g.
 # {"Mean": "stats.Mean is the statistic, aggregation.Mean the reducer"}.
-ALLOWED_SHARED_NAMES: dict[str, str] = {}
+ALLOWED_SHARED_NAMES: dict[str, str] = {
+    "Diffusion2D": (
+        "sesmax_core.testing.Diffusion2D is the test-problem model, "
+        "finitevolx.Diffusion2D the stencil operator"
+    ),
+}
 
 _AUTOREF = re.compile(r"\[([^\]]+)\]\[[^\]]*\]")
 # A full stop that ends a sentence (not "e.g." / "i.e." / "etc.").

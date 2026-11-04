@@ -29,13 +29,18 @@ in `AGENTS.md`.
 3. Also flag, wherever they appear in the diff:
    - a finite-difference stencil, a C-grid interpolation, a vorticity, divergence or kinetic-energy formula → finitevolX;
    - a spectral derivative or a Helmholtz / Poisson solve → spectraldiffx;
-   - a hand-written time-stepping loop or Runge–Kutta scheme → diffrax (and the core's steppers once they exist);
+   - a hand-written time-stepping loop or Runge–Kutta scheme → diffrax through `Model.integrate` and `Model.step`, `rollout`, `imex_solver`;
    - `jnp.linalg.inv`, `solve` or a Cholesky on a covariance → lineax or gaussx;
-   - a basis (RBF, Fourier, wavelet, EOF) built by hand → vardax's bases;
-   - flattening a state pytree to a vector by hand → `jax.flatten_util.ravel_pytree` (and the core's DA adapters once they exist);
+   - a basis (RBF, Fourier, wavelet, EOF) built by hand → the `spatial_from_*` constructors;
+   - flattening a state pytree to a vector by hand → `state_to_vector`, `make_ensemble`;
+   - physics contributions summed by hand in a `vector_field` → `Term` and `TermModel`;
+   - a forcing field added to a tendency by hand → `ForcingTerm` with `add_to` or `add_vector_to`;
+   - a softplus or sigmoid on a parameter, or `stop_gradient` to freeze one → `positive`, `interval`, `frozen`;
+   - hand-written non-dimensionalisation or standardisation of a state → `Scales`, `StateAffine`, `ScaledModel`;
+   - a cached Helmholtz solve or a vertical-mode transform → `HelmholtzCache` and its versions, `ModalTransform`;
+   - a finite check inside a tendency → `guard_finite`; between chunks → `sesmax_core.monitor`;
    - a public name that duplicates another public name for a different object (`tests/test_capabilities.py` will fail on it).
 
-   This list grows with the code: when sesmax-core receives somax's machinery (phase C1 of `docs/design/workspace_and_core.md`), its usual re-implementations join it.
 
 ## Report
 

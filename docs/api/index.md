@@ -8,8 +8,6 @@ import sesmax_core
 
 The [capability index](capabilities.md) lists every public name on one page, with a one-line summary each.
 
-`sesmax_core` receives the core machinery from somax during phase C1 of the workspace and core design; each public module gets its own page here as it lands.
-
 ## Modules
 
 | Page | Contents |

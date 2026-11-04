@@ -17,7 +17,8 @@ description: Review a change or pull request in this repository against its own 
 4. **Contracts** — the workspace tiers (a package imports only below
    itself; `tests/test_workspace.py`), optional dependencies behind their
    extra with an `ImportError` that names it, and the rules under "The
-   contracts" in `AGENTS.md`.
+   contracts" in `AGENTS.md` for whatever the diff touches: models, terms,
+   forcing, DA adapters, monitors, migrated code.
 5. **Checklist** — the rest of `CODE_REVIEW.md` (public API, API page and
    `docs/api/index.md` row, capability index, MyST prose, tests and tiers),
    skipping what ruff, ty or the tests already enforce.
