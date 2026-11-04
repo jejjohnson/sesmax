@@ -7,6 +7,9 @@ matrix-free IMEX integrator for stiff term-based models (those built with
 stage with a Krylov (GMRES) Newton root-finder — O(N) memory rather than
 O(N^2).
 
+:func:`stable_step` is the largest stable step for an explicit solve, from the
+actual spacings, speeds and diffusivities.
+
 Pure JAX / diffrax / lineax / optimistix (all base dependencies), so
 importing this is cheap; it is kept out of ``sesmax_core``'s top-level
 ``__init__`` to mirror the module-per-surface layout (cf.
@@ -28,10 +31,15 @@ Example::
     )
 """
 
-from sesmax_core._src.solvers import imex_solver, imex_stepsize_controller
+from sesmax_core._src.solvers import (
+    imex_solver,
+    imex_stepsize_controller,
+    stable_step,
+)
 
 
 __all__ = [
     "imex_solver",
     "imex_stepsize_controller",
+    "stable_step",
 ]

@@ -38,9 +38,14 @@ This is the recommended way to run any ``imex=True`` sesmax model at
 
 from __future__ import annotations
 
+import math
+from collections.abc import Sequence
+
 import diffrax as dfx
 import lineax as lx
 import optimistix as optx
+
+from sesmax_core._src._validation import require_non_negative, require_positive
 
 
 def imex_solver(
@@ -99,3 +104,85 @@ def imex_stepsize_controller(
         stepsize_controller=...)``.
     """
     return dfx.PIDController(rtol=rtol, atol=atol)
+
+
+def stable_step(
+    spacing: Sequence[float],
+    *,
+    speed: Sequence[float] = (),
+    diffusivity: Sequence[float] = (),
+    cfl: float = 1.0,
+) -> float:
+    r"""Largest stable step for an explicit solve, from the actual fields.
+
+    Δt_max = CFL / (Σᵢ |uᵢ| / Δxᵢ + 2 Σᵢ Kᵢ / Δxᵢ²)
+
+    Advection and diffusion act in the same explicit step, so their rates add,
+    and taking the smaller of two separate bounds would allow up to twice this
+    step. :meth:`sesmax_core.Scales.dt_from_cfl` answers a different question,
+    from characteristic scales, before a run has fields.
+
+    This is a first-order, forward-Euler estimate that catches a step orders of
+    magnitude too large. It is not a stability certificate for a high-order
+    reconstruction or a Runge-Kutta scheme, whose stability regions differ.
+
+    Args:
+        spacing: Grid spacing Δxᵢ along each axis.
+        speed: Largest speed |uᵢ| along each axis, or empty for no advection.
+        diffusivity: Largest diffusivity Kᵢ along each axis, or empty for no
+            diffusion.
+        cfl: Safety factor on the bound.
+
+    Returns:
+        The bound, or ``inf`` when nothing moves or diffuses.
+
+    Raises:
+        ValueError: If a spacing, or ``cfl``, is not positive, a diffusivity is
+            negative, a speed or diffusivity is not finite, or ``speed`` or
+            ``diffusivity`` is neither empty nor one value per axis.
+
+    Examples:
+        Advection only, along one axis of two:
+
+        >>> stable_step((0.5, 1.0), speed=(1.0, 0.0))
+        0.5
+
+        Advection and diffusion add, so the bound is below each alone:
+
+        >>> stable_step((1.0,), speed=(1.0,), diffusivity=(0.5,))
+        0.5
+
+        Nothing moves or diffuses:
+
+        >>> stable_step((1.0, 1.0))
+        inf
+    """
+    require_positive("stable_step", cfl=cfl)
+    for axis, step in enumerate(spacing):
+        require_positive("stable_step", **{f"spacing[{axis}]": step})
+    for name, values in (("speed", speed), ("diffusivity", diffusivity)):
+        if len(values) not in (0, len(spacing)):
+            raise ValueError(
+                f"stable_step: {name} must be empty or have one value per axis; "
+                f"got {len(values)} for {len(spacing)} axes."
+            )
+    # A blown-up state's NaN speed must not come back as a NaN step.
+    require_non_negative(
+        "stable_step",
+        **{f"|speed[{axis}]|": abs(value) for axis, value in enumerate(speed)},
+    )
+    require_non_negative(
+        "stable_step",
+        **{f"diffusivity[{axis}]": value for axis, value in enumerate(diffusivity)},
+    )
+
+    # Σᵢ |uᵢ| / Δxᵢ
+    advective_rate = sum(
+        abs(value) / step for value, step in zip(speed, spacing, strict=False)
+    )
+    # 2 Σᵢ Kᵢ / Δxᵢ²
+    diffusive_rate = 2.0 * sum(
+        value / step**2 for value, step in zip(diffusivity, spacing, strict=False)
+    )
+    total_rate = advective_rate + diffusive_rate
+    return math.inf if total_rate == 0.0 else cfl / total_rate

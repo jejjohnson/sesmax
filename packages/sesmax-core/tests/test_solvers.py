@@ -13,9 +13,10 @@ import jax.numpy as jnp
 import optimistix as optx
 import pytest
 
+import sesmax_core
 from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
 from sesmax_core._src.testing.pde2d.burgers_terms import Burgers2DTermModel
-from sesmax_core.solvers import imex_solver, imex_stepsize_controller
+from sesmax_core.solvers import imex_solver, imex_stepsize_controller, stable_step
 
 
 def _imex_burgers(n: int) -> tuple[Burgers2DTermModel, Burgers2DState]:
@@ -103,3 +104,60 @@ def test_imex_solver_scales_to_large_grid() -> None:
         stepsize_controller=imex_stepsize_controller(),
     )
     assert jnp.all(jnp.isfinite(sol.ys.u))
+
+
+def test_stable_step_matches_the_hand_computed_bound():
+    """Δt_max = 1 / (Σ |u| / Δx + 2 Σ K / Δx²), worked by hand.
+
+    With Δx = (50, 50, 25), u = (3, 0.5, 0) and K = (10, 10, 2): the advective
+    rate is 0.06 + 0.01 = 0.07, the diffusive rate is 2 (0.004 + 0.004 + 0.0032)
+    = 0.0224, and the bound is 1 / 0.0924.
+    """
+    bound = stable_step(
+        (50.0, 50.0, 25.0), speed=(3.0, 0.5, 0.0), diffusivity=(10.0, 10.0, 2.0)
+    )
+    assert bound == pytest.approx(1.0 / 0.0924, rel=1e-12)
+
+
+def test_stable_step_scales_with_cfl_and_ignores_the_sign_of_a_speed():
+    base = stable_step((1.0, 1.0), speed=(1.0, 2.0))
+    assert stable_step((1.0, 1.0), speed=(-1.0, -2.0)) == base
+    assert stable_step((1.0, 1.0), speed=(1.0, 2.0), cfl=0.5) == pytest.approx(
+        0.5 * base
+    )
+
+
+def test_stable_step_scales_with_spacing_for_advection_and_its_square_for_diffusion():
+    coarse_advection = stable_step((1.0,), speed=(1.0,))
+    fine_advection = stable_step((0.5,), speed=(1.0,))
+    assert fine_advection == pytest.approx(0.5 * coarse_advection)
+    coarse_diffusion = stable_step((1.0,), diffusivity=(1.0,))
+    fine_diffusion = stable_step((0.5,), diffusivity=(1.0,))
+    assert fine_diffusion == pytest.approx(0.25 * coarse_diffusion)
+
+
+def test_stable_step_is_infinite_when_nothing_moves_or_diffuses():
+    assert stable_step((1.0, 1.0)) == float("inf")
+    assert stable_step((1.0,), speed=(0.0,), diffusivity=(0.0,)) == float("inf")
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"spacing": (0.0,)},
+        {"spacing": (-1.0,)},
+        {"spacing": (1.0,), "cfl": 0.0},
+        {"spacing": (1.0,), "diffusivity": (-1.0,)},
+        {"spacing": (1.0,), "speed": (float("nan"),)},
+        {"spacing": (1.0,), "speed": (float("inf"),)},
+        {"spacing": (1.0, 1.0), "speed": (1.0,)},
+        {"spacing": (1.0,), "diffusivity": (1.0, 1.0)},
+    ],
+)
+def test_stable_step_rejects_bad_inputs(kwargs):
+    with pytest.raises(ValueError, match="stable_step"):
+        stable_step(**kwargs)
+
+
+def test_stable_step_is_exported_from_the_package_root():
+    assert sesmax_core.stable_step is stable_step

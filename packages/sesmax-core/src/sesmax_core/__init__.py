@@ -77,6 +77,7 @@ from sesmax_core._src.io import (
 from sesmax_core._src.model import Model, TermModel
 from sesmax_core._src.scaled import ScaledModel
 from sesmax_core._src.scales import Scales
+from sesmax_core._src.solvers import stable_step
 from sesmax_core._src.state_affine import StateAffine
 from sesmax_core._src.terms import (
     Compose,
@@ -175,6 +176,7 @@ __all__ = [
     "spatial_from_rbf",
     "spatial_from_spherical_rbf",
     "spatial_from_wavelet",
+    "stable_step",
     "state_to_dataset",
     "tile_in_time",
     "trainable_mask",
