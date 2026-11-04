@@ -65,6 +65,7 @@ project:
     - title: Design
       children:
         - file: design/workspace_and_core.md
+        - file: design/shared_core.md
     - title: Project
       children:
         - file: contributing.md

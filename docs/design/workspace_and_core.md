@@ -58,7 +58,7 @@ The geostack plan's module table was inferred from somax's capability index; rea
 | --- | --- | --- |
 | Names | `esmax`, `esmax-core`, `esmax_core` | `sesmax`, `sesmax-core`, `sesmax_core` |
 | Repository | rename `jejjohnson/somax` | new repository `jejjohnson/sesmax`; somax archived after parity (not deleted) |
-| Spatial bases | duplicates of vardax, removed | they are thin adapters over `geonnax.basis` that return somax's `SpatialBasis` with a prior standard deviation, and vardax has only four of the eight (RBF, Fourier, wavelet, EOF); they still move to vardax (SX-5), and the other four (Gabor, graph Laplacian, spherical RBF, divergence-free) go upstream first |
+| Spatial bases | duplicates of vardax, removed | they are thin adapters over `geonnax.basis` that return somax's `SpatialBasis` with a prior standard deviation, and vardax has only four of the eight (RBF, Fourier, wavelet, EOF); they stay over geonnax, as SX-5 now records |
 | `eval` | split between core and ocean | moves whole to `sesmax-ocean`: every metric takes a finitevolX C-grid `Difference2D`, and `compute_eval_metrics` dispatches on QG models |
 | `models` | all to the ocean | Lorenz-63, Lorenz-96, the 1D and 2D PDE test problems, the 1D shallow-water models and the 2D linear shallow-water model go to `sesmax_core.testing` (steps 1 to 16 of somax's tutorial series); only the nonlinear 2D, multilayer, QG and spherical models go to the ocean |
 | Modules the plan did not list | — | `basis`, `forcing_bank`, `scales`, `scaled`, `transforms`, `resolution`, `checkpoint`, `train`, `guards`, `operator_term`, `cli` (placed below) |
@@ -149,7 +149,7 @@ Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were
 | `core/model.py` | `SomaxModel`, `TermModel` | `sesmax_core` (top level) | `SomaxModel` → `Model` |
 | `core/terms.py`, `operator_term.py` | `Term`, `TermFn`, `Sum`, `Scaled`, `Compose`, `explicit`, `implicit`, `partition`, `build_diffrax_terms`; `OperatorTerm` | `sesmax_core.terms` | `OperatorTerm` joins the term algebra |
 | `core/forcing.py`, `core/basis.py` | `ForcingProtocol` and the constant, seasonal and interpolated forcings; `SpatialBasis`, `TemporalBasis`, `BasisForcing`, `ForcingTerm`, `add_to`, `control_filter` and the vector versions | `sesmax_core.forcing` | none |
-| `core/forcing_bank.py` (generic half) | `spatial_from_*` (Gabor, RBF, Fourier, graph Laplacian, EOF, wavelet, spherical RBF, divergence-free), `tile_in_time`, `GaussianWindowsInTime`, `matern_spectral_density` | `sesmax_core.forcing` | `spatial_from_{rbf,fourier,wavelet,eof}` are replaced by vardax's bases; the other four stay over geonnax until vardax ships them (SX-5) |
+| `core/forcing_bank.py` (generic half) | `spatial_from_*` (Gabor, RBF, Fourier, graph Laplacian, EOF, wavelet, spherical RBF, divergence-free), `tile_in_time`, `GaussianWindowsInTime`, `matern_spectral_density` | `sesmax_core.forcing` | all eight stay over geonnax (SX-5) |
 | `core/forcing_bank.py` (ocean presets) | `ssh_geostrophic`, `sss_coastal`, `sst_frontal`, `geostrophic_currents` | `sesmax-ocean` (C2) | named after ocean fields |
 | `core/scales.py`, `core/scaled.py` | `Scales` (Rossby, Burger, Froude numbers, `dt_from_cfl`), `ScaledModel` | `sesmax_core.scales` | none |
 | `core/transforms.py` | `StateAffine`; `StratificationProfile`, `ModalTransform` | `StateAffine` to `sesmax_core.scales`; the layered pieces to `sesmax_core.gfd` | split by concept |
@@ -194,7 +194,7 @@ The base install is what somax's base install already pulls for these modules; a
 | `[checkpoint]` | orbax-checkpoint | `sesmax_core.checkpoint` |
 
 finitevolX is a base dependency for `ModalTransform` (`build_coupling_matrix`) and for the PDE toys.
-Making `[da]` an extra is what somax#212 does for somax; sesmax-core starts that way. Taking vardax's bases (SX-5, #25) would move vardax into the base install.
+Making `[da]` an extra is what somax#212 does for somax; sesmax-core starts that way.
 An optional module imported without its extra raises an `ImportError` that names the extra, as `somax.flows` already does.
 
 ### Renames
@@ -303,9 +303,8 @@ somax stays the working ocean package until C2 merges, so the migration must not
 - **Type checking is stricter here.** somax pins ty 0.0.49 and ignores nine ty rules, whereas the template runs ty ≥ 0.0.83 with none ignored, so the copied code may fail `make typecheck`. Fallback: copy somax's ignore list into `sesmax-core` and remove rules one at a time in follow-up PRs.
 - **Doctests run on the copied code.** The template collects docstring examples with `--doctest-modules`, and somax never did. Fallback: fix the examples that fail, or convert them to plain `Example::` blocks, which doctest does not collect.
 - **Git-pinned dependencies.** finitevolX, geonnax, filterax, vardax and gaussx come from git, so release-please builds and a PyPI release of `sesmax-core` cannot publish direct references. Fallback: keep git pins until each releases on PyPI, as the plumax and radtrax stack does with radtrax.
-- **vardax's bases may not fit `BasisForcing`.** somax's `SpatialBasis` carries a prior standard deviation per mode and a `synthesize` / `analyze` pair, and vardax's basis API was not checked against it for this page (unverified). Fallback: a small adapter in `sesmax_core.forcing` that wraps a vardax basis as a `SpatialBasis`.
 - **The core keeps finitevolX in its base install.** `ModalTransform` and the PDE toys need it, so a user who only wants the term algebra still installs a C-grid library. Fallback: move `gfd` and `testing` behind a `[gfd]` extra if the install size becomes a complaint.
-- **The modal eigensolver.** somax fixed the non-symmetric layer matrix in its own `ModalTransform` (a symmetric similarity transform, `D^½ A D^-½`), whereas finitevolX still has the bug. Fallback: C1 keeps somax's version and its test, and does not switch to finitevolX's until finitevolX is fixed.
+- **The modal eigensolver.** somax fixed the non-symmetric layer matrix in its own `ModalTransform` (a symmetric similarity transform, `D^½ A D^-½`), and finitevolX has since fixed its own, in its #252. The [shared-core design](shared_core.md) has the comparison, and whether to delegate is a C2 decision.
 
 ## Decisions on the open questions
 
@@ -317,7 +316,7 @@ All six were settled on 30 Oct 2026.
 | SX-2 | How the code arrives | a copy at somax `9cb19b3`, with the source commit named in each C1 commit message and in the CHANGELOG | history and `git blame` stay in the archived somax repository |
 | SX-3 | Where the toy models live | `sesmax_core.testing`: Lorenz, the PDE test problems and, decided later the same day, the 1D shallow-water and 2D linear shallow-water models (the models of steps 1 to 16 of somax's tutorial series) | 27 somax test files move to the core whole; the step tutorials move with the models |
 | SX-4 | Where the `somax-sim` runner lives | leaning towards the core: the generic run loop in `sesmax_core.sim` behind a `[sim]` extra, with each component registering its models and scenarios; confirmed in the C2 design page | the runner stops hard-coding the ocean registry |
-| SX-5 | Spatial bases | take vardax's bases | vardax joins the core's base install; the four bases vardax lacks are proposed upstream (an ask for vardax, recorded here and not filed as a PR there) and stay over geonnax until they ship |
+| SX-5 | Spatial bases | stay on `geonnax.basis`, changed on 4 Nov 2026 from taking vardax's, whose constructors delegate to it | the core's base install keeps geonnax and needs no vardax; see the [shared-core design](shared_core.md) |
 | SX-6 | Coverage gate | very low to start: `fail_under = 30` per package, raised in follow-ups | the template's 90 % is a target, not a C1 gate |
 
 ## Follow-up issues
@@ -327,7 +326,6 @@ All six were settled on 30 Oct 2026.
 - [ ] `test(core): move somax's core tests, and add toy-model cases for the split ones` (C1)
 - [ ] `docs(core): API pages, capability index and agent files from the moved code` (C1)
 - [ ] `docs(design): sesmax-ocean, the ocean models, the runner and the DUACS benchmark` (C2)
-- [ ] vardax: add Gabor, graph-Laplacian, spherical-RBF and divergence-free bases, so sesmax-core can drop its geonnax adapters (SX-5)
 
 ## Relationships
 
