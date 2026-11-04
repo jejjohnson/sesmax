@@ -72,6 +72,11 @@ they cannot see.
 - **Optional dependencies** are imported inside the function or module that
   needs them and raise an `ImportError` naming the extra; the package's
   top-level import never pulls one in.
+- **Models** implement `vector_field` and `apply_boundary_conditions`, return a tendency with the state's structure, and change how they integrate through `build_terms`, never by overriding `step`. A method outside the three that `Model` wraps reads a constrained parameter only after `paramax.unwrap`.
+- **Terms** return zero in the fields they do not touch; a stiff term is wrapped with `implicit`, and an IMEX model builds through `build_diffrax_terms`, so `partition` routes it.
+- **Forcing** reaches a tendency through `ForcingTerm`, and an optimiser over a `BasisForcing` updates only `coeffs` (`control_filter`).
+- **DA adapters** store a `template` rather than an `unravel` closure, drive the model only through `step`, and receive the same `transform` that built the flat vectors. `VardaxForwardModel` is used only with autonomous models.
+- **Monitors** do host-side work between chunks and never run inside a trace; a halt that must happen at the offending step is a guard. A verdict with `terminate=True` carries a `reason`.
 
 ### 3. Public API and documentation
 
@@ -218,6 +223,113 @@ def loss(model, u):
 u = jnp.ones(3)
 grads = eqx.filter_grad(loss)(Drag(jnp.asarray(0.5)), u)
 assert float(grads.r) == 3.0  # d/dr Σ (r u)² = 2 r Σ u² = 2 · 0.5 · 3
+```
+
+### A constrained parameter outside the wrapped methods
+
+```python
+import jax
+import jax.numpy as jnp
+import paramax
+
+import sesmax_core as sx
+
+
+class DecayParams(sx.Params):
+    rate: jax.Array
+
+
+class DecayState(sx.State):
+    x: jax.Array
+
+
+class Decay(sx.Model):
+    params: DecayParams
+
+    # ✅ vector_field runs on the unwrapped model, so the rate is a plain array
+    def vector_field(self, t, state, args=None):
+        return DecayState(x=-self.params.rate * state.x)
+
+    def apply_boundary_conditions(self, state):
+        return state
+
+    # ❌ Model does not wrap this method, so the rate is still a paramax wrapper
+    def e_folding_time(self):
+        return 1.0 / self.params.rate
+
+
+model = Decay(DecayParams(rate=sx.positive(2.0)))
+tendency = model.vector_field(0.0, DecayState(x=jnp.ones(2)))
+assert jnp.allclose(tendency.x, -2.0)
+try:
+    model.e_folding_time()
+except TypeError:
+    pass
+else:
+    raise AssertionError("expected a TypeError on the wrapper")
+# ✅ Unwrap first for anything outside vector_field, diagnose and the boundaries
+assert jnp.allclose(paramax.unwrap(model).e_folding_time(), 0.5)
+```
+
+### An untagged stiff term stays explicit
+
+```python
+import equinox as eqx
+import jax
+
+import sesmax_core as sx
+
+
+class Damping(sx.Term):
+    rate: float = eqx.field(default=1.0)
+
+    def __call__(self, t, state, args=None):
+        return jax.tree.map(lambda leaf: -self.rate * leaf, state)
+
+
+# ❌ No implicit summand: an IMEX solver has nothing to put in its implicit stage
+_, implicit_part = sx.partition(Damping() + 100.0 * Damping())
+assert implicit_part is None
+
+# ✅ Tagged, and the tag survives scaling
+explicit_part, implicit_part = sx.partition(
+    Damping() + 100.0 * sx.implicit(Damping())
+)
+assert explicit_part is not None
+assert implicit_part is not None
+```
+
+### An optimiser that updates the whole forcing
+
+```python
+import equinox as eqx
+import jax
+import jax.numpy as jnp
+
+import sesmax_core as sx
+
+
+forcing = sx.BasisForcing(
+    coeffs=jnp.ones(2),
+    spatial=sx.SpatialBasis.from_array(jnp.eye(4)[:, :2]),
+    temporal=sx.ConstantInTime(m=2),
+    grid_shape=(2, 2),
+)
+
+
+def loss(basis_forcing):
+    return jnp.sum(basis_forcing(0.0) ** 2)
+
+
+# ❌ The dictionary is a leaf too, so a plain gradient would move it
+gradient = jax.grad(loss)(forcing)
+assert float(jnp.abs(gradient.spatial.Phi).sum()) > 0.0
+
+# ✅ Partition first, so only the coefficients are differentiated
+control, fixed = eqx.partition(forcing, sx.control_filter(forcing))
+gradient = jax.grad(lambda c: loss(eqx.combine(c, fixed)))(control)
+assert gradient.spatial.Phi is None
+assert jnp.allclose(gradient.coeffs, 2.0)
 ```
 
 ---

@@ -17,7 +17,7 @@ Each distribution lives in `packages/<dist>/` with its own `pyproject.toml`, `sr
 | — | `sesmax` | `sesmax` | code-free umbrella that installs the packages | scaffolded |
 | 2 | `sesmax-couple` | `sesmax_couple` | flux exchange, regridding, coupled runs | later |
 | 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, ocean diagnostics, scenarios | phase C2 |
-| 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing, DA adapters, monitors, I/O | empty until phase C1 |
+| 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, monitors, I/O, test problems | moved from somax; first release 0.1.0 |
 
 The public API of each package is its top-level `__all__`, plus its public submodules.
 
@@ -34,7 +34,7 @@ Each foundation brings a rule. Breaking one runs fine on your example and fails 
 | Foundation | Used for | The rule it brings |
 |---|---|---|
 | **uv workspace** | one lock file and one environment for every package | `make install` (`uv sync --all-packages --all-groups`); a new package is a directory under `packages/`, a `[tool.uv.sources]` entry and a `dev` group entry in the root `pyproject.toml`, and a release-please entry. |
-| **JAX and Equinox** (from phase C1) | every model, term and step | A step is a pure function of state, parameters and forcing that `jit`, `grad` and `vmap` go through; models and states are `eqx.Module`s; shapes and flags are static fields, physical parameters are leaves. |
+| **JAX and Equinox** | every model, term and step | A step is a pure function of state, parameters and forcing that `jit`, `grad` and `vmap` go through; models and states are `eqx.Module`s; shapes and flags are static fields, physical parameters are leaves. |
 | **The stack** (finitevolX, spectraldiffx, diffrax, lineax, gaussx, vardax, filterax) | stencils, spectral solves, time stepping, linear algebra, bases, assimilation | Compose them; never re-implement a stencil, a solver or a basis here. |
 | **pytest + `--doctest-modules`** | the suites and every docstring `Examples:` block | An example's expected output is what the code prints; a stale example is a failing test. |
 
@@ -62,16 +62,56 @@ find out whether it exists:
 |---|---|
 | A finite-difference stencil, a C-grid interpolation, a vorticity, divergence or kinetic-energy formula | finitevolX |
 | A spectral derivative, a Helmholtz or Poisson solve | spectraldiffx |
-| A time-stepping loop or a Runge–Kutta scheme | diffrax (and the core's steppers from phase C1) |
+| A time-stepping loop or a Runge–Kutta scheme | diffrax through `Model.integrate` and `Model.step`; `rollout` for a trajectory; `imex_solver` for a stiff term |
 | `jnp.linalg.inv`, `solve` or a Cholesky on a covariance | lineax, gaussx |
-| An RBF, Fourier, wavelet or EOF basis | vardax's bases |
-| Flattening a state pytree into a vector | `jax.flatten_util.ravel_pytree` (and the core's DA adapters from phase C1) |
-
-This table grows with the code: phase C1 adds the core's own names.
+| An RBF, Fourier, wavelet or EOF basis | the `spatial_from_*` constructors (`geonnax.basis` today, vardax's bases after #25) |
+| Flattening a state pytree into a vector | `state_to_vector`, `make_ensemble` (`sesmax_core.da`), or `jax.flatten_util.ravel_pytree` where the DA stack is not installed |
+| Summing physics contributions by hand in a `vector_field` | `Term`, its `+` and `*` algebra, `TermModel` |
+| Lifting a forcing field onto a tendency component | `ForcingTerm`, `add_to`, `add_vector_to` |
+| A softplus or sigmoid on a parameter, or `stop_gradient` to freeze one | `positive`, `interval`, `frozen`, `trainable_mask` |
+| Non-dimensionalising or standardising a state | `Scales`, `StateAffine`, `ScaledModel` |
+| A vertical-mode transform or a cached Helmholtz solve | `ModalTransform`, `HelmholtzCache` and its periodic, Dirichlet, Neumann and multimodal versions |
+| A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_core.monitor` |
+| A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 
 ## The contracts
 
-Everything composes because it keeps these contracts; the tests in "What enforces them" check most of them. The contracts for models, terms, forcing and the DA adapters arrive with the code in phase C1, written from what somax already does.
+Everything composes because it keeps these contracts; the tests in "What enforces them" check most of them.
+
+### Models
+
+- A model subclasses `Model` and implements `vector_field(t, state, args=None)`, which returns a tendency pytree with the state's structure, and `apply_boundary_conditions(state)`, which returns a state. `diagnose(state)` is optional and returns a `Diagnostics`.
+- `Model` wraps those three methods so they run on the unwrapped model, so a `positive` or `interval` parameter behaves like a plain array inside them. Anything else reads a constrained parameter through the `diagnostics` method or `paramax.unwrap`, because arithmetic on a wrapper is a type error.
+- `integrate(state0, t0, t1, dt, **kw)` returns a diffrax `Solution`, and `step(state, dt, *, t0=0.0, **kw)` returns a bare state with the same structure as `state`. The DA adapters and `rollout` call `step`, so a model changes how it integrates by overriding `build_terms` (SDE or IMEX), never `step`.
+- A model whose right-hand side is an assembled term tree subclasses `TermModel`, which owns `vector_field` and `build_terms`; it overrides `apply_boundary_conditions` when it has boundaries.
+- States subclass `State`, parameters `Params`, fixed constants `PhysConsts` and diagnostics `Diagnostics`. Physical parameters are leaves; shapes and flags are `eqx.field(static=True)`. A state sets `scale_kinds` and `mask_locations` where a field's name does not determine its meaning (`StateAffine` reads them).
+
+### Terms
+
+- A term subclasses `Term` and implements `__call__(t, state, args=None)`, which returns a tendency with the state's structure, zero in the fields it does not touch.
+- Terms compose with `+`, `-`, `*` and `@` (`Sum`, `Scaled`, `Compose`). A coefficient is a JAX leaf, so `jax.grad` flows through it.
+- A term is explicit unless wrapped with `implicit`. `partition` flattens a `Sum` by kind, and `build_diffrax_terms` returns one `ODETerm` when all summands share a kind, or a `MultiTerm` of (explicit, implicit) for an IMEX solver.
+- Use `TermFn` to wrap a plain callable and `OperatorTerm` to lift a pipekit operator. `OperatorTerm` is a lazy top-level export, so `import sesmax_core` stays pipekit-free.
+
+### Forcing
+
+- A forcing subclasses `ForcingProtocol` and implements `__call__(t, grid)`, which returns a field. `ForcingTerm(forcing, place=add_to("q"), grid=grid)` lifts it into the term algebra; a forcing never edits a tendency itself.
+- `BasisForcing` is `SpatialBasis.Phi @ (coeffs * TemporalBasis.weights(t))`. `coeffs` is the only control: `control_filter` selects it for an optimiser, and the dictionary, the temporal gate and the prior `std` stay fixed.
+- Each `SpatialBasis` carries its per-mode prior standard deviation, from a spectral density for a spectral basis and prescribed for a frame. `whiten` and `regularization` read it.
+
+### Data-assimilation adapters
+
+- filterax and vardax work on flat vectors and sesmax on pytrees. An adapter stores a `template` state and calls `ravel_pytree` per call rather than holding an `unravel` closure, so it stays a clean pytree under `jit` and `filter_vmap`. It drives the model only through `step`.
+- A `transform` given to `state_to_vector` or `make_ensemble` must also be given to the adapter, or the model receives standardised values as if they were physical ones.
+- `VardaxForwardModel` passes the same `t0` on every substep, so it is exact only for autonomous models.
+- Adapters import their library, so `sesmax_core.da` sits behind `[da]`, stays out of the top-level `__init__` and raises an `ImportError` naming the extra.
+
+### Monitors
+
+- A monitor subclasses `BaseMonitor`, sets `name` and overrides what it needs of `on_run_start(model, state0, *, spec)`, `on_chunk_end(model, state, info)` and `on_run_end(model, final_state, *, ok)`.
+- Monitors run host-side between jitted chunks, so they may hold Python state and never run inside a trace. A halt that must happen at the offending step is a `guard_finite`, `guard_positive` or `guard_ceiling` in the tendency instead.
+- `on_chunk_end` returns a `MonitorVerdict`; `terminate=True` needs a `reason`.
+- Nothing in the core calls monitors yet: the run loop that does arrives with `sesmax_core.sim` (#28).
 
 ### Migrated code
 
@@ -80,7 +120,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 
 ### Moving code from somax
 
-Phase C1 copies somax's core at commit `9cb19b3` (issues #9 to #34). Every moved file is checked against its source with the import rewriter:
+Code moves from somax at commit `9cb19b3` (phase C1 moved the core, and phase C2 moves the ocean). Every moved file is checked against its source with the import rewriter:
 
 ```bash
 diff <(git -C ../somax show 9cb19b3:somax/_src/core/types.py | sed -f scripts/somax_imports.sed) \
@@ -105,6 +145,14 @@ Most rules here are tests, so CI tells you when one breaks. Read a test's docstr
 | `packages/*/tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of public modules; every submodule declares a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
 | `tests/test_workspace.py` | The tiers (the core imports no component and nothing from somax); the umbrella holds no code; each `__version__` matches its `pyproject.toml` |
 | `tests/test_capabilities.py` | `docs/api/capabilities.md` is current; no name is bound to two different objects |
+| `packages/sesmax-core/tests/test_lazy_exports.py` | `OperatorTerm` is exported lazily, so `import sesmax_core` does not import pipekit |
+| `packages/sesmax-core/tests/da/test_missing_extra.py` | Importing `sesmax_core.da` or `sesmax_core.flows` without its extra raises an `ImportError` naming the extra |
+| `packages/sesmax-core/tests/core/test_model.py`, `test_paramax_integration.py` | The model contract; a model with wrapped parameters behaves like one with plain arrays, and gradients land on the stored values |
+| `packages/sesmax-core/tests/core/test_terms.py` | The term algebra, IMEX partitioning and the diffrax terms it builds |
+| `packages/sesmax-core/tests/core/test_forcing.py`, `core/test_basis.py` | Forcing fields, the reduced-order bases, and that a one-column `BasisForcing` reproduces a hand-written wind forcing |
+| `packages/sesmax-core/tests/test_monitor.py` | The monitor protocol and the built-in monitors, without an integration |
+| `packages/sesmax-core/tests/da/test_filterax.py`, `da/test_vardax.py` | A twin experiment through each DA adapter improves on the background (skipped without `[da]`) |
+| `packages/sesmax-core/tests/testing/` | The test problems against analytic or published solutions, for example Ghia's cavity and Poiseuille flow in `test_navier_stokes.py` |
 | `tests/test_build_docs.py` | The two-tool docs pipeline: inventory parsing, anchor repair, link checking, the inventory port and the absolute nav URL in `docs/myst.yml`, the files copied to the site root (`ROOT_FILES`) |
 | The `bare-install` job in `ci.yml` | Each package installs and imports alone, with no workspace around it |
 | `--doctest-modules` on each package's sources (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
@@ -119,15 +167,16 @@ Step-by-step recipes for the common jobs live as plain Markdown in `.claude/skil
 
 | Job | Recipe |
 |---|---|
-| Finish adopting the template (the agent files and extension-point skills, in phase C1) | `adopt-template` |
 | Add or update a guide page (MyST prose) | `add-guide-page` |
 | Add or update an example notebook | `add-notebook` |
+| Add a physics term or a term model | `add-term` |
+| Add a forcing, a spatial or temporal basis | `add-forcing-basis` |
+| Add a simulation monitor | `add-monitor` |
+| Adapt the models to a new DA library | `add-da-adapter` |
 | Verify before a PR | `pre-pr-check` |
 | Review a change | `sesmax-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `correctness-reviewer.md`) |
 | Write a squash commit message | `squash-commit` |
 | Open or link GitHub issues | `create-gh-issue`, `link-gh-issues` (templates in `.github/ISSUE_TEMPLATE/`; `make gh-labels`, `gh-sub`, `gh-block`, `gh-show`) |
-
-Phase C1 adds one recipe per extension point of the core (`add-term`, `add-forcing-basis`, `add-monitor`, `add-da-adapter`).
 
 ## Working in the repo
 
@@ -177,7 +226,7 @@ demand and weekly. Select the fast tier locally with
 
 ### Tests that assert on random draws
 
-The workspace draws no random numbers yet. Models, ensembles and DA tests will:
+Models, ensembles and DA tests draw random numbers:
 
 - **Incidental randomness** (any draw would do): seed it
   (`random.Random(0)`, `numpy.random.default_rng(0)`, a fixed key) so a

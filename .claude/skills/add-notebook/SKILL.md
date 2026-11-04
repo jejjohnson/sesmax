@@ -16,7 +16,7 @@ read it first. This is the checklist.
   `docs/notebooks/`: mystmd builds flat URLs from basenames, underscores
   becoming hyphens (`smoothing_deep_dive.ipynb` → `/smoothing-deep-dive/`),
   and a clash gets an unstable `-1` suffix.
-- Use the public API the way a user would (`import sesmax_core as mp`); no
+- Use the public API the way a user would (`import sesmax_core as sx`, `import sesmax_core.testing as sxt`); no
   private names.
 
 ## 2. Draft in `.py`, commit the `.ipynb`

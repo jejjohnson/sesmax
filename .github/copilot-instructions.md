@@ -9,7 +9,7 @@ The essentials, in case you only read this file:
 
 - A uv workspace: one package per directory under `packages/` (`sesmax-core` in tier 0, components such as `sesmax-ocean` in tier 1, a coupler in tier 2, and the code-free umbrella `sesmax`). A package imports only packages below its tier (`tests/test_workspace.py`). Search [`docs/api/capabilities.md`](../docs/api/capabilities.md) before writing a helper.
 - The plan, the phases and what moves from somax are in [`docs/design/workspace_and_core.md`](../docs/design/workspace_and_core.md); code copied from somax keeps its behaviour and changes only imports and the listed renames.
-- Model steps are pure functions of state, parameters and forcing that `jit`, `grad` and `vmap` go through; optional dependencies sit behind an extra and raise an `ImportError` naming it.
+- Model steps are pure functions of state, parameters and forcing that `jit`, `grad` and `vmap` go through; optional dependencies sit behind an extra and raise an `ImportError` naming it. The contracts for models, terms, forcing, DA adapters and monitors are in `AGENTS.md`.
 
 The rules for every project:
 
@@ -24,8 +24,8 @@ The rules for every project:
 - Partial test runs need `--no-cov` (the coverage gate fails a subset).
 - Never push or merge to `main` unless told to; never replace an existing PR
   description, only append to it.
-- Step-by-step recipes (adopt the template, add a guide page or notebook;
-  pre-PR check; review) are plain Markdown
+- Step-by-step recipes (add a guide page, notebook, term, forcing basis,
+  monitor or DA adapter; pre-PR check; review) are plain Markdown
   in `.claude/skills/<name>/SKILL.md`, and the two review checklists in
   `.claude/agents/`; follow them as written.
 - Path-scoped standards live in `.github/instructions/`; code review follows
