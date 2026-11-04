@@ -58,7 +58,7 @@ The geostack plan's module table was inferred from somax's capability index; rea
 | --- | --- | --- |
 | Names | `esmax`, `esmax-core`, `esmax_core` | `sesmax`, `sesmax-core`, `sesmax_core` |
 | Repository | rename `jejjohnson/somax` | new repository `jejjohnson/sesmax`; somax archived after parity (not deleted) |
-| Spatial bases | duplicates of vardax, removed | they are thin adapters over `geonnax.basis` that return somax's `SpatialBasis` with a prior standard deviation, and vardax has only four of the eight (RBF, Fourier, wavelet, EOF); they still move to vardax (SX-5), and the other four (Gabor, graph Laplacian, spherical RBF, divergence-free) go upstream first |
+| Spatial bases | duplicates of vardax, removed | they are thin adapters over `geonnax.basis` that return somax's `SpatialBasis` with a prior standard deviation, and vardax has only four of the eight (RBF, Fourier, wavelet, EOF); they stay over geonnax, as SX-5 now records |
 | `eval` | split between core and ocean | moves whole to `sesmax-ocean`: every metric takes a finitevolX C-grid `Difference2D`, and `compute_eval_metrics` dispatches on QG models |
 | `models` | all to the ocean | Lorenz-63, Lorenz-96, the 1D and 2D PDE test problems, the 1D shallow-water models and the 2D linear shallow-water model go to `sesmax_core.testing` (steps 1 to 16 of somax's tutorial series); only the nonlinear 2D, multilayer, QG and spherical models go to the ocean |
 | Modules the plan did not list | — | `basis`, `forcing_bank`, `scales`, `scaled`, `transforms`, `resolution`, `checkpoint`, `train`, `guards`, `operator_term`, `cli` (placed below) |
@@ -149,7 +149,7 @@ Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were
 | `core/model.py` | `SomaxModel`, `TermModel` | `sesmax_core` (top level) | `SomaxModel` → `Model` |
 | `core/terms.py`, `operator_term.py` | `Term`, `TermFn`, `Sum`, `Scaled`, `Compose`, `explicit`, `implicit`, `partition`, `build_diffrax_terms`; `OperatorTerm` | `sesmax_core.terms` | `OperatorTerm` joins the term algebra |
 | `core/forcing.py`, `core/basis.py` | `ForcingProtocol` and the constant, seasonal and interpolated forcings; `SpatialBasis`, `TemporalBasis`, `BasisForcing`, `ForcingTerm`, `add_to`, `control_filter` and the vector versions | `sesmax_core.forcing` | none |
-| `core/forcing_bank.py` (generic half) | `spatial_from_*` (Gabor, RBF, Fourier, graph Laplacian, EOF, wavelet, spherical RBF, divergence-free), `tile_in_time`, `GaussianWindowsInTime`, `matern_spectral_density` | `sesmax_core.forcing` | `spatial_from_{rbf,fourier,wavelet,eof}` are replaced by vardax's bases; the other four stay over geonnax until vardax ships them (SX-5) |
+| `core/forcing_bank.py` (generic half) | `spatial_from_*` (Gabor, RBF, Fourier, graph Laplacian, EOF, wavelet, spherical RBF, divergence-free), `tile_in_time`, `GaussianWindowsInTime`, `matern_spectral_density` | `sesmax_core.forcing` | all eight stay over geonnax (SX-5) |
 | `core/forcing_bank.py` (ocean presets) | `ssh_geostrophic`, `sss_coastal`, `sst_frontal`, `geostrophic_currents` | `sesmax-ocean` (C2) | named after ocean fields |
 | `core/scales.py`, `core/scaled.py` | `Scales` (Rossby, Burger, Froude numbers, `dt_from_cfl`), `ScaledModel` | `sesmax_core.scales` | none |
 | `core/transforms.py` | `StateAffine`; `StratificationProfile`, `ModalTransform` | `StateAffine` to `sesmax_core.scales`; the layered pieces to `sesmax_core.gfd` | split by concept |
