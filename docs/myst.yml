@@ -27,6 +27,9 @@ project:
     - references.bib
   toc:
     - file: index.md
+    - title: Foundations
+      children:
+        - file: notebooks/cgrid_and_boundaries.ipynb
     - file: guide/steps_to_navier_stokes.md
       children:
         - file: notebooks/step01_linear_convection_1d.ipynb

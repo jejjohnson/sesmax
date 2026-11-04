@@ -1,6 +1,6 @@
 # Steps to Navier–Stokes
 
-The geophysical models sesmax is built for are made of a few elementary processes: transport (advection), smoothing (diffusion), their nonlinear coupling, and an elliptic constraint that ties velocity to vorticity. This series builds up to the incompressible Navier–Stokes equations one process at a time, after Lorena Barba's CFD Python, in one dimension and then in two {cite}`leveque2002finite,durran2010numerical`. Each step derives its PDE, runs a model from `sesmax_core.testing`, checks it against an analytic solution or a benchmark where one exists, and differentiates through the run.
+The geophysical models sesmax is built for are made of a few elementary processes: transport (advection), smoothing (diffusion), their nonlinear coupling, and an elliptic constraint that ties velocity to vorticity. This series builds up to the incompressible Navier–Stokes equations one process at a time, after Lorena Barba's CFD Python, in one dimension and then in two {cite}`leveque2002finite,durran2010numerical`. Each step derives its PDE, runs a model from `sesmax_core.testing`, checks it against an analytic solution or a benchmark where one exists, and differentiates through the run. The [C-grid page](../notebooks/cgrid_and_boundaries.ipynb) explains the grid they all share.
 
 | Steps | Topic | Models |
 | --- | --- | --- |
