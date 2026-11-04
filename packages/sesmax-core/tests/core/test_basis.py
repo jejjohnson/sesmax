@@ -23,6 +23,7 @@ from sesmax_core import (
     ForcingTerm,
     FourierInTime,
     GaussianWindowsInTime,
+    HatInTime,
     SeasonalWindForcing,
     SpatialBasis,
     State,
@@ -302,6 +303,74 @@ class TestGaussianWindowsInTime:
         np.testing.assert_allclose(w[0], 1.0, atol=1e-6)  # peak at its own centre
         expected = jnp.exp(-0.5 * ((2.0 - 8.0) / 1.0) ** 2)
         np.testing.assert_allclose(w[1], expected, atol=1e-6)
+
+
+class TestHatInTime:
+    KNOTS = jnp.array([0.0, 1.0, 3.0, 7.0])
+
+    def _forcing(self, coeffs):
+        # Two grid cells, each with its own scale, on every knot's column.
+        dictionary = jnp.outer(jnp.array([1.0, 2.0]), jnp.ones(4))
+        spatial = SpatialBasis.from_array(dictionary, std=jnp.ones(4))
+        return BasisForcing(
+            coeffs=coeffs,
+            spatial=spatial,
+            temporal=HatInTime(knots=self.KNOTS),
+            grid_shape=(2,),
+        )
+
+    def test_weights_are_one_at_their_own_knot_and_zero_at_the_others(self):
+        hats = HatInTime(knots=self.KNOTS)
+        weights = jax.vmap(hats.weights)(self.KNOTS)
+        np.testing.assert_allclose(weights, jnp.eye(4), atol=1e-6)
+
+    @pytest.mark.parametrize("t", [-1.0, 0.0, 0.25, 1.0, 2.2, 6.9, 7.0, 9.0])
+    def test_weights_sum_to_one(self, t):
+        total = jnp.sum(HatInTime(knots=self.KNOTS).weights(t))
+        np.testing.assert_allclose(total, 1.0, atol=1e-6)
+
+    @pytest.mark.parametrize("t", [-1.0, 0.0, 0.25, 1.0, 2.2, 6.9, 7.0, 9.0])
+    def test_forcing_matches_interpolating_its_coefficients(self, t):
+        coeffs = jnp.array([1.0, -2.0, 0.5, 4.0])
+        field = self._forcing(coeffs)(t)
+        value = jnp.interp(t, self.KNOTS, coeffs)
+        np.testing.assert_allclose(field, jnp.array([1.0, 2.0]) * value, rtol=1e-6)
+
+    def test_gradient_reaches_only_the_active_coefficients(self):
+        forcing = self._forcing(jnp.array([1.0, -2.0, 0.5, 4.0]))
+        trainable, fixed = eqx.partition(forcing, control_filter(forcing))
+
+        def total(candidate):
+            return jnp.sum(eqx.combine(candidate, fixed)(2.0))
+
+        gradient = eqx.filter_grad(total)(trainable).coeffs
+
+        # At t = 2, halfway from knot 1 to knot 3, on cells scaled 1 and 2.
+        expected = jnp.array([0.0, 1.5, 1.5, 0.0])
+        np.testing.assert_allclose(gradient, expected, rtol=1e-6)
+
+    def test_runs_under_jit(self):
+        hats = HatInTime(knots=self.KNOTS)
+        jitted = eqx.filter_jit(hats.weights)
+        np.testing.assert_array_equal(jitted(2.0), hats.weights(2.0))
+
+    def test_accepts_knots_as_a_list(self):
+        hats = HatInTime(knots=[0.0, 1.0, 3.0])
+        np.testing.assert_allclose(hats.weights(0.5), jnp.array([0.5, 0.5, 0.0]))
+
+    def test_can_be_built_inside_a_trace(self):
+        @jax.jit
+        def weights(t):
+            return HatInTime(knots=self.KNOTS).weights(t)
+
+        np.testing.assert_allclose(weights(0.5), jnp.array([0.5, 0.5, 0.0, 0.0]))
+
+    @pytest.mark.parametrize(
+        "knots", [[0.0, 2.0, 1.0], [0.0, 1.0, 1.0], [[0.0, 1.0], [2.0, 3.0]]]
+    )
+    def test_rejects_knots_that_are_not_increasing(self, knots):
+        with pytest.raises(ValueError, match="strictly increasing"):
+            HatInTime(knots=jnp.array(knots))
 
 
 class TestTileInTime:
