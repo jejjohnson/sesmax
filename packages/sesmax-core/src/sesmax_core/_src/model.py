@@ -235,6 +235,13 @@ class Model(eqx.Module):
         Returns:
             The forward model.
 
+        Raises:
+            ValueError: If :meth:`build_terms` gives anything but one
+                ``ODETerm``, as an IMEX split or an SDE does. A
+                ``DiffraxForwardModel`` holds one vector field, so it would
+                silently advance stiff terms explicitly or drop the noise.
+                Use :meth:`integrate` for those.
+
         Examples:
             A window through the forward model equals ``Model.step``:
 
@@ -253,6 +260,12 @@ class Model(eqx.Module):
             >>> dynamics(state, 0.0, 0.05).x.shape
             (12,)
         """
+        if not isinstance(self.build_terms(), dfx.ODETerm):
+            raise ValueError(
+                "as_forward_model: build_terms() does not give one ODETerm, and a "
+                "DiffraxForwardModel holds one vector field. Use integrate() with "
+                "the solver these terms need instead."
+            )
         # Imported here because pipekit is kept out of `import sesmax_core`.
         from pipekit_jax import DiffraxForwardModel
 
@@ -337,28 +350,6 @@ class TermModel(Model):
     def apply_boundary_conditions(self, state: PyTree) -> PyTree:
         """Pass-through by default; override to enforce boundary conditions."""
         return state
-
-    def as_forward_model(
-        self, *, dt: float, dt0: float, **settings: Any
-    ) -> DiffraxForwardModel:
-        """This model as a ``pipekit_jax.DiffraxForwardModel``; see :class:`Model`.
-
-        Raises:
-            ValueError: If the term tree mixes explicit and implicit terms. A
-                ``DiffraxForwardModel`` holds one vector field, so it would
-                silently advance the implicit terms explicitly. Use
-                :meth:`integrate` with an IMEX solver instead.
-        """
-        from sesmax_core._src.terms import partition
-
-        explicit_part, implicit_part = partition(self.terms)
-        if explicit_part is not None and implicit_part is not None:
-            raise ValueError(
-                "as_forward_model: this term tree mixes explicit and implicit terms, "
-                "and a DiffraxForwardModel holds one vector field. Use integrate() "
-                "with imex_solver() instead."
-            )
-        return super().as_forward_model(dt=dt, dt0=dt0, **settings)
 
     def build_terms(self) -> dfx.AbstractTerm:
         """Build IMEX-aware diffrax terms from the term tree.

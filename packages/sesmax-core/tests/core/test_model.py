@@ -12,7 +12,15 @@ import jax.tree_util as jtu
 import numpy as np
 import pytest
 
-from sesmax_core import Model, TermFn, TermModel, implicit, positive
+from sesmax_core import (
+    Model,
+    ScaledModel,
+    StateAffine,
+    TermFn,
+    TermModel,
+    implicit,
+    positive,
+)
 
 
 @runtime_checkable
@@ -281,7 +289,7 @@ def test_term_model_forward_model_rejects_mixed_terms():
     decay = TermFn(lambda t, state, args=None: -state)
     model = TermModel(terms=decay + implicit(decay))
 
-    with pytest.raises(ValueError, match="mixes explicit and implicit"):
+    with pytest.raises(ValueError, match="one ODETerm"):
         model.as_forward_model(dt=0.5, dt0=0.05)
 
 
@@ -294,3 +302,38 @@ def test_term_model_forward_model_accepts_a_single_kind():
     final = model.as_forward_model(dt=0.5, dt0=0.5).step(state, 0.5)
 
     np.testing.assert_array_equal(final, model.step(state, 0.5))
+
+
+def test_scaled_model_forward_model_rejects_mixed_terms():
+    """Wrapping an IMEX model can't get it past the check."""
+    decay = TermFn(lambda t, state, args=None: -state)
+    inner = TermModel(terms=decay + implicit(decay))
+    transform = StateAffine.identity(jnp.zeros(3))
+    model = ScaledModel(inner=inner, transform=transform, time_scale=1.0)
+
+    with pytest.raises(ValueError, match="one ODETerm"):
+        model.as_forward_model(dt=0.5, dt0=0.05)
+
+
+def test_scaled_model_forward_model_matches_model_step():
+    """A scaled single-kind model runs in its transformed coordinates."""
+    inner = ExponentialDecay(rate=0.7)
+    state = jnp.array([1.0, -2.0, 3.0])
+    transform = StateAffine.identity(state)
+    model = ScaledModel(inner=inner, transform=transform, time_scale=2.0)
+
+    final = model.as_forward_model(dt=0.5, dt0=0.5).step(state, 0.5)
+
+    np.testing.assert_allclose(final, model.step(state, 0.5), rtol=1e-6)
+
+
+def test_forward_model_rejects_a_multi_term_model():
+    """An override of ``build_terms`` isn't silently replaced by one field."""
+
+    class TwoTermDecay(ExponentialDecay):
+        def build_terms(self):
+            drift = dfx.ODETerm(lambda t, state, args: -state)
+            return dfx.MultiTerm(drift, drift)
+
+    with pytest.raises(ValueError, match="one ODETerm"):
+        TwoTermDecay().as_forward_model(dt=0.5, dt0=0.05)
