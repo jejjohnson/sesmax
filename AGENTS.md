@@ -106,6 +106,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 - filterax and vardax work on flat vectors and sesmax on pytrees. An adapter stores a `template` state and calls `ravel_pytree` per call rather than holding an `unravel` closure, so it stays a clean pytree under `jit` and `filter_vmap`. It drives the model only through `step`.
 - A `transform` given to `state_to_vector` or `make_ensemble` must also be given to the adapter, or the model receives standardised values as if they were physical ones.
 - `VardaxForwardModel` passes the same `t0` on every substep, so it is exact only for autonomous models.
+- `WindowOperator` is the route for a time-varying forcing: it maps a control through a whole model run to the stacked observations, for `vardax.ThreeDVar`, and the model integrates the window with its own clock. It inverts for a forcing or a parameter, not an initial state.
 - Adapters import their library, so `sesmax_core.da` sits behind `[da]`, stays out of the top-level `__init__` and raises an `ImportError` naming the extra.
 
 ### Monitors

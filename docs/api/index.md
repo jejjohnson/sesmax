@@ -22,7 +22,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Training rollouts](train.md) | `rollout`, `rollout_loss`, `state_mse`, `ModelStep` |
 | [Monitors](monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
 | [Operators](operators.md) | `ModelOp`, `OperatorTerm` |
-| [Data assimilation](da.md) (`[da]`) | `FilteraxDynamics`, `VardaxForwardModel`, `SubsampleObs`, `state_to_vector`, `make_ensemble` |
+| [Data assimilation](da.md) (`[da]`) | `FilteraxDynamics`, `VardaxForwardModel`, `WindowOperator`, `SubsampleObs`, `state_to_vector`, `make_ensemble` |
 | [Flows](flows.md) (`[flows]`) | `StateAffineBijection`, `to_flowjax`, `learned_prior` |
 | [I/O](io.md) (`[xarray]`) | `state_to_dataset`, `dataset_to_state`, `snapshots_to_dataset`, `append_to_dataset`, `save_dataset`, `load_dataset`, `scales_attrs`, `transform_attrs`, `apply_scale_metadata` |
 | [Checkpointing](checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |

@@ -21,6 +21,10 @@ Variational assimilation with `vardax`:
   ``IncrementalFourDVar`` differentiates in forward mode, so it needs
   ``adjoint=diffrax.DirectAdjoint()`` on the adapter.
 
+:class:`WindowOperator` maps a control through a whole model run to the stacked
+observations, for ``vardax.ThreeDVar``, so that a time-dependent forcing sees the
+right time at every step.
+
 Shared bridge:
 
 - :func:`state_to_vector` / :func:`make_ensemble` convert sesmax pytree
@@ -42,6 +46,7 @@ try:
         FilteraxDynamics,
         SubsampleObs,
         VardaxForwardModel,
+        WindowOperator,
         make_ensemble,
         state_to_vector,
     )
@@ -57,6 +62,7 @@ __all__ = [
     "FilteraxDynamics",
     "SubsampleObs",
     "VardaxForwardModel",
+    "WindowOperator",
     "make_ensemble",
     "state_to_vector",
 ]

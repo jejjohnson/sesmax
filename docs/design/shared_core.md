@@ -491,10 +491,10 @@ window = sx.da.WindowOperator(  # (m,) → (D_y,)
     save_times=save_times,
     dt=dt,
 )
-# not pinned (vardax): CallableObs is not in sesmax's pinned vardax
+# today (vardax)
 # q* = argmin 𝒥(q)
 analysis = vardax.ThreeDVar(
-    obs_op=vardax.CallableObs(fn=window, jac="bwd", materialise=True),
+    obs_op=window.as_obs_op(),
     prior_mean=prior_mean,  # (m,)
     prior_cov_op=prior_covariance,  # (m, m) PSD operator
     obs_cov_op=obs_covariance,  # (D_y, D_y) PSD operator
