@@ -55,6 +55,9 @@ project:
         - file: notebooks/step14_gravity_waves_1d.ipynb
         - file: notebooks/step15_shallow_water_1d.ipynb
         - file: notebooks/step16_geostrophic_adjustment.ipynb
+    - title: Data assimilation
+      children:
+        - file: notebooks/data_assimilation_etkf.ipynb
     - title: Design
       children:
         - file: design/workspace_and_core.md

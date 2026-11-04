@@ -186,15 +186,15 @@ The base install is what somax's base install already pulls for these modules; a
 
 | Install | Brings | Needed by |
 | --- | --- | --- |
-| base | jax, jaxtyping, equinox, diffrax, lineax, optimistix, paramax, einops, finitevolX (tag), spectraldiffx, geonnax (commit), vardax (commit, for the spatial bases), pipekit, pipekit-jax | everything not listed below |
-| `[da]` | filterax (commit), gaussx through the workspace override | `sesmax_core.da` (vardax is already in the base install) |
+| base | jax, jaxtyping, equinox, diffrax, lineax, optimistix, paramax, einops, finitevolX (tag), spectraldiffx, geonnax (commit), pipekit, pipekit-jax | everything not listed below |
+| `[da]` | filterax (commit), vardax (commit), gaussx through the workspace override | `sesmax_core.da` |
 | `[sim]` | cyclopts, loguru, hydra-zen, omegaconf, pyyaml (C2) | `sesmax_core.sim` |
 | `[flows]` | flowjax | `sesmax_core.flows` |
 | `[xarray]` | xarray, zarr | `sesmax_core.io` |
 | `[checkpoint]` | orbax-checkpoint | `sesmax_core.checkpoint` |
 
 finitevolX is a base dependency for `ModalTransform` (`build_coupling_matrix`) and for the PDE toys.
-Making `[da]` an extra is what somax#212 does for somax; sesmax-core starts that way, although taking vardax's bases (SX-5) puts vardax itself in the base install.
+Making `[da]` an extra is what somax#212 does for somax; sesmax-core starts that way. Taking vardax's bases (SX-5, #25) would move vardax into the base install.
 An optional module imported without its extra raises an `ImportError` that names the extra, as `somax.flows` already does.
 
 ### Renames
@@ -215,7 +215,7 @@ No deprecated aliases: nothing outside somax imports these names (a grep of `geo
 
 A Lorenz-96 system stands in for any model in this sketch.
 The state is $\mathbf{x} \in \mathbb{R}^{D_x}$ with $D_x = 40$ variables on a ring, the forcing is $F = 8$, and the dynamics are $\mathrm{d}x_i/\mathrm{d}t = (x_{i+1} - x_{i-2})\, x_{i-1} - x_i + F$.
-The sketch integrates one window, differentiates a rollout loss with respect to $F$, and hands the model to filterax; only the import lines differ from somax at `9cb19b3`.
+The sketch integrates one window, differentiates a rollout loss with respect to $F$, and hands the model to filterax and to vardax; only the import lines differ from somax at `9cb19b3`.
 
 ```python
 # Shapes: D_x = 40 state variables; N_E = 32 ensemble members; T = 100 snapshots
@@ -223,7 +223,8 @@ import equinox as eqx
 import jax
 
 import sesmax_core as sx
-from sesmax_core.da import FilteraxDynamics, make_ensemble
+from vardax import MaskedIdentity, StrongFourDVar
+from sesmax_core.da import FilteraxDynamics, VardaxForwardModel, make_ensemble
 from sesmax_core.testing import L96State, Lorenz96
 from sesmax_core.train import rollout, rollout_loss
 
@@ -245,6 +246,20 @@ grad_F = eqx.filter_grad(rollout_loss)(                      # same tree as mode
 # today* (somax: SomaxDynamics, make_ensemble) — renamed in C1
 ensemble = make_ensemble(state0, jax.random.key(1), size=32, std=0.1)  # (N_E, D_x)
 dynamics = FilteraxDynamics(model=model, template=state0)
+
+# today (sesmax_core): without advection the window stays free of chaos
+linear_model = Lorenz96.create(F=8.0, advection=False)
+forward = VardaxForwardModel(model=linear_model, template=state0, dt=0.05)
+# today (vardax)
+# x̂₀ = argmin ½‖x₀ − μ_x‖²(Σ_x⁻¹) + ½ ∑ₜ ‖yₜ − h(xₜ)‖²(Σ_ε⁻¹)
+strong = StrongFourDVar(
+    forward=forward,
+    obs_op=MaskedIdentity(),
+    prior_mean=background,   # (D_x,)
+    prior_cov_op=prior_cov,  # (D_x, D_x) PSD operator
+    obs_cov_op=obs_cov,      # (D_x, D_x) PSD operator
+)
+analysis = strong(batch)[0]  # (D_x,)
 ```
 
 ## Tests that move with the core
