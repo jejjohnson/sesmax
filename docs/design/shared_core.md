@@ -21,7 +21,7 @@ numbering:
 
 ## Decision
 
-Proposed: design `sesmax-core` as the layer every time-stepping GeoModels repository can build on, with `sesmax-ocean` and plumax as its first two consumers, and add five things to it: time-stepping settings, a temporal basis for time-resolved controls, tracer transport terms, a stable-step bound, and a whole-window operator for source inversion.
+Proposed: design `sesmax-core` as the layer every time-stepping GeoModels repository can build on, with `sesmax-ocean` and plumax as its first two consumers, and add only what no library already owns: a temporal basis for time-resolved controls, a stable-step bound, a whole-window operator for source inversion, and a thin method that hands a model to `pipekit_jax.DiffraxForwardModel`.
 plumax designs against this API but does not switch over until the core and its stack are on PyPI.
 radtrax does not depend on the core.
 Status: proposed, for review. Nothing here is implemented, and no follow-up issue is filed yet.
@@ -32,7 +32,8 @@ Status: proposed, for review. Nothing here is implemented, and no follow-up issu
 | --- | --- |
 | Can the layering work? | Yes: `sesmax-core` sits below both `sesmax-ocean` and plumax, and the import graph stays acyclic |
 | Does a non-ocean model fit the core's contracts? | Yes: plumax's transport model, as a `TermModel`, gives the same tendency to the last bit |
-| What is worth adding? | Five candidates and one upstream option, each with its API and its use in each consumer |
+| What is repeated across the stack today? | Little is copied, but several things are written again under other names; [the audit](#repetition-audit) gives an owner for each |
+| What is worth adding? | Four small candidates and two upstream asks, each with its API and its use in each consumer |
 | What should stay out? | radtrax, plumax's physics and met fields, and observation operators |
 | What has to happen first? | The pins have to converge and the stack has to reach PyPI |
 
@@ -201,98 +202,137 @@ One thing did not map directly, and it matters for the design.
 The core's `apply_boundary_conditions(state)` fills the ghosts once per state, but advection and diffusion need different Dirichlet ghosts, as plumax's comments explain, so here each term fills its own and the model's method stays a pass-through.
 The contract in `AGENTS.md` should say that this is allowed.
 
+(repetition-audit)=
+## Repetition audit
+
+Before adding anything, we parsed every definition in finitevolX, spectraldiffx, gaussx, geonnax, vardax, filterax, pipekit, pipekit-cycle, pipekit-jax, sesmax, somax, plumax and radtrax, then compared function bodies with local names normalised and listed the definitions for each concept.
+
+Very little is copied. Leaving out sesmax and somax, whose 143 shared functions are the deliberate copy that ends when somax is archived, only two functions of five or more statements are identical across repositories: `_coerce_step` in pipekit-cycle and pipekit-jax, and `split_keys` in gaussx and geonnax.
+The repetition is re-implementation under other names, which a body comparison cannot catch, so the table below comes from reading the definitions.
+
+| Concept | Owner | Also written in | Action |
+| --- | --- | --- | --- |
+| Horizontal advection and diffusion | finitevolX `Advection*`, `Diffusion*` | thin wrappers: plumax `advection_tendency`, `diffusion_tendency`; sesmax `_burgers_flux`, `_advective_form` | keep the wrappers thin; SC-6 removes the periodic logic they repeat |
+| Vertical advection and diffusion | nobody: `Advection3D` and `Diffusion3D` act per level | plumax `vertical_advection_tendency`, `vertical_diffusion_tendency` | move to finitevolX (SC-7) |
+| Periodic edge handling | nobody | plumax `advection_tendency`; sesmax `_burgers_flux`, `_advective_form`, `IncompressibleNS2D._wrap` | move to finitevolX (SC-6) |
+| Solver, controller, adjoint and step budget | pipekit-jax `DiffraxForwardModel` | plumax `solver_kwargs`, `_pick_solver`; vardax `_DynamicalForwardModel`; the core's `integrate(**kw)` | reuse it (SC-1) |
+| One step as a `ForwardModel` | pipekit-jax `DiffraxForwardModel` | plumax `EulerianForwardModel`; the core's `ModelOp`, `VardaxForwardModel`, `FilteraxDynamics` | plumax drops its adapter; the core keeps what adds flattening or pipelines |
+| Explicit Runge–Kutta schemes | diffrax, finitevolX `RK3SSP` and others | no copies found | use them through `solver=` |
+| Time-varying fields | diffrax interpolation, through the core's `InterpolatedForcing` | plumax `WindSchedule`, `interpolate_in_time`, `_time_bracket`, `_interpolated_emission` | plumax can move at S4 |
+| Vertical modes | finitevolX `decompose_vertical_modes`, fixed in its #252 | the core's `ModalTransform.from_physics` | see below the table |
+| Helmholtz and Poisson solves | spectraldiffx | the core's `HelmholtzCache` family, which only forwards to it | decide in C2: the caches exist to give one `solve` signature |
+| Spatial bases | geonnax `basis` | vardax's constructors and the core's `spatial_from_*`, both delegating to it | see below the table |
+| Stable step | nobody | plumax `stable_step_bound`; somax `check_cfl`; the core's `Scales.dt_from_cfl`, from scales | SC-4 |
+| Observation operators | vardax | pipekit-cycle has its own `CallableObs` and `LinearObs`; the core's `SubsampleObs` | #27; the two names are an ask for pipekit and vardax |
+| Whitening | gaussx | vardax `_whitener`; radtrax `WhiteningTransform`; the core's `BasisForcing.whiten` | check when vardax work reaches them; not compared |
+| Filter statistics | gaussx | filterax `kalman_gain` and `ensemble_covariance` delegate; its `gaspari_cohn`, `inflate_*` and `sigma_points` are written out | an ask for filterax; not compared numerically |
+| Lorenz systems | none | `vardax.Lorenz63`, `vardax.Lorenz96`; `sesmax_core.testing` | accept: vardax cannot import sesmax, which sits above it |
+| Error classes | each package | vardax, plumax and radtrax each define `ParameterError`, `ShapeError` or `GridError` | accept: one base per package is the house style |
+
+Three of these need more words.
+
+**Vertical modes.** The workspace design says finitevolX still has the eigensolver bug, and that is out of date. Rossby radii from the two agree to $7 \times 10^{-11}$ on three stratifications in double precision, so `ModalTransform` no longer needs its own eigensolve for correctness. On the first of those, its transforms equal finitevolX's to $10^{-16}$ after one overall factor of 0.1, so delegating would rescale modal coefficients, and the switch needs a decision and a test rather than a silent swap.
+
+**Spatial bases.** Decision SX-5 says to take vardax's bases, but vardax's constructors delegate to `geonnax.basis`, as the core's already do, so that adds a hop without removing a repeat. The decision is worth revisiting in #25.
+
+**The core's own repeats.** `scales._require_positive` repeats `_validation.require_positive`, and among the test models, the same `apply_boundary_conditions` body appears in four 1D models and the same `diagnose` in the same four. Both are small cleanups.
+
+This audit also changed this page's candidates: a first draft proposed an `Integrator` class and two tracer terms, and neither survived.
+
 ## The candidates
 
 | ID | Candidate | Home | `sesmax-ocean` | plumax | radtrax |
 | --- | --- | --- | --- | --- | --- |
-| SC-1 | `Integrator`, time-stepping settings | `sesmax_core.solvers` | runner, spin-up | `simulate.py`, `fourdvar.py` | no |
+| SC-1 | `Model.as_forward_model`, over `DiffraxForwardModel` | `sesmax_core.Model` | cycling DA | replaces `EulerianForwardModel` | no |
 | SC-2 | `HatInTime`, a temporal basis | `sesmax_core.forcing` | time-resolved wind control | emission time series | no |
-| SC-3 | `TracerAdvection`, `TracerDiffusion` | `sesmax_core.terms` | a passive tracer, later | `les_fvm` | no |
 | SC-4 | `stable_step` | `sesmax_core.solvers` | runner preflight | `stable_step_bound` | no |
 | SC-5 | `WindowOperator` | `sesmax_core.da` | forcing estimation | `fourdvar.py` | no |
 | SC-6 | `wall="periodic"` | upstream, finitevolX | through the core | `advection.py` | no |
+| SC-7 | vertical advection and diffusion | upstream, finitevolX | later | `_vertical_ops.py` | no |
 
-None of the proposed names exists in the capability index today.
+SC-3, tracer transport terms in the core, is withdrawn; its section says why.
+None of the proposed names exists in the capability index today, and the concepts were checked against the libraries above.
 
 Some of what plumax needs already ships, so these are not candidates:
 
-| plumax today | Core today |
+| plumax today | Stack today |
 | --- | --- |
-| `EulerianForwardModel`, which takes one explicit Euler step | `ModelOp` and `VardaxForwardModel`, on the model's own integrator |
+| `EulerianForwardModel`, which takes one explicit Euler step | `pipekit_jax.DiffraxForwardModel` |
 | `WindSchedule`, `MetField.wind_at`, for a field through time | `InterpolatedForcing`, whose `from_data` already interpolates a tuple of components |
 | `GaussianSource` | `BasisForcing` with a one-column `SpatialBasis`, lifted by `ForcingTerm` |
 | `_to_dataset`, in part | `snapshots_to_dataset` |
 
-### SC-1: `Integrator`
+### SC-1: reuse `DiffraxForwardModel`
 
-A run needs a solver, a step controller, an adjoint and a step budget, and they only work in certain combinations.
-The core leaves that to `**kw`, and each consumer has grown its own handling: `imex_solver` must be paired with `imex_stepsize_controller`, somax's runner computes `max(16384, int(expected_steps * 1.2))`, plumax has `_pick_solver` and a `solver_kwargs` dict with a workaround for `StepTo` and `dt0`, and #80 had to add `adjoint` to `VardaxForwardModel` because forward-mode solvers fail on diffrax's default.
+A run needs a solver, a step controller, an adjoint and a step budget, and each consumer has grown its own handling of them: plumax has `_pick_solver` and a `solver_kwargs` dict, and #80 added `adjoint` to `VardaxForwardModel`.
+`pipekit_jax.DiffraxForwardModel` already bundles all four, satisfies `pipekit_cycle.ForwardModel`, and has `as_dynamics()` for the `(state, t0, t1)` form that filterax uses. pipekit-jax is already a base dependency of the core, so a new settings class would be one more repeat.
 
-```python
-# proposed (SC-1)
-class Integrator(eqx.Module):
-    """How to advance a model: solver, controller, adjoint and step budget."""
+| Check, at the same solver and step | Result |
+| --- | --- |
+| plumax's `EulerianDispersionRHS` through it, against a direct `diffeqsolve` | largest difference 0 |
+| A core `Lorenz96` through it, against `Model.step` | largest difference 0 |
+| `jax.jvp` with `adjoint=DirectAdjoint()`, the #80 case | finite |
+| `jax.jvp` with the default adjoint | the same `TypeError` as #80 |
 
-    solver: dfx.AbstractSolver = dfx.Tsit5()
-    controller: dfx.AbstractStepSizeController = dfx.ConstantStepSize()
-    adjoint: dfx.AbstractAdjoint = dfx.RecursiveCheckpointAdjoint()
-    max_steps: int | None = eqx.field(static=True, default=4096)
-
-    @classmethod
-    def imex(cls, *, rtol: float = 1e-3, atol: float = 1e-6) -> "Integrator":
-        """KenCarp3 with a matrix-free Newton solve and its matching controller."""
-
-    def budget_for(self, t0: float, t1: float, dt: float) -> "Integrator":
-        """Set max_steps from the window, with a margin and a floor."""
-
-    def forward_mode(self) -> "Integrator":
-        """Swap in DirectAdjoint, for solvers that differentiate forward."""
-```
-
-`Model.integrate`, `Model.step`, `rollout`, `ModelOp` and the DA adapters take `integrator=`.
-Keyword arguments keep working and override it, so nothing already written changes.
-
-In `sesmax-ocean`, the runner stops computing a step budget by hand:
+plumax can use this today, with no core at all, once it declares pipekit-jax:
 
 ```python
-# Shapes: N_T = saved snapshots; G = Ny × Nx with the ghosts
+# Shapes: G = Nz × Ny × Nx with the ghosts
+import diffrax as dfx
+import jax.numpy as jnp
+from pipekit_cycle import ForwardModel
+from pipekit_jax import DiffraxForwardModel
+from plumax.les_fvm import EulerianDispersionRHS, make_grid, uniform_wind_field
+from plumax.les_fvm.boundary import build_default_concentration_bc
+from plumax.les_fvm.diffusion import make_eddy_diffusivity
+from plumax.les_fvm.source import make_gaussian_source
 
-# Today (somax, cli/_run.py):
-max_steps = max(16384, int(expected_steps * 1.2))
-sol = model.integrate(state, t0, t1, dt, saveat=saveat, max_steps=max_steps)
-# After:
-# proposed (SC-1)
-integrator = sx.Integrator().budget_for(t0, t1, dt)
-sol = model.integrate(state, t0, t1, dt, saveat=saveat, integrator=integrator)
-```
-
-In plumax, the forward model holds one object in place of a dict:
-
-```python
-# Shapes: N_T = saved snapshots; G = Nz × Ny × Nx with the ghosts
-
-# Today (plumax, les_fvm/fourdvar.py):
-kw = {"solver": diffrax.Heun(), "dt0": 1.0, "max_steps": 100_000, **solver_kwargs}
-if isinstance(kw["stepsize_controller"], diffrax.StepTo):
-    kw["dt0"] = None
-# After:
-# proposed (SC-1)
-integrator = sx.Integrator(solver=dfx.Heun(), max_steps=100_000)
-# proposed (SC-1)
-# c(s, tₖ) for each saved time
-history = model.integrate(  # c → N_T × G
-    state0, t0, t1, dt, saveat=saveat, integrator=integrator
+# today (plumax)
+grid = make_grid((0.0, 2000.0, 40), (-400.0, 400.0, 16), (0.0, 200.0, 8))
+horizontal, vertical = build_default_concentration_bc()
+rhs = EulerianDispersionRHS(
+    plume_grid=grid,
+    wind_field=uniform_wind_field(grid, u=3.0, v=0.5),
+    eddy_diffusivity=make_eddy_diffusivity((10.0, 2.0)),
+    source=make_gaussian_source(grid, 1.0, (500.0, 0.0, 50.0)),
+    horizontal_bc=horizontal,
+    vertical_bc=vertical,
 )
+# today (pipekit_jax): in place of plumax's EulerianForwardModel
+forward = DiffraxForwardModel(
+    vector_field=rhs, solver=dfx.Heun(), dt0=1.0, dt=5.0, max_steps=100
+)
+assert isinstance(forward, ForwardModel)
+# c(t + Δt) = step(c(t))
+next_c = forward.step(jnp.zeros(grid.shape), 5.0)  # → G
 ```
 
-In `sesmax_core.da`, the adapter takes the same object, so `adjoint=` from #80 is replaced before the first release:
+The core needs only a thin method, so that boundary conditions and constrained parameters are handled as `Model.build_terms` handles them:
 
 ```python
 # proposed (SC-1)
-forward = VardaxForwardModel(
-    model=model, template=state0, dt=dt, integrator=sx.Integrator().forward_mode()
-)
+class Model(eqx.Module):
+    def as_forward_model(self, *, dt: float, dt0: float, **settings):
+        """This model as a DiffraxForwardModel, applying its boundary conditions."""
 ```
+
+In `sesmax-ocean` and `sesmax_core.testing`, this is how a model enters a cycle or a filter:
+
+```python
+# Shapes: D_x = 40 variables
+
+# proposed (SC-1)
+forward = model.as_forward_model(dt=0.05, dt0=0.05, solver=dfx.Tsit5())
+# today (filterax's form, from pipekit_jax)
+dynamics = forward.as_dynamics()
+# proposed (SC-1): the same model, with forward-mode gradients
+tangent_ready = model.as_forward_model(dt=0.05, dt0=0.05, adjoint=dfx.DirectAdjoint())
+```
+
+What it does not replace is worth stating.
+It holds one vector field, so it cannot express the `MultiTerm` an IMEX split needs, and `Model.integrate(**kw)` with `imex_solver` stays.
+Its `step` integrates over $[0, \Delta t]$, so a model with time-dependent forcing needs `as_dynamics()` or SC-5.
+The runner's step budget stays in the runner (#28).
 
 ### SC-2: `HatInTime`
 
@@ -357,66 +397,16 @@ rhs = advection + drag + viscosity + sx.ForcingTerm(wind, place=sx.add_to("q"))
 
 `test_basis.py` already checks that a one-column `BasisForcing` reproduces the hand-written wind forcing to the bit, so only the temporal basis is new.
 
-### SC-3: `TracerAdvection` and `TracerDiffusion`
+### SC-3: withdrawn
 
-The proof above is a transport model written against plumax's helpers.
-The generic part, flux-form transport of a named field by a velocity that comes from a forcing, belongs in the core.
-The physics that sets the coefficients stays with each consumer.
+A first draft proposed `TracerAdvection` and `TracerDiffusion` in the core.
+They would have been a third layer over finitevolX's operators, after plumax's `advection_tendency` and the wrappers in sesmax, and only plumax would use them now, since the ocean's dynamics keep their own operators, such as the Arakawa Jacobian.
 
-$$\frac{\partial c}{\partial t} = -\nabla \cdot (\mathbf{u} c) + \nabla \cdot (\mathbf{K} \nabla c)$$ (shared-transport)
+So the term classes stay in plumax, written as in the proof above: a `Term` of about ten lines around finitevolX. The core already supplies what they need, namely `Term`, `TermModel` and the `+` algebra.
+The stencil gaps go upstream instead (SC-6, SC-7).
+A core class can follow if a second consumer appears, such as a passive tracer in `sesmax-ocean`.
 
-```python
-# proposed (SC-3)
-class TracerAdvection(Term):
-    """−∇·(u c) for one named state field, in 2D or 3D."""
-
-    field: str = eqx.field(static=True)
-    velocity: ForcingProtocol  # t ↦ face velocities, one per axis
-    grid: eqx.Module
-    ghosts: Callable[[Array], Array]  # fills this term's ghost ring
-    method: str = eqx.field(static=True, default="weno5")
-
-
-class TracerDiffusion(Term):
-    """∇·(K ∇c) for one named state field, in 2D or 3D."""
-
-    field: str = eqx.field(static=True)
-    diffusivity: ForcingProtocol | Array
-    grid: eqx.Module
-    ghosts: Callable[[Array], Array]
-```
-
-Each term takes its own `ghosts`, because of the finding in the proof.
-
-In plumax, the right-hand side becomes a sum, and the model gains IMEX and term-level swaps for free:
-
-```python
-# Shapes: G = Nz × Ny × Nx with the ghosts
-
-# Today (plumax, les_fvm/dynamics.py):
-rhs = EulerianDispersionRHS(plume_grid, wind, eddy, source, horizontal, vertical)
-# After:
-# proposed (SC-3)
-# ∂c/∂t = −∇·(u c) + ∇·(K ∇c) + q ρ
-model = sx.TermModel(
-    terms=sx.TracerAdvection("c", wind, grid, ghosts=advection_ghosts)
-    + sx.implicit(sx.TracerDiffusion("c", eddy, grid, ghosts=diffusion_ghosts))
-    + sx.ForcingTerm(emission, place=sx.add_to("c"))
-)
-```
-
-In `sesmax-ocean`, the dynamics keep their own operators, such as the Arakawa Jacobian, and a passive tracer rides on the model's velocity:
-
-```python
-# Shapes: G = Ny × Nx with the ghosts
-
-# proposed (SC-3, C2): SST advected by the model's velocity
-tracer = sx.TracerAdvection("sst", velocity_from_state, grid, ghosts=periodic_ghosts)
-# proposed (SC-3)
-rhs = dynamics + tracer + sx.TracerDiffusion("sst", kappa, grid, ghosts=periodic_ghosts)
-```
-
-In `sesmax_core.testing`, `LinearConvection2D` and `Diffusion2D` could become thin wrappers, but only if their printed numbers do not change, so that is optional.
+The proof's one finding still stands, so the `AGENTS.md` contract gains a line: a term may fill its own ghosts, because advection and diffusion need different Dirichlet ghost values.
 
 ### SC-4: `stable_step`
 
@@ -478,7 +468,6 @@ class WindowOperator(eqx.Module):
     obs_op: Callable[[PyTree], Array]
     save_times: Float[Array, " time"]
     dt: float = eqx.field(static=True)
-    integrator: Integrator = Integrator()
 
     def __call__(self, control: Float[Array, " param"]) -> Float[Array, " obs"]:
         ...
@@ -534,11 +523,14 @@ window = sx.da.WindowOperator(  # (m,) → (D_y,)
 )
 ```
 
-### SC-6: `wall="periodic"`, upstream
+### SC-6 and SC-7: upstream in finitevolX
+
+These are the two stencil gaps that make everyone write around finitevolX. Stencils belong there, so both are upstream asks and not core API.
+
+**SC-6, `wall="periodic"`.**
 
 Filling the ghosts of the interpolated face velocities and passing `wall="open"` makes a periodic domain conservative.
 That logic now exists in `plumax.les_fvm.advection.advection_tendency`, in sesmax's `_burgers_flux.py` and `_advective_form.py`, and in `IncompressibleNS2D._wrap`, and forgetting it caused #67.
-Stencils belong in finitevolX, so this is an upstream ask, not a core API.
 
 ```python
 # Shapes: G = Ny × Nx with the ghosts
@@ -550,6 +542,19 @@ tendency = advection(u, u_on_U, v_on_V, method=method, wall="open")
 # After:
 # proposed (finitevolX)
 tendency = advection(u, u_on_U, v_on_V, method=method, wall="periodic")
+```
+
+**SC-7, vertical operators.** `Advection3D` and `Diffusion3D` act per level, so plumax writes its own vertical tendencies with `vertical_advection_tendency` and `vertical_diffusion_tendency`.
+
+```python
+# Shapes: G = Nz × Ny × Nx with the ghosts
+
+# Today (plumax, les_fvm/advection.py):
+vertical = vertical_advection_tendency(concentration, w, plume_grid.dz)
+# After:
+# proposed (finitevolX)
+# ∂c/∂t ⊇ −∂(w c)/∂z
+vertical = advection_3d.vertical(concentration, w, method="upwind1")  # → G
 ```
 
 ## Related work this changes
@@ -594,34 +599,34 @@ Candidate SC-5 also needs the vardax bump, since `CallableObs` is not in sesmax'
 | Phase | Scope | Gate |
 | --- | --- | --- |
 | S0 | Bump the pins to what plumax and radtrax use; replace git references with PyPI ranges where the stack has released | `uv lock` resolves with radtrax importable; the core's suite passes |
-| S1 | SC-1 and SC-4 | Existing tests pass unchanged; a test that `Integrator` matches the same settings passed as keywords |
-| S2 | SC-2 and SC-3, plus the `AGENTS.md` note on per-term ghosts | The proof's numbers, as a test on a core-only transport model; `LinearConvection2D` as a closed-form check |
+| S1 | SC-1 and SC-4, the `AGENTS.md` note on per-term ghosts, and the core's own small repeats | Existing tests pass; `as_forward_model` matches `Model.step` exactly |
+| S2 | SC-2 | A forcing built on `HatInTime` matches `jnp.interp` of its coefficients |
 | S3 | SC-5, and the #73 decision | A twin experiment recovering a time-varying source on a core model |
-| S4 | plumax's `les_fvm` moves onto the core, as plumax PRs | plumax's existing tests pass, and the proof's comparison holds on its real configurations |
-| Upstream | SC-6 on finitevolX | The three sesmax copies and plumax's copy deleted |
+| S4 | plumax drops `EulerianForwardModel`, moves `les_fvm` onto `TermModel` and adopts SC-4 and SC-5, as plumax PRs | plumax's existing tests pass, and the proof's comparison holds on its real configurations |
+| Upstream | SC-6 and SC-7 on finitevolX | The three sesmax copies and plumax's copy deleted |
 
 S1 to S3 touch only sesmax, so they can go ahead before S4.
 S0 is what makes S4 possible, and S4 does not block the ocean move.
+Replacing `EulerianForwardModel` needs only a pipekit-jax dependency, so it could go ahead at any time.
 
 ## Risks
 
 - **The base install is heavy for plumax.** The core's top-level import needs `paramax`, and `sesmax_core.train` needs `pipekit_jax`, so plumax would gain both, plus spectraldiffx and einops. Fallback: move `gfd` and `testing` behind an extra, which the workspace design already lists.
-- **A second consumer can bend the API.** Fallback: a candidate joins the core only if both consumers use it in this page's form; otherwise it stays in plumax.
-- **The proof used plumax's helpers.** It shows the contracts fit, not that the core's proposed terms do. Gate S2 tests that directly.
-- **3D is less even than 2D.** `Advection3D` covers the horizontal, and plumax adds its own vertical advection in `_vertical_ops.py`. See the first open question.
+- **A second consumer can bend the API.** Fallback: a candidate joins the core only if both consumers use it in this page's form; otherwise it stays in plumax. SC-3 already went this way.
+- **The audit reads names and bodies, not behaviour.** A repeat under an unrelated name can escape it, and the rows marked as not compared are candidates, not findings.
 - **The proof ran one configuration.** It used a uniform wind and plumax's default boundaries. Gate S4 runs plumax's own.
 
 ## Open questions
 
 | ID | Question | Leaning |
 | --- | --- | --- |
-| SC-Q1 | Where does vertical advection go? | Upstream in finitevolX with SC-6, since it is a stencil |
-| SC-Q2 | Does `Integrator` replace `imex_solver` and `imex_stepsize_controller`? | They stay as what `Integrator.imex` calls, because both are public names |
-| SC-Q3 | Are SC-1 and SC-4 worth doing if plumax never switches? | Yes: the ocean runner and the DA adapters use them alone |
+| SC-Q1 | Does `ModalTransform` delegate to finitevolX, given their different normalisation? | Decide in C2, when the multilayer models it serves arrive |
+| SC-Q2 | Should #25 still take vardax's bases, since they delegate to geonnax anyway? | Keep the core on geonnax unless vardax's constructors add something the core needs |
+| SC-Q3 | Are SC-1 and SC-4 worth doing if plumax never switches? | Yes: the DA adapters and the ocean runner use them alone |
 
 ## Relationships
 
 - Depends on: [the workspace and core design](workspace_and_core.md)
 - Changes: #28, #29, #73
-- Upstream asks, not filed: finitevolX (SC-6, SC-Q1)
+- Upstream asks, not filed: finitevolX (SC-6, SC-7); pipekit and vardax (`CallableObs`, `LinearObs`); filterax (`gaspari_cohn`, `inflate_*`, `sigma_points`)
 - Other repositories to change at S4: plumax; geostack's `docs/api/dependency_graph.md`
