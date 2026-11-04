@@ -15,16 +15,17 @@ dependencies = []
 members = ["packages/*"]
 
 [tool.uv]
-# Copied from somax at 9cb19b3. filterax pins gaussx to a commit while vardax
-# asks for a bare ``gaussx`` and finitevolX needs gaussx >= 0.6.5: force
-# finitevolX's tag across the graph. finitevolX pins pipekit to a commit while
-# vardax follows pipekit's main: force the same commit everywhere (bump all
-# three with finitevolX's pin, and with packages/sesmax-core/pyproject.toml).
+# filterax pins gaussx to a commit while vardax asks for a bare ``gaussx`` and
+# finitevolX needs gaussx >= 0.6.5: force one tag across the graph. finitevolX
+# pins pipekit to a commit while vardax follows pipekit's main: force the same
+# tags everywhere (bump these with packages/sesmax-core/pyproject.toml).
 override-dependencies = [
-    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.5",
-    "pipekit @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit",
-    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-cycle",
-    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-jax",
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.6.6",
+    # vardax sources geonnax v0.0.10; hold the graph on the core's tag.
+    "geonnax @ git+https://github.com/jejjohnson/geonnax.git@v0.0.11",
+    "pipekit @ git+https://github.com/jejjohnson/pipekit.git@pipekit-v0.1.4#subdirectory=packages/pipekit",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-cycle-v0.0.3#subdirectory=packages/pipekit-cycle",
+    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-jax-v0.0.6#subdirectory=packages/pipekit-jax",
 ]
 
 [tool.uv.sources]

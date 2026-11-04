@@ -431,7 +431,7 @@ Every public name in `sesmax_core` (175 of them), each listed once at its public
 
 <!-- upstream -->
 
-Listed at finitevolx 0.0.48, spectraldiffx 0.1.1, diffrax 0.7.2, lineax 0.1.1, paramax 0.0.5, pipekit 0.0.2, geonnax 0.0.4.
+Listed at finitevolx 0.1.0, spectraldiffx 0.1.1, diffrax 0.7.2, lineax 0.1.1, paramax 0.0.5, pipekit 0.1.4, geonnax 0.0.11.
 
 ## Upstream: `finitevolx`
 
@@ -1134,6 +1134,7 @@ Composable operators and pipelines: `ModelOp` and `OperatorTerm` are the bridges
 | `AssertHasAttribute` | class | Pass-through; raise `QCError` if attribute missing (or value mismatches). |
 | `AssertShape` | class | Pass-through; raise `QCError` if ``getattr(x, 'shape')`` mismatches. |
 | `AsyncMap` | class | Apply ``op`` to each item of an iterable inside an async event loop. |
+| `BackendError` | class | Inputs on more than one backend, or a backend the code does not run on. |
 | `BatchedMap` | class | Split an iterable into batches and call ``op`` on each batch as a list. |
 | `Branch` | class | Binary conditional: run ``if_true`` or ``if_false`` based on a predicate. |
 | `Cache` | class | Memoise an inner operator by hashing its input and config. |
@@ -1150,6 +1151,8 @@ Composable operators and pipelines: `ModelOp` and `OperatorTerm` are the bridges
 | `Input` | class | A named entry point into a `Graph`. |
 | `Lambda` | class | Wrap an arbitrary callable as an `Operator`. |
 | `Memoize` | class | Memoise an inner operator by hashing its input and config. |
+| `MissingAdapterError` | class | A carrier from a known family arrived with no adapter registered. |
+| `NamedArrayAdapter` | class | What carrier-agnostic code needs from one carrier family. |
 | `Node` | class | A vertex in a `Graph`. |
 | `Operator` | class | Base class for pipekit operators. |
 | `Predictor` | class | Anything with a sklearn-style ``predict`` method. |
@@ -1169,18 +1172,28 @@ Composable operators and pipelines: `ModelOp` and `OperatorTerm` are the bridges
 | `ThreadMap` | class | Apply ``op`` to each item of an iterable using a thread pool. |
 | `Try` | class | Run ``primary``; on caught exceptions run ``fallback``. |
 | `allowed` | function | Return the registered class names (``"module.Class"`` keys). |
+| `backend_name` | function | ``"jax"``, ``"dask"`` or ``"numpy"`` for raw data (tracers count as JAX). |
+| `backend_of` | function | The backend of a carrier or a raw array; ``None`` for any other value. |
 | `check_pickleable` | function | Return the list of `forbid_in_yaml`-flagged operators inside ``op``. |
 | `complement` | function | Return a predicate that negates ``predicate``. |
 | `compose` | function | Right-to-left composition (mathematical order). |
 | `compose_left` | function | Left-to-right composition (pipeline order). |
 | `compute_output_signature` | function | Free-function dispatch to ``op.compute_output_signature``. |
 | `dumps` | function | JSON-encode an operator's state record. |
+| `from_state_sandboxed` | function | Build an operator tree from a state record, allowlisted classes only. |
+| `get_adapter` | function | The adapter for ``x``'s type, or ``None`` for an unnamed value. |
 | `juxt` | function | Return a callable that applies each operator to its input and tuples the results. |
 | `loads` | function | Decode an operator from its JSON state record. |
-| `loads_sandboxed` | function | Like `loads`, but reject any class not in the allowlist. |
+| `loads_sandboxed` | function | Like `loads`, but reject any class, at any depth, not in the allowlist. |
+| `on_import` | function | Call ``callback(module)`` once ``name`` is imported, without importing it. |
 | `pipe` | function | Apply ``operators`` left-to-right to ``value``. |
+| `pipeline_hash` | function | Content hash of a pipeline's whole configuration, and optional weights. |
 | `register` | function | Register ``cls`` as loadable via `loads_sandboxed`. |
+| `register_adapter` | function | Register ``adapter`` for ``carrier_type`` and its subclasses. |
+| `register_lazy_adapter` | function | Register ``loader`` for carrier types defined under ``module_prefix``. |
+| `signature_of` | function | ``x``'s `Signature` if it is a registered carrier; ``x`` itself otherwise. |
 | `unregister` | function | Remove ``cls`` from the sandboxed loader's allowlist. |
+| `unregister_adapter` | function | Remove the adapter registered for exactly ``carrier_type``, if any. |
 
 ## Upstream: `geonnax`
 
@@ -1190,31 +1203,51 @@ Only `geonnax.basis` is used: the bases behind the `spatial_from_*` constructors
 
 | Name | Kind | What it does |
 |---|---|---|
+| `SlepianBasis` | class | Slepian functions of a general region, in the real spherical-harmonic basis. |
 | `SlepianCapBasis` | class | Precomputed Slepian cap eigendecomposition in the real-SH basis. |
+| `associated_legendre` | function | Associated Legendre functions $P_l^m(t)$ for $0 \le m \le l \le l_{\max}$. |
+| `associated_legendre_indices` | function | The ``(l, m)`` pair of each column of `associated_legendre`. |
+| `cotangent_laplacian_eigpairs` | function | Smallest eigenpairs of the cotangent Laplace–Beltrami operator of a mesh. |
+| `curlfree_basis` | function | Curl-free vector basis: gradients of the box Laplacian eigenfunctions. |
 | `divfree_basis` | function | Divergence-free vector basis from box-Dirichlet stream functions. |
 | `eof_basis` | function | Leading ``n_modes`` empirical orthogonal functions of a data matrix. |
-| `fourier_basis` | function | Tensor-product Dirichlet eigenpairs on $[-L, L]^D$. |
-| `fourier_basis_1d` | function | Evaluate the first ``num_basis`` 1D Dirichlet eigenfunctions on ``[-L, L]``. |
+| `fibonacci_sphere` | function | The Fibonacci lattice: ``n`` near-uniform points on the unit sphere. |
+| `fourier_basis` | function | Tensor-product Laplacian eigenpairs on $[-L, L]^D$ (Dirichlet by default). |
+| `fourier_basis_1d` | function | Evaluate the first ``num_basis`` 1D Laplacian eigenfunctions on ``[-L, L]``. |
 | `fourier_eigenvalues` | function | Return the flattened sum-of-squares eigenvalues for a ``D``-dimensional box. |
 | `fourier_eigenvalues_1d` | function | Return $\lambda_j = (j\pi / (2L))^2$ for ``j = 1, ..., num_basis``. |
 | `fourier_features` | function | Cos/sin Fourier basis at dyadic frequencies. |
 | `gabor_frame` | function | Evaluate a bank of Gabor atoms (Gaussian envelope times oscillation). |
 | `gabor_frame_grid` | function | Build a dyadic radial-Gabor frame over a bounded box. |
+| `gauss_legendre` | function | Gauss–Legendre nodes and weights on $[-1, 1]$. |
+| `gauss_legendre_grid` | function | Gauss–Legendre grid on the sphere with its quadrature weights. |
 | `gaussian_window_features` | function | Gaussian-window-in-time basis, the temporal analogue of an RBF column. |
 | `graph_laplacian_eigpairs` | function | Smallest ``num_basis`` Laplacian eigenpairs of an undirected graph. |
 | `harmonic_degrees` | function | Return the per-harmonic degree ``l`` for the flattened ``(l_max + 1)^2`` block. |
+| `healpix_grid` | function | HEALPix pixel centres with their equal-area weights. |
+| `icosphere` | function | Subdivided icosahedron: a quasi-uniform triangle mesh of the sphere. |
 | `interaction_features` | function | Element-wise products on selected pairs of input columns. |
+| `latlon_grid` | function | Regular cell-centred lat/lon grid with exact cell-area weights. |
+| `legendre_polynomials` | function | Legendre polynomials $P_0(t), \ldots, P_{l_{\max}}(t)$. |
+| `mesh_vertex_areas` | function | Lumped (barycentric) vertex areas of a triangle mesh. |
+| `needlet_basis` | function | Spherical needlets for scales $j = 0, \ldots, j_{\max}$, plus the constant. |
+| `needlet_window` | function | The needlet window $b$: smooth, supported in $[1/B, B]$, a partition of unity. |
 | `rbf_basis` | function | Evaluate a placeable radial basis at given centres and widths. |
 | `real_spherical_harmonics` | function | Evaluate real spherical harmonics up to degree ``l_max``. |
 | `seasonal_features` | function | Cos/sin features at multiples of $2\pi / \tau_p$. |
 | `seasonal_frequencies` | function | Flatten ``(period, harmonic_count)`` pairs into Python lists. |
 | `shannon_number` | function | Return the spherical-cap Shannon number for a bandlimit and area. |
+| `shell_basis` | function | Spherical harmonics times radial polynomials on a spherical shell. |
 | `slepian_cap_basis` | function | Construct a Slepian basis for an axisymmetric spherical cap. |
 | `slepian_cap_eigh_per_m` | function | Solve the cap Slepian eigenproblem one azimuthal block at a time. |
 | `slepian_concentration_matrix` | function | Build the real-SH concentration matrix for a north-pole cap. |
+| `slepian_polar_gap_basis` | function | Slepian functions of the band between two polar caps (a polar gap). |
+| `slepian_region_basis` | function | Slepian functions of a region given by a quadrature over it. |
+| `spherical_polygon_mask` | function | Which points lie inside a spherical polygon. |
 | `spherical_rbf_basis` | function | Placeable radial basis on the unit 2-sphere, in geodesic distance. |
 | `standardize` | function | Affine standardize: ``(x - mu) / std``. |
 | `unstandardize` | function | Inverse of `standardize`: ``z * std + mu``. |
+| `vector_spherical_harmonics` | function | Gradient and toroidal vector spherical harmonics for $1 \le l \le l_{\max}$. |
 | `wavelet_basis_1d` | function | Orthonormal 1D DWT synthesis-basis matrix on a periodic length-``n`` grid. |
 | `wavelet_basis_2d` | function | Separable orthonormal 2D DWT basis as a Kronecker product. |
 | `wendland_c2` | function | Wendland $C^2$ kernel, positive definite in dimensions $d \le 3$. |

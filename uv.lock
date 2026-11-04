@@ -20,10 +20,11 @@ members = [
     "sesmax-workspace",
 ]
 overrides = [
-    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.5" },
-    { name = "pipekit", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
-    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
-    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
+    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.6" },
+    { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
+    { name = "pipekit", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=pipekit-v0.1.4" },
+    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-cycle-v0.0.3" },
+    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-jax-v0.0.6" },
 ]
 
 [[package]]
@@ -627,8 +628,8 @@ wheels = [
 
 [[package]]
 name = "filterax"
-version = "0.0.3"
-source = { git = "https://github.com/jejjohnson/filterax?rev=28c1070#28c1070aab7a31795537427abfceca4ccf048f1d" }
+version = "0.0.6"
+source = { git = "https://github.com/jejjohnson/filterax?rev=v0.0.6#9b9736a6cb995327c9a6d456f18fb5797b42b4b0" }
 dependencies = [
     { name = "einops" },
     { name = "einx" },
@@ -643,8 +644,8 @@ dependencies = [
 
 [[package]]
 name = "finitevolx"
-version = "0.0.48"
-source = { git = "https://github.com/jejjohnson/finitevolX.git?rev=c6f3d9916c6a2cd9ffb4e8e67d64cecc0bd17aeb#c6f3d9916c6a2cd9ffb4e8e67d64cecc0bd17aeb" }
+version = "0.1.0"
+source = { git = "https://github.com/jejjohnson/finitevolX.git?rev=v0.1.0#831c69f60c6b443be1f7291144c65832f6da62c7" }
 dependencies = [
     { name = "beartype" },
     { name = "diffrax" },
@@ -743,8 +744,8 @@ wheels = [
 
 [[package]]
 name = "gaussx"
-version = "0.6.5"
-source = { git = "https://github.com/jejjohnson/gaussx?rev=v0.6.5#12ff91a68da2886478e9b3a1d0d4c0745d74ca41" }
+version = "0.6.6"
+source = { git = "https://github.com/jejjohnson/gaussx?rev=v0.6.6#600e5a0b3fff410b94602848e5cd8febda8def02" }
 dependencies = [
     { name = "einx" },
     { name = "equinox" },
@@ -758,8 +759,8 @@ dependencies = [
 
 [[package]]
 name = "geonnax"
-version = "0.0.4"
-source = { git = "https://github.com/jejjohnson/geonnax.git?rev=9f160d3#9f160d37e455530291e964421271d8079372fd5b" }
+version = "0.0.11"
+source = { git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11#11d850cfc670d03de36d5910afe4aaa9f8bde4a9" }
 dependencies = [
     { name = "einops" },
     { name = "einx" },
@@ -2159,21 +2160,21 @@ wheels = [
 
 [[package]]
 name = "pipekit"
-version = "0.0.2"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c#d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+version = "0.1.4"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=pipekit-v0.1.4#7dca5377083ef2c17605feb237c50a06d5bd34ab" }
 
 [[package]]
 name = "pipekit-cycle"
-version = "0.0.2"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c#d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+version = "0.0.3"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-cycle-v0.0.3#00b6c61fafa586b93ff4cf3bfe676f8ad0a06c3a" }
 dependencies = [
     { name = "pipekit" },
 ]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.0.2"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c#d1eb41d4ac98c371cb198ee72aedfdf45046127c" }
+version = "0.0.6"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-jax-v0.0.6#969175ccdff18d08dee8888201fc4bb4227d25a1" }
 dependencies = [
     { name = "equinox" },
     { name = "jax" },
@@ -2766,10 +2767,10 @@ requires-dist = [
     { name = "diffrax", specifier = ">=0.7.2" },
     { name = "einops", specifier = ">=0.8.2" },
     { name = "equinox", specifier = ">=0.13.8" },
-    { name = "filterax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/filterax?rev=28c1070" },
-    { name = "finitevolx", extras = ["pipekit"], git = "https://github.com/jejjohnson/finitevolX.git?rev=c6f3d9916c6a2cd9ffb4e8e67d64cecc0bd17aeb" },
+    { name = "filterax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/filterax?rev=v0.0.6" },
+    { name = "finitevolx", extras = ["pipekit"], git = "https://github.com/jejjohnson/finitevolX.git?rev=v0.1.0" },
     { name = "flowjax", marker = "extra == 'flows'" },
-    { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=9f160d3" },
+    { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxlib", specifier = ">=0.11.1" },
     { name = "jaxtyping", specifier = ">=0.3.9" },
@@ -2777,11 +2778,11 @@ requires-dist = [
     { name = "optimistix", specifier = ">=0.1" },
     { name = "orbax-checkpoint", marker = "extra == 'checkpoint'", specifier = ">=0.11.37" },
     { name = "paramax", specifier = ">=0.0.5" },
-    { name = "pipekit", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
-    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
-    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=d1eb41d4ac98c371cb198ee72aedfdf45046127c" },
+    { name = "pipekit", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=pipekit-v0.1.4" },
+    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-cycle-v0.0.3" },
+    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-jax-v0.0.6" },
     { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1" },
-    { name = "vardax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/vardax?rev=a00b1ae" },
+    { name = "vardax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/vardax?rev=v0.3.0" },
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2026.4.0" },
     { name = "zarr", marker = "extra == 'xarray'", specifier = ">=3.1.6" },
 ]
@@ -3180,13 +3181,14 @@ wheels = [
 
 [[package]]
 name = "vardax"
-version = "0.1.8"
-source = { git = "https://github.com/jejjohnson/vardax?rev=a00b1ae#a00b1aeb65e84e6bdcef458e0171a9921d3905fa" }
+version = "0.3.0"
+source = { git = "https://github.com/jejjohnson/vardax?rev=v0.3.0#ddbbae7819891821e5b5b69b6a93f31beca772f4" }
 dependencies = [
     { name = "diffrax" },
-    { name = "einops" },
+    { name = "einx" },
     { name = "equinox" },
     { name = "gaussx" },
+    { name = "geonnax" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },

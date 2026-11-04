@@ -19,7 +19,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Development Status :: 2 - Pre-Alpha",
 ]
-# Copied from somax's pyproject.toml at 9cb19b3 (versions and pins unchanged).
+# Each git dependency is pinned to a tag.
 # Git dependencies are direct references so a bare install of this package
 # resolves the same commits without the workspace around it.
 dependencies = [
@@ -35,21 +35,21 @@ dependencies = [
     # bounded parameter in an unconstrained space, so an optimiser can never
     # step a viscosity or a drag negative.
     "paramax>=0.0.5",
-    "finitevolx[pipekit] @ git+https://github.com/jejjohnson/finitevolX.git@c6f3d9916c6a2cd9ffb4e8e67d64cecc0bd17aeb",
+    "finitevolx[pipekit] @ git+https://github.com/jejjohnson/finitevolX.git@v0.1.0",
     "spectraldiffx @ git+https://github.com/jejjohnson/spectraldiffx.git@0.1.1",
-    "pipekit @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit",
-    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-cycle",
-    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@d1eb41d4ac98c371cb198ee72aedfdf45046127c#subdirectory=packages/pipekit-jax",
+    "pipekit @ git+https://github.com/jejjohnson/pipekit.git@pipekit-v0.1.4#subdirectory=packages/pipekit",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-cycle-v0.0.3#subdirectory=packages/pipekit-cycle",
+    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-jax-v0.0.6#subdirectory=packages/pipekit-jax",
     # The spatial bases of the forcing bank (only ``geonnax.basis`` is used).
-    "geonnax @ git+https://github.com/jejjohnson/geonnax.git@9f160d3",
+    "geonnax @ git+https://github.com/jejjohnson/geonnax.git@v0.0.11",
 ]
 
 [project.optional-dependencies]
 # Ensemble filters (filterax) and variational assimilation (vardax) drive any
 # model through ``sesmax_core.da``.
 da = [
-    "filterax @ git+https://github.com/jejjohnson/filterax@28c1070",
-    "vardax @ git+https://github.com/jejjohnson/vardax@a00b1ae",
+    "filterax @ git+https://github.com/jejjohnson/filterax@v0.0.6",
+    "vardax @ git+https://github.com/jejjohnson/vardax@v0.3.0",
 ]
 # The flowjax bridge in ``sesmax_core.flows``.
 flows = [
