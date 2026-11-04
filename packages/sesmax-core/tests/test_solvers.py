@@ -13,6 +13,7 @@ import jax.numpy as jnp
 import optimistix as optx
 import pytest
 
+import sesmax_core
 from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
 from sesmax_core._src.testing.pde2d.burgers_terms import Burgers2DTermModel
 from sesmax_core.solvers import imex_solver, imex_stepsize_controller, stable_step
@@ -156,3 +157,7 @@ def test_stable_step_is_infinite_when_nothing_moves_or_diffuses():
 def test_stable_step_rejects_bad_inputs(kwargs):
     with pytest.raises(ValueError, match="stable_step"):
         stable_step(**kwargs)
+
+
+def test_stable_step_is_exported_from_the_package_root():
+    assert sesmax_core.stable_step is stable_step

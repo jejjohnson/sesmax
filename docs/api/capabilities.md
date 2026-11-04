@@ -111,6 +111,12 @@ Every public name in `sesmax_core` (176 of them), each listed once at its public
 |---|---|---|
 | `Scales` | class | Characteristic scales of a run. |
 
+### Memory-safe IMEX solver construction for stiff sesmax models. (`sesmax_core._src.solvers`)
+
+| Name | Kind | What it does |
+|---|---|---|
+| `stable_step` | function | Largest stable step for an explicit solve, from the actual fields. |
+
 ### Per-leaf affine maps on model states: non-dimensionalisation and standardisation. (`sesmax_core._src.state_affine`)
 
 | Name | Kind | What it does |
@@ -242,7 +248,6 @@ Every public name in `sesmax_core` (176 of them), each listed once at its public
 |---|---|---|
 | `imex_solver` | function | Build a ``KenCarp3`` IMEX solver with a matrix-free implicit stage. |
 | `imex_stepsize_controller` | function | Build an adaptive PID controller for an IMEX solve. |
-| `stable_step` | function | Largest stable step for an explicit solve, from the actual fields. |
 
 ## `sesmax_core.testing`
 
