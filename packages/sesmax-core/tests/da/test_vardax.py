@@ -21,9 +21,18 @@ import pytest
 
 pytest.importorskip("vardax")
 
+import diffrax as dfx
 import gaussx
 import lineax as lx
-from vardax import Batch1D, MaskedIdentity, StrongFourDVar
+from pipekit import Operator
+from pipekit_cycle import DAState
+from vardax import (
+    Batch1D,
+    IncrementalFourDVar,
+    MaskedIdentity,
+    StrongFourDVar,
+    VarDACycle,
+)
 
 from sesmax_core._src.testing.lorenz96 import L96State, Lorenz96
 from sesmax_core.da import VardaxForwardModel, state_to_vector
@@ -128,3 +137,109 @@ def test_somax_forward_model_is_forward_model():
     assert isinstance(forward, ForwardModel)
     assert forward.dt == 0.05
     assert forward.state_signature is None
+
+
+def _window(model, *, n_variables, n_steps, background_std, dt=0.05, obs_var=0.04):
+    """A truth, a noisy observation window and a background, for one twin run."""
+    step = jax.jit(lambda state: model.step(state, dt))
+    truth = L96State(x=8.0 * jnp.ones(n_variables).at[0].add(0.01))
+    for _ in range(200):
+        truth = step(truth)
+    initial_truth, _ = state_to_vector(truth)
+    trajectory = [initial_truth]
+    state = truth
+    for _ in range(n_steps):
+        state = step(state)
+        trajectory.append(state_to_vector(state)[0])
+    trajectory = jnp.stack(trajectory)
+    noise = jnp.sqrt(obs_var) * jax.random.normal(jax.random.key(0), trajectory.shape)
+    background = initial_truth + background_std * jax.random.normal(
+        jax.random.key(1), (n_variables,)
+    )
+    psd = lx.positive_semidefinite_tag
+    background_cov = lx.MatrixLinearOperator(0.5 * jnp.eye(n_variables), psd)
+    obs_cov = lx.MatrixLinearOperator(obs_var * jnp.eye(n_variables), psd)
+    return truth, initial_truth, trajectory + noise, background, background_cov, obs_cov
+
+
+def _rmse(estimate, truth):
+    return float(jnp.sqrt(jnp.mean((estimate - truth) ** 2)))
+
+
+@pytest.mark.slow
+def test_incremental_4dvar_improves_on_background_on_the_chaotic_model():
+    """Incremental 4D-Var differentiates forward, so it needs ``adjoint``.
+
+    The chaotic model on a three-step window: this route succeeded on each of
+    six truths when it was checked, where ``StrongFourDVar`` succeeded on four.
+    """
+    model = Lorenz96.create(F=8.0)
+    truth, initial_truth, observed, background, background_cov, obs_cov = _window(
+        model, n_variables=12, n_steps=3, background_std=0.3
+    )
+    forward = VardaxForwardModel(
+        model=model, template=truth, dt=0.05, adjoint=dfx.DirectAdjoint()
+    )
+    incremental = IncrementalFourDVar(
+        forward=forward,
+        obs_op=MaskedIdentity(),
+        prior_mean=background,
+        prior_cov_op=background_cov,
+        obs_cov_op=obs_cov,
+    )
+    batch = Batch1D(
+        input=observed[None], mask=jnp.ones_like(observed)[None], target=None
+    )
+    analysis = incremental(batch)[0]
+    assert _rmse(analysis, initial_truth) < _rmse(background, initial_truth)
+
+
+def test_default_adjoint_supports_reverse_mode_only():
+    """Without ``adjoint`` a forward-mode solver fails, with diffrax's own error."""
+    model = Lorenz96.create(F=8.0)
+    state = L96State(x=jnp.linspace(-2.0, 2.0, 12))
+    forward = VardaxForwardModel(model=model, template=state, dt=0.05)
+    vector, _ = state_to_vector(state)
+    with pytest.raises(TypeError, match="forward-mode"):
+        jax.jvp(lambda x: forward.step(x, 0.05), (vector,), (vector,))
+
+    direct = VardaxForwardModel(
+        model=model, template=state, dt=0.05, adjoint=dfx.DirectAdjoint()
+    )
+    _, tangent = jax.jvp(lambda x: direct.step(x, 0.05), (vector,), (vector,))
+    assert jnp.all(jnp.isfinite(tangent))
+
+
+@pytest.mark.slow
+def test_vardax_cycle_runs_a_window_through_the_adapter():
+    """One forecast and analysis of ``VarDACycle`` improves on the background."""
+    model = Lorenz96.create(F=8.0, advection=False)
+    truth, initial_truth, observed, background, background_cov, obs_cov = _window(
+        model, n_variables=12, n_steps=3, background_std=1.0
+    )
+    forward = VardaxForwardModel(model=model, template=truth, dt=0.05)
+    strong = StrongFourDVar(
+        forward=forward,
+        obs_op=MaskedIdentity(),
+        prior_mean=background,
+        prior_cov_op=background_cov,
+        obs_cov_op=obs_cov,
+    )
+
+    class WindowSource(Operator):
+        def _apply(self, index):
+            return observed[None]
+
+        def get_config(self):
+            return {}
+
+    cycle = VarDACycle(
+        forward=forward,
+        obs_op=MaskedIdentity(),
+        model=strong,
+        obs_source=WindowSource(),
+        n_steps=1,
+    )
+    analysis, state = cycle(background, DAState(obs_err_cov=obs_cov))
+    assert state.cycle_count == 1
+    assert _rmse(analysis[0], initial_truth) < _rmse(background, initial_truth)

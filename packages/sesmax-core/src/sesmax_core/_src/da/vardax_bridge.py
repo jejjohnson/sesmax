@@ -65,6 +65,12 @@ class VardaxForwardModel(eqx.Module):
             flat vectors come from ``state_to_vector`` with a transform;
             without it the adapter hands the model transformed values as
             if they were physical ones.
+        adjoint: Optional diffrax adjoint forwarded to ``model.step``. Leave it
+            ``None`` for solvers that differentiate in reverse mode, such as
+            ``StrongFourDVar``. Set ``diffrax.DirectAdjoint()`` for solvers
+            that differentiate in forward mode, such as
+            ``IncrementalFourDVar``: diffrax's default adjoint supports only
+            reverse mode.
     """
 
     model: Any
@@ -78,6 +84,7 @@ class VardaxForwardModel(eqx.Module):
     #: near-zero standardised thickness as a real layer depth and
     #: corrupting the first forecast.
     transform: Any = None
+    adjoint: Any = None
 
     def step(
         self,
@@ -93,7 +100,8 @@ class VardaxForwardModel(eqx.Module):
         x = unravel(state)
         if self.transform is not None:
             x = self.transform.inverse(x)
-        x_next = self.model.step(x, dt, t0=self.t0)
+        options = {} if self.adjoint is None else {"adjoint": self.adjoint}
+        x_next = self.model.step(x, dt, t0=self.t0, **options)
         if self.transform is not None:
             x_next = self.transform.forward(x_next)
         flat, _ = ravel_pytree(x_next)
