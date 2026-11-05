@@ -4,7 +4,7 @@
 commit ``9cb19b3``): the state and parameter types and their constraints,
 the model base classes, the term algebra, non-dimensionalisation and
 standardisation (``Scales``, ``StateAffine``, ``ScaledModel``), the
-layered-fluid pieces (``ModalTransform``, the Helmholtz caches), and forcing
+layered-fluid pieces (``ModalTransform``), and forcing
 with its reduced-order bases. The data-assimilation adapters, the flowjax
 bridge, monitors and rollouts are in their own submodules, some behind an
 extra (``[da]``, ``[flows]``); the I/O functions and the checkpointer are
@@ -55,13 +55,6 @@ from sesmax_core._src.forcing_bank import (
     spatial_from_spherical_rbf,
     spatial_from_wavelet,
     tile_in_time,
-)
-from sesmax_core._src.gfd.helmholtz import (
-    DirichletHelmholtzCache,
-    HelmholtzCache,
-    MultimodalHelmholtzCache,
-    NeumannHelmholtzCache,
-    PeriodicHelmholtzCache,
 )
 from sesmax_core._src.gfd.modal import ModalTransform, StratificationProfile
 from sesmax_core._src.io import (
@@ -116,22 +109,17 @@ __all__ = [
     "ConstantForcing",
     "ConstantInTime",
     "Diagnostics",
-    "DirichletHelmholtzCache",
     "ForcingProtocol",
     "ForcingTerm",
     "FourierInTime",
     "GaussianWindowsInTime",
     "HatInTime",
-    "HelmholtzCache",
     "InterpolatedForcing",
     "ModalTransform",
     "Model",
-    "MultimodalHelmholtzCache",
-    "NeumannHelmholtzCache",
     "NoForcing",
     "OperatorTerm",
     "Params",
-    "PeriodicHelmholtzCache",
     "PhysConsts",
     "Scaled",
     "ScaledModel",
