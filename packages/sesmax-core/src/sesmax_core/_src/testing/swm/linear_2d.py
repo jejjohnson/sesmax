@@ -14,6 +14,7 @@ from finitevolx import (
     Mask2D,
     coriolis_fn,
     enforce_periodic,
+    wall_boundaries,
 )
 from jaxtyping import Array, Float, PyTree
 
@@ -151,16 +152,9 @@ class LinearShallowWater2D(Model):
             u = enforce_periodic(state.u)
             v = enforce_periodic(state.v)
         else:
-            h, u, v = state.h, state.u, state.v
-            # No normal flow: wall faces AND ghost faces
-            u = u.at[:, 0].set(0.0).at[:, -2].set(0.0).at[:, -1].set(0.0)
-            v = v.at[0, :].set(0.0).at[-2, :].set(0.0).at[-1, :].set(0.0)
-            # Free-slip: tangential velocity ghost = adjacent interior
-            u = u.at[0, :].set(u[1, :]).at[-1, :].set(u[-2, :])
-            v = v.at[:, 0].set(v[:, 1]).at[:, -1].set(v[:, -2])
-            # Height: zero-gradient at ghost cells
-            h = h.at[0, :].set(h[1, :]).at[-1, :].set(h[-2, :])
-            h = h.at[:, 0].set(h[:, 1]).at[:, -1].set(h[:, -2])
+            h = wall_boundaries(state.h, "h")
+            u = wall_boundaries(state.u, "u")
+            v = wall_boundaries(state.v, "v")
         return LinearSW2DState(h=h, u=u, v=v)
 
     def diagnose(self, state: PyTree) -> LinearSW2DDiagnostics:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import diffrax as dfx
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
@@ -280,3 +281,32 @@ def test_changing_a_constant_does_not_retrace():
     jax.block_until_ready(step(model, s0))
     jax.block_until_ready(step(_with(model, g=10.0, H0=80.0), s0))
     assert len(traces) == 1
+
+
+def test_wall_fill_is_no_normal_flow_and_free_slip():
+    """The fill finitevolX's ``wall_boundaries`` does for the C-grid walls."""
+    model = LinearShallowWater2D.create(nx=12, ny=10, bc="wall")
+    key_h, key_u, key_v = jax.random.split(jax.random.PRNGKey(0), 3)
+    shape = (model.grid.Ny, model.grid.Nx)
+    state = LinearSW2DState(
+        h=jax.random.normal(key_h, shape),
+        u=jax.random.normal(key_u, shape),
+        v=jax.random.normal(key_v, shape),
+    )
+
+    filled = model.apply_boundary_conditions(state)
+
+    # No normal flow on the wall faces
+    assert jnp.all(filled.u[1:-1, 0] == 0.0)
+    assert jnp.all(filled.u[1:-1, -2] == 0.0)
+    assert jnp.all(filled.v[0, 1:-1] == 0.0)
+    assert jnp.all(filled.v[-2, 1:-1] == 0.0)
+    # Free slip: the tangential velocity's ghost holds the adjacent interior value
+    assert jnp.array_equal(filled.u[0, 1:-2], filled.u[1, 1:-2])
+    assert jnp.array_equal(filled.v[1:-2, 0], filled.v[1:-2, 1])
+    # Zero gradient in height
+    assert jnp.array_equal(filled.h[0, 1:-1], filled.h[1, 1:-1])
+    assert jnp.array_equal(filled.h[1:-1, -1], filled.h[1:-1, -2])
+    # The interior is left alone
+    assert jnp.array_equal(filled.h[1:-1, 1:-1], state.h[1:-1, 1:-1])
+    assert jnp.array_equal(filled.u[1:-1, 1:-2], state.u[1:-1, 1:-2])
