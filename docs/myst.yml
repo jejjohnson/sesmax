@@ -66,6 +66,7 @@ project:
       children:
         - file: design/workspace_and_core.md
         - file: design/shared_core.md
+        - file: design/run_loop.md
     - title: Project
       children:
         - file: contributing.md
