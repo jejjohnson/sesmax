@@ -37,7 +37,7 @@ in `AGENTS.md`.
    - a forcing field added to a tendency by hand → `ForcingTerm` with `add_to` or `add_vector_to`;
    - a softplus or sigmoid on a parameter, or `stop_gradient` to freeze one → `positive`, `interval`, `frozen`;
    - hand-written non-dimensionalisation or standardisation of a state → `Scales`, `StateAffine`, `ScaledModel`;
-   - a cached Helmholtz solve or a vertical-mode transform → `HelmholtzCache` and its versions, `ModalTransform`;
+   - a vertical-mode transform → `ModalTransform`;
    - a finite check inside a tendency → `guard_finite`; between chunks → `sesmax_core.monitor`;
    - a public name that duplicates another public name for a different object (`tests/test_capabilities.py` will fail on it).
 

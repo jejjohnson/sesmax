@@ -13,7 +13,6 @@ s/\bSomaxDynamics\b/FilteraxDynamics/g
 s/\bSomaxModel\b/Model/g
 s/somax\._src\.core\.transforms import StateAffine/sesmax_core._src.state_affine import StateAffine/g
 s/somax\._src\.core\.transforms import \(ModalTransform\|StratificationProfile\)/sesmax_core._src.gfd.modal import \1/g
-s/somax\._src\.core\.helmholtz/sesmax_core._src.gfd.helmholtz/g
 s/somax\._src\.core\./sesmax_core._src./g
 s/somax\._src\.models\.lorenz/sesmax_core._src.testing.lorenz/g
 s/somax\._src\.models\.pde/sesmax_core._src.testing.pde/g

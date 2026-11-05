@@ -16,7 +16,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Terms](terms.md) | `Term`, `TermFn`, `Sum`, `Scaled`, `Compose`, `explicit`, `implicit`, `partition`, `build_diffrax_terms`, `OperatorTerm` |
 | [Forcing](forcing.md) | `ForcingProtocol` and the constant, seasonal and interpolated forcings; `SpatialBasis`, `TemporalBasis`, `BasisForcing`, `ForcingTerm`, the vector versions; the `spatial_from_*` constructors, `tile_in_time`, `GaussianWindowsInTime`, `HatInTime`, `matern_spectral_density` |
 | [Scales](scales.md) | `Scales`, `StateAffine`, `ScaledModel` |
-| [Layered fluids](gfd.md) | `StratificationProfile`, `ModalTransform`, `HelmholtzCache` and its periodic, Dirichlet, Neumann and multimodal versions |
+| [Layered fluids](gfd.md) | `StratificationProfile`, `ModalTransform` |
 | [Domains](domain.md) | `Domain`, `TimeDomain` |
 | [Solvers](solvers.md) | `imex_solver`, `imex_stepsize_controller`, `stable_step` |
 | [Training rollouts](train.md) | `rollout`, `rollout_loss`, `state_mse`, `ModelStep` |

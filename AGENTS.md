@@ -70,7 +70,7 @@ find out whether it exists:
 | Lifting a forcing field onto a tendency component | `ForcingTerm`, `add_to`, `add_vector_to` |
 | A softplus or sigmoid on a parameter, or `stop_gradient` to freeze one | `positive`, `interval`, `frozen`, `trainable_mask` |
 | Non-dimensionalising or standardising a state | `Scales`, `StateAffine`, `ScaledModel` |
-| A vertical-mode transform or a cached Helmholtz solve | `ModalTransform`, `HelmholtzCache` and its periodic, Dirichlet, Neumann and multimodal versions |
+| A vertical-mode transform | `ModalTransform` |
 | A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_core.monitor` |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 

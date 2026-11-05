@@ -220,7 +220,7 @@ The repetition is re-implementation under other names, which a body comparison c
 | Explicit Runge–Kutta schemes | diffrax, finitevolX `RK3SSP` and others | no copies found | use them through `solver=` |
 | Time-varying fields | diffrax interpolation, through the core's `InterpolatedForcing` | plumax `WindSchedule`, `interpolate_in_time`, `_time_bracket`, `_interpolated_emission` | plumax can move at S4 |
 | Vertical modes | finitevolX `decompose_vertical_modes`, fixed in its #252 | the core's `ModalTransform.from_physics` | see below the table |
-| Helmholtz and Poisson solves | spectraldiffx | the core's `HelmholtzCache` family, which only forwards to it | decide in C2: the caches exist to give one `solve` signature |
+| Helmholtz and Poisson solves | spectraldiffx | nothing since the core's `HelmholtzCache` family, which only forwarded to it, was removed | call spectraldiffx directly |
 | Spatial bases | geonnax `basis` | vardax's constructors and the core's `spatial_from_*`, both delegating to it | see below the table |
 | Stable step | nobody | plumax `stable_step_bound`; somax `check_cfl`; the core's `Scales.dt_from_cfl`, from scales | SC-4 |
 | Observation operators | vardax | pipekit-cycle has its own `CallableObs` and `LinearObs`; the core's `SubsampleObs` | #27; the two names are [vardax#217](https://github.com/jejjohnson/vardax/issues/217) |
