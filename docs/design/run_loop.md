@@ -31,6 +31,7 @@ Status: proposed, for review. The chunk pipeline is prototyped, and nothing else
 | Question | Answer |
 | --- | --- |
 | Where does the loop live? | In `sesmax_core.sim`; the ocean keeps its models, scenarios, metrics and DVC commands |
+| What do long-run platforms add? | Schedules, a clean stop, versioned checkpoints, a per-chunk health record and numerics in the manifest; [see below](#platforms) |
 | How much can pipekit carry? | The loop, the cadence, the sinks and the retry; the advance, the monitors and the run spec stay ours, for the reasons in [the table](#pipekit-map) |
 | Does the design work? | The prototype passes on Lorenz-96, and [the results](#prototype) include two defects it found |
 | What does it need first? | One fix to `Model.integrate`, and `pipekit-cycle` 0.0.4 |
@@ -108,8 +109,9 @@ chunk = Sequential(
     [
         AdvanceChunk(model, schedule),  # x(tₖ₊₁) = x(tₖ) + ∫ f(x, t) dt
         RunMonitors(model, monitors),  # raises if a monitor asks to stop
-        Branch(is_snapshot, Sink(write_snapshot), Identity()),
-        Branch(is_checkpoint, sturdy_checkpoint, Identity()),
+        Tap(write_health_record),
+        Branch(snapshot_due, Sink(write_snapshot), Identity()),
+        Branch(checkpoint_due, sturdy_checkpoint, Identity()),
     ]
 )
 # today (pipekit_cycle, from 0.0.4): a stateful Sequential as the step
@@ -155,6 +157,7 @@ class Component:
     checks: Mapping[str, Check]  # extra names for spec.assertions
     evaluate: Callable[[Model, State], dict[str, float]] | None = None
     field_units: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    describe_numerics: Callable[[Model], dict[str, Any]] | None = None
 
 
 # proposed (SIM-2): replaces every read of spec.scenario.nondim in the loop
@@ -178,6 +181,70 @@ The YAML files therefore don't change, which keeps C2's gate of "only import cha
 `sesmax_core.testing` registers itself as a component too, with Lorenz-96 and the linear shallow-water model, so the core can test its runner end to end without the ocean.
 `ModelOp.from_registry`, which the core move left out, returns on top of this.
 
+(platforms)=
+### What we take from long-run platforms
+
+Oceananigans, Orbax, CLU and MOM6 each solved part of this already.
+These come from reading their documentation, not from the checks in the numerics review, and the fit to sesmax is our judgement.
+
+| Idea | Source | What it becomes here |
+| --- | --- | --- |
+| Schedules by iteration, simulation time or wall time, combined with and/or | [Oceananigans](https://clima.github.io/OceananigansDocumentation/dev/simulations/schedules) | Predicates for `Branch` |
+| A wall-time limit and a checkpoint at the end | [Oceananigans](https://clima.github.io/OceananigansDocumentation/dev/simulations/simulations_overview) | `WatchdogMonitor`, plus a clean stop that can be resumed |
+| Atomic rename, or a commit file where rename isn't safe | [Orbax](https://orbax.readthedocs.io/en/latest/api_reference/checkpoint.path.atomicity.html) | Versioned checkpoints, with a commit file as the fallback |
+| Retention by count and by period | [Orbax](https://orbax.readthedocs.io/en/latest/guides/checkpoint/api_refactor.html) | `keep_last` and `keep_every` |
+| A checkpoint holds the time stepper's state | [Oceananigans](https://clima.github.io/OceananigansDocumentation/dev/simulations/checkpointing) | diffrax's `solver_state` and `controller_state` |
+| Steps per second, ETA, timing by section, a metric writer | [CLU](https://github.com/google/CommonLoopUtils/blob/main/clu/periodic_actions.py) | The per-chunk health record |
+
+**Schedules.**
+A schedule is a predicate on the frame, so it needs no new pipekit feature.
+Snapshots stay on simulation time, because they are results and must not depend on how fast the machine ran.
+Checkpoints and health records may also use wall time, because they aren't results.
+
+```python
+# proposed (SIM-1)
+snapshot_due = every_sim_seconds(save_interval)
+checkpoint_due = every_chunks(20) | every_wall_seconds(1800.0)
+```
+
+**A clean stop.**
+`WatchdogMonitor` already stops a run at a chunk boundary, but today every `terminate` becomes the same error as a blow-up, so no artifact is written.
+`MonitorVerdict` gains `resumable: bool = False`.
+A resumable stop writes a checkpoint, records `status: "stopped"` in the manifest and exits with its own exit code, and `restart` picks up from there.
+A non-finite state still refuses to write anything.
+
+**Versioned checkpoints.**
+Today (bug): `checkpoint.zarr` is overwritten in place with `mode="w"`, so a crash during a write can destroy the only checkpoint. We read this in the code and didn't reproduce it.
+The mount the long runs write to is CIFS, and a test there shows that a plain atomic swap can't work:
+
+| Operation on a 50-file store on the data mount | Result |
+| --- | --- |
+| Rename to a new name | works, 184 ms |
+| Rename onto an existing store | `PermissionError` |
+| Move the old store aside, rename, delete the old store | works, 1.0 s, with a gap where neither name holds a checkpoint |
+
+After this design: each checkpoint is written to `checkpoints/<step>.partial.zarr` and renamed to `checkpoints/<step>.zarr`, a new name, so nothing is overwritten.
+`restart` takes the newest complete store and ignores partial ones.
+Older stores are then removed by `keep_last`, while `keep_every` keeps an archive at a longer period.
+`commit="file"` writes a `commit_success` file instead of renaming, for a filesystem where rename isn't safe.
+We tested only that these renames succeed, not that they are atomic under a crash, so the fallback stays available.
+
+**Stepper state across chunks.**
+The prototype's exact restart used fixed-step Tsit5 only.
+An adaptive controller starts again from `dt` at each chunk unless it is given its state, so `AdvanceChunk` threads `solver_state` and `controller_state` through the carry when a controller is passed, and checkpoints store them.
+This is untested, so SIM-2's gate includes a restart test for each stepper in use.
+
+**The health record.**
+Each chunk appends one line to `metrics.jsonl`: the monitors' metrics, solver statistics, wall time by section, steps per second and an ETA.
+The writer is a small protocol in the shape of CLU's `MetricWriter`, with `write_scalars(step, scalars)`, `flush()` and `close()`, and we copy the shape rather than depend on CLU, which isn't accepting contributions.
+The default writes JSON lines, and an `ExperimentTracker` adapter can sit behind the same protocol later.
+The core's guards stop a run at the first event, so MOM6's count of tolerated velocity truncations has no equivalent here.
+
+**Numerics in the manifest.**
+somax's manifest records library versions, platform, device count, `dt` and wall time.
+It gains the pipekit versions, the spec's hash and a `numerics` block from a new `Component.describe_numerics(model) -> dict`, with the stepper, the controller, the viscosity or filter strength and the Jacobian variant.
+Two runs that differ only in filter strength can give different results, so a record without it can't be interpreted.
+
 ### Dependencies
 
 `run_chunks` needs only `pipekit` and `pipekit-cycle`, which are already in the base install.
@@ -191,7 +258,7 @@ That is smaller than #28 expected: somax's `sim` group also lists `hydra-core`, 
 We built the chunk pipeline in a scratch script, on Lorenz-96 with 40 variables, in double precision, with `pipekit` 0.1.4 and `pipekit-cycle` 0.0.3 and a small wrapper in place of the `Sequential` step.
 The prototype's chunks use `integrate` with a plain `dt`, so the fix for the step count below was tested beside it rather than inside it.
 `pipekit-cycle` 0.0.4 was then checked separately, on a toy stateful step with a `Branch` and a `Sink`.
-The run specs, the registry, the command line and the rename of partial snapshots were not prototyped.
+The run specs, the registry, the command line, the schedules, the clean stop, the health record and the versioned checkpoints were not prototyped; only the renames were tested, on the data mount.
 
 | Check | Result |
 | --- | --- |
@@ -260,9 +327,12 @@ An explicit `stepsize_controller`, such as `imex_stepsize_controller`, passes th
 | Snapshots during a run | all held in memory until the end | streamed to `snapshots.partial.zarr`, renamed when the run succeeds |
 | A run that fails | no artifacts | no `snapshots.zarr`, `final_state.zarr` or `metrics.json`; the partial store stays for inspection |
 | Metrics hook | `compute_eval_metrics` | `Component.evaluate` |
+| Stopping on a wall-time limit | an error, with no artifacts | a checkpoint and a resumable exit |
+| Crash-recovery checkpoints | one store, overwritten | versioned stores, each finished by a rename |
+| Per-chunk record | text in `run.log` | `metrics.jsonl` as well |
 | `check_cfl` | its own formula | `stable_step`, as SC-4 planned |
 
-What stays: the YAML schema, the commands, the artifact names, the checks' names, `run.log`, the monitors and the crash-recovery `checkpoint.zarr`.
+What stays: the YAML schema, the commands, the artifact names, the checks' names and `run.log`. The one artifact that changes is `checkpoint.zarr`, which becomes the `checkpoints/` directory, and `restart` still reads an old one.
 `SimulationCheckpointer`, the orbax class in the core, stays unused by the runner, as it is in somax.
 
 ## Phases
@@ -270,8 +340,8 @@ What stays: the YAML schema, the commands, the artifact names, the checks' names
 | Phase | Scope | Gate |
 | --- | --- | --- |
 | SIM-0 | Compile once in `integrate`; bump `pipekit-cycle` to 0.0.4 | Repeat calls hit the cache on `Model`, `TermModel`, `ScaledModel` and IMEX; existing suites pass; `uv lock` resolves |
-| SIM-1 | `run_chunks`, `ChunkFrame`, `AdvanceChunk`, `RunMonitors` and the sinks, in the base install | The table above as tests, on Lorenz-96 and linear shallow water |
-| SIM-2 | `RunSpec`, `simulate`, `spinup`, `restart`, the registry, `sesmax-sim`, and the testing component, behind `[sim]` | somax's `test_cli_run.py`, `test_cli_spec.py` and `test_cli_progress.py`, ported to the testing component, pass |
+| SIM-1 | `run_chunks`, `ChunkFrame`, `AdvanceChunk`, `RunMonitors`, the schedules and the sinks, in the base install | The prototype's table as tests, on Lorenz-96 and linear shallow water |
+| SIM-2 | `RunSpec`, `simulate`, `spinup`, `restart`, the registry, `sesmax-sim`, the testing component, the clean stop, versioned checkpoints, `metrics.jsonl` and the `numerics` block, behind `[sim]` | somax's `test_cli_run.py`, `test_cli_spec.py` and `test_cli_progress.py`, ported to the testing component, pass; a killed run restarts from its newest complete checkpoint; a restart test passes for each stepper in use |
 | SIM-3 | The generic checks on `stable_step`, and `ModelOp.from_registry` | somax's matching tests pass |
 | C2 | `sesmax-ocean` registers its models, scenarios, checks and units | A short double-gyre run from one of somax's configs matches `somax-sim`, up to the two fixes above |
 
@@ -282,7 +352,7 @@ SIM-2 ports from `feat/doublegyre-bt-qg-hires`, not from `9cb19b3`: its checkpoi
 ## Risks
 
 - **The prototype ran on small models.** Streaming and the compile cache were not tried on a 256 × 256 multilayer run. C2's gate is the first test at that size.
-- **Older runs must still restart.** Checkpoints and final states carry `somax_sim_t`, `somax_coordinates` and related attributes, and runs on the data mount use those names. Fallback: write `sesmax_*`, and read either.
+- **Older runs must still restart.** Checkpoints and final states carry `somax_sim_t`, `somax_coordinates` and related attributes, and runs on the data mount use those names and a single `checkpoint.zarr`. Fallback: write `sesmax_*`, and read either, from either layout.
 - **Two trees during the move.** somax's runner keeps changing until C2. #19's "core changes land in sesmax" note should cover the runner from SIM-2 onwards.
 - **The name search can miss things.** The file table comes from names and a partial read of `_run.py`, so an ocean assumption may still sit inside a helper. The testing component is what will expose one.
 
@@ -293,6 +363,7 @@ SIM-2 ports from `feat/doublegyre-bt-qg-hires`, not from `9cb19b3`: its checkpoi
 | SIM-Q1 | Does #29's `geo.simulate` keep that name, given `sim.simulate` here and the "one object, one name" rule? | Keep `sim.simulate` for the spec-driven run, and settle #29's name when that design is written |
 | SIM-Q2 | Stream snapshots by default, or keep them in memory? | Stream: it removes the memory growth, and the partial store keeps the no-artifacts promise |
 | SIM-Q3 | Does `spec.timestepping` gain a solver block, since the runner always uses `integrate`'s default today? | Not in this move; `run_chunks` takes `**integrate_kwargs`, as `WindowOperator` does |
+| SIM-Q4 | On a failed check, should `sesmax-sim` offer to replay the last chunk from the newest checkpoint with `jax_debug_nans` on? | Yes, later: the flag is too costly to leave on, and this is when it earns its cost |
 
 ## Follow-up issues
 
@@ -300,6 +371,7 @@ SIM-2 ports from `feat/doublegyre-bt-qg-hires`, not from `9cb19b3`: its checkpoi
 - `fix(sim): state the step count of a chunk`, part of SIM-1
 - `feat(sim): run_chunks, a chunk pipeline on pipekit`
 - `feat(sim): RunSpec, the component registry and sesmax-sim behind [sim]`
+- `feat(sim): versioned checkpoints, a resumable stop and the per-chunk health record`
 - `feat(sim): generic checks on stable_step, and ModelOp.from_registry`
 
 ## Relationships
