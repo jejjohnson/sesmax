@@ -304,7 +304,7 @@ somax stays the working ocean package until C2 merges, so the migration must not
 - **Doctests run on the copied code.** The template collects docstring examples with `--doctest-modules`, and somax never did. Fallback: fix the examples that fail, or convert them to plain `Example::` blocks, which doctest does not collect.
 - **Git-pinned dependencies.** finitevolX, geonnax, filterax, vardax and gaussx come from git, so release-please builds and a PyPI release of `sesmax-core` cannot publish direct references. Fallback: keep git pins until each releases on PyPI, as the plumax and radtrax stack does with radtrax.
 - **The core keeps finitevolX in its base install.** `ModalTransform` and the PDE toys need it, so a user who only wants the term algebra still installs a C-grid library. Fallback: move `gfd` and `testing` behind a `[gfd]` extra if the install size becomes a complaint.
-- **The modal eigensolver.** somax fixed the non-symmetric layer matrix in its own `ModalTransform` (a symmetric similarity transform, `D^½ A D^-½`), and finitevolX has since fixed its own, in its #252. The [shared-core design](shared_core.md) has the comparison, and whether to delegate is a C2 decision.
+- **The modal eigensolver.** somax fixed the non-symmetric layer matrix in its own `ModalTransform` (a symmetric similarity transform, `D^½ A D^-½`), and finitevolX has since fixed its own, in its #252. The [shared-core design](shared_core.md) has the comparison, and `ModalTransform` has delegated to finitevolX since 5 Nov 2026.
 
 ## Decisions on the open questions
 
