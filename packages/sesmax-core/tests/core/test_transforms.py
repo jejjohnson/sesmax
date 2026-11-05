@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import jax
 import jax.numpy as jnp
 import pytest
-from finitevolx import build_coupling_matrix
+from finitevolx import build_coupling_matrix, decompose_vertical_modes
 
 from sesmax_core import ModalTransform, StratificationProfile
 
@@ -221,6 +222,53 @@ class TestModalTransform:
         A = build_coupling_matrix(jnp.asarray(_MQG_H), jnp.asarray(_MQG_GP))
         ev_general = jnp.sort(jnp.real(jnp.linalg.eigvals(A)))
         assert jnp.allclose(jnp.sort(mt.eigenvalues), ev_general, atol=1e-6)
+
+    def test_delegates_the_transforms_to_finitevolx(self):
+        mt = ModalTransform.from_physics(H=_MQG_H, g_prime=_MQG_GP, f0=_MQG_F0)
+        A = build_coupling_matrix(jnp.asarray(_MQG_H), jnp.asarray(_MQG_GP))
+        radii, Cl2m, Cm2l = decompose_vertical_modes(A, _MQG_F0)
+        assert jnp.array_equal(mt.Cl2m, Cl2m)
+        assert jnp.array_equal(mt.Cm2l, Cm2l)
+        assert jnp.array_equal(mt.rossby_radii, radii)
+
+    def test_eigenvalues_do_not_depend_on_f0(self):
+        """They come from the transforms, so f0 = 0 leaves them usable."""
+        mt = ModalTransform.from_physics(H=_MQG_H, g_prime=_MQG_GP, f0=_MQG_F0)
+        no_rotation = ModalTransform.from_physics(H=_MQG_H, g_prime=_MQG_GP, f0=0.0)
+        assert jnp.array_equal(no_rotation.eigenvalues, mt.eigenvalues)
+
+    def test_eigenvalues_set_the_rossby_radii(self):
+        """R = 1 / (|f0| sqrt(Λ)), the relation the two fields must keep."""
+        mt = ModalTransform.from_physics(H=_MQG_H, g_prime=_MQG_GP, f0=_MQG_F0)
+        expected = 1.0 / (abs(_MQG_F0) * jnp.sqrt(mt.eigenvalues))
+        assert jnp.allclose(mt.rossby_radii, expected, rtol=1e-3)
+
+    def test_modal_coupling_reproduces_the_layer_coupling(self):
+        """C_m2l Λ C_l2m x = A x, the product ReparameterizedQG computes."""
+        mt = ModalTransform.from_physics(H=_MQG_H, g_prime=_MQG_GP, f0=_MQG_F0)
+        A = build_coupling_matrix(jnp.asarray(_MQG_H), jnp.asarray(_MQG_GP))
+        x = jnp.array([1.0, -2.0, 0.5])
+        result = mt.to_layer(mt.eigenvalues * mt.to_modal(x))
+        assert jnp.allclose(result, A @ x, rtol=1e-4)
+
+    def test_modal_solve_matches_a_direct_layer_solve(self):
+        """(A + I) ψ = q solved mode by mode, whatever scale the modes have."""
+        mt = ModalTransform.from_physics(H=_MQG_H, g_prime=_MQG_GP, f0=_MQG_F0)
+        A = build_coupling_matrix(jnp.asarray(_MQG_H), jnp.asarray(_MQG_GP))
+        q = jnp.array([1.0, -2.0, 0.5])
+        direct = jnp.linalg.solve(A + jnp.eye(3), q)
+        modal = mt.to_layer(mt.to_modal(q) / (1.0 + mt.eigenvalues))
+        assert jnp.allclose(modal, direct, rtol=1e-5)
+
+    def test_builds_under_jit(self):
+        @jax.jit
+        def build(H, g_prime):
+            return ModalTransform.from_physics(H=H, g_prime=g_prime, f0=_MQG_F0)
+
+        H, g_prime = jnp.asarray(_MQG_H), jnp.asarray(_MQG_GP)
+        traced = build(H, g_prime)
+        direct = ModalTransform.from_physics(H=H, g_prime=g_prime, f0=_MQG_F0)
+        assert jnp.allclose(traced.eigenvalues, direct.eigenvalues)
 
     def test_from_stratification(self):
         strat = StratificationProfile.from_layers(

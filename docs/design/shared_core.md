@@ -219,7 +219,7 @@ The repetition is re-implementation under other names, which a body comparison c
 | One step as a `ForwardModel` | pipekit-jax `DiffraxForwardModel` | plumax `EulerianForwardModel`; the core's `ModelOp`, `VardaxForwardModel`, `FilteraxDynamics` | plumax drops its adapter; the core keeps what adds flattening or pipelines |
 | Explicit Runge–Kutta schemes | diffrax, finitevolX `RK3SSP` and others | no copies found | use them through `solver=` |
 | Time-varying fields | diffrax interpolation, through the core's `InterpolatedForcing` | plumax `WindSchedule`, `interpolate_in_time`, `_time_bracket`, `_interpolated_emission` | plumax can move at S4 |
-| Vertical modes | finitevolX `decompose_vertical_modes`, fixed in its #252 | the core's `ModalTransform.from_physics` | see below the table |
+| Vertical modes | finitevolX `decompose_vertical_modes`, fixed in its #252 | nothing since `ModalTransform.from_physics` delegated to it | see below the table |
 | Helmholtz and Poisson solves | spectraldiffx | nothing since the core's `HelmholtzCache` family, which only forwarded to it, was removed | call spectraldiffx directly |
 | Spatial bases | geonnax `basis` | vardax's constructors and the core's `spatial_from_*`, both delegating to it | see below the table |
 | Stable step | nobody | plumax `stable_step_bound`; somax `check_cfl`; the core's `Scales.dt_from_cfl`, from scales | SC-4 |
@@ -231,7 +231,7 @@ The repetition is re-implementation under other names, which a body comparison c
 
 Three of these need more words.
 
-**Vertical modes.** The workspace design says finitevolX still has the eigensolver bug, and that is out of date. Rossby radii from the two agree to $7 \times 10^{-11}$ on three stratifications in double precision, so `ModalTransform` no longer needs its own eigensolve for correctness. On the first of those, its transforms equal finitevolX's to $10^{-16}$ after one overall factor of 0.1, so delegating would rescale modal coefficients, and the switch needs a decision and a test rather than a silent swap.
+**Vertical modes.** The workspace design says finitevolX still has the eigensolver bug, and that is out of date. Rossby radii from the two agree to $7 \times 10^{-11}$ on three stratifications in double precision, so `ModalTransform` no longer needs its own eigensolve for correctness. On the first of those, its transforms equal finitevolX's to $10^{-16}$ after one overall factor of 0.1, so delegating rescales modal coefficients. `ModalTransform` now delegates, and tests hold the two uses that matter to a direct layer solve, because nothing reads a modal coefficient's scale.
 
 **Spatial bases.** Decision SX-5 said to take vardax's bases, but vardax's constructors delegate to `geonnax.basis`, as the core's already do, so that would add a hop without removing a repeat. The core stays on geonnax, and #25 and #26 are closed as not planned.
 
@@ -620,7 +620,6 @@ Replacing `EulerianForwardModel` needs only a pipekit-jax dependency, so it coul
 
 | ID | Question | Leaning |
 | --- | --- | --- |
-| SC-Q1 | Does `ModalTransform` delegate to finitevolX, given their different normalisation? | Decide in C2, when the multilayer models it serves arrive |
 | SC-Q2 | Are SC-1 and SC-4 worth doing if plumax never switches? | Yes: the DA adapters and the ocean runner use them alone |
 
 ## Relationships
