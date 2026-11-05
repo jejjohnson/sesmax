@@ -380,3 +380,4 @@ SIM-2 ports from `feat/doublegyre-bt-qg-hires`, not from `9cb19b3`: its checkpoi
 - Answers: SX-4, #28
 - Related: #29 (levels), #19 (later somax commits), #15 (`ModelOp`)
 - Parent: #8
+- Related: [the numerics wishlist](numerics_wishlist.md), whose monitors feed the health record
