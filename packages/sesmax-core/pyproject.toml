@@ -1,6 +1,6 @@
 [project]
 name = "sesmax-core"
-version = "0.0.0"
+version = "0.1.0"
 description = "The core of sesmax: state, terms, steppers, forcing, DA adapters and I/O shared by every simple Earth-system model in JAX."
 authors = [
     {name = "J. Emmanuel Johnson", email = "jemanjohnson34@gmail.com"},
