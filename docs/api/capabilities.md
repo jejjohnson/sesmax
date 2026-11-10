@@ -102,12 +102,6 @@ Every public name in `sesmax_core` (173 of them), each listed once at its public
 |---|---|---|
 | `Scales` | class | Characteristic scales of a run. |
 
-### Memory-safe IMEX solver construction for stiff sesmax models. (`sesmax_core._src.solvers`)
-
-| Name | Kind | What it does |
-|---|---|---|
-| `stable_step` | function | Largest stable step for an explicit solve, from the actual fields. |
-
 ### Per-leaf affine maps on model states: non-dimensionalisation and standardisation. (`sesmax_core._src.state_affine`)
 
 | Name | Kind | What it does |
@@ -141,6 +135,12 @@ Every public name in `sesmax_core` (173 of them), each listed once at its public
 | `interval` | function | Constrain a parameter to the open interval ``(lower, upper)``. |
 | `positive` | function | Constrain a parameter to be strictly positive. |
 | `trainable_mask` | function | Boolean pytree marking which leaves an optimiser may update. |
+
+### Re-exported from other libraries
+
+| Name | Kind | What it does |
+|---|---|---|
+| `stable_step` | function | Re-exported from `integrix`. |
 
 ## `sesmax_core.da`
 
@@ -243,8 +243,8 @@ Every public name in `sesmax_core` (173 of them), each listed once at its public
 
 | Name | Kind | What it does |
 |---|---|---|
-| `imex_solver` | function | Build a ``KenCarp3`` IMEX solver with a matrix-free implicit stage. |
-| `imex_stepsize_controller` | function | Build an adaptive PID controller for an IMEX solve. |
+| `imex_solver` | function | Re-exported from `integrix`. |
+| `imex_stepsize_controller` | function | Re-exported from `integrix`. |
 
 ## `sesmax_core.testing`
 

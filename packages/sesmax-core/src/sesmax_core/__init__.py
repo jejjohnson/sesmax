@@ -71,7 +71,6 @@ from sesmax_core._src.io import (
 from sesmax_core._src.model import Model, TermModel
 from sesmax_core._src.scaled import ScaledModel
 from sesmax_core._src.scales import Scales
-from sesmax_core._src.solvers import stable_step
 from sesmax_core._src.state_affine import StateAffine
 from sesmax_core._src.terms import (
     Compose,
@@ -95,6 +94,7 @@ from sesmax_core._src.types import (
     positive,
     trainable_mask,
 )
+from sesmax_core.solvers import stable_step
 
 
 if TYPE_CHECKING:

@@ -42,7 +42,7 @@ class Drag(sx.Term):
 
 - `__call__(t, state, args=None)` returns a pytree with the state's structure, zero in any field the term does not touch.
 - Coefficients are leaves; grids, shapes and flags are `eqx.field(static=True)`.
-- Tag a stiff term where the model assembles it, `sx.implicit(Drag(1.0))`, and pair it with `imex_solver` and `imex_stepsize_controller`.
+- Tag a stiff term where the model assembles it, `sx.implicit(Drag(1.0))`, and pair it with `imex_solver` and `imex_stepsize_controller` (`from sesmax_core.solvers import imex_solver, imex_stepsize_controller`; both live in `integrix.march`).
 
 ## 3. Assemble it
 
