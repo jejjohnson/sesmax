@@ -1,5 +1,9 @@
 """Tests for the matrix-free IMEX solver helpers (issue #55).
 
+The helpers live in ``integrix.march`` and ``sesmax_core.solvers`` re-exports
+them; these tests ran unchanged against sesmax-core's own copies and
+now run against the integrix functions.
+
 The cheap tests (construction + a small IMEX solve that would error or build
 a dense Jacobian without the helper) run in the fast PR lane. The
 large-grid scaling check that actually reproduces the 256x256 regime is
@@ -8,7 +12,11 @@ marked ``slow``.
 
 from __future__ import annotations
 
+import itertools
+
 import diffrax as dfx
+import integrix.march
+import jax
 import jax.numpy as jnp
 import optimistix as optx
 import pytest
@@ -161,3 +169,47 @@ def test_stable_step_rejects_bad_inputs(kwargs):
 
 def test_stable_step_is_exported_from_the_package_root():
     assert sesmax_core.stable_step is stable_step
+
+
+@pytest.mark.parametrize(
+    "name", ["imex_solver", "imex_stepsize_controller", "stable_step"]
+)
+def test_the_solvers_are_the_integrix_functions(name):
+    assert getattr(sesmax_core.solvers, name) is getattr(integrix.march, name)
+
+
+def _stable_step_at_f08f59d(spacing, speed, diffusivity, cfl):
+    """The bound as sesmax-core computed it at f08f59d, in Python floats."""
+    advective_rate = sum(abs(u) / dx for u, dx in zip(speed, spacing, strict=True))
+    diffusive_rate = 2.0 * sum(
+        k / dx**2 for k, dx in zip(diffusivity, spacing, strict=True)
+    )
+    total_rate = advective_rate + diffusive_rate
+    return float("inf") if total_rate == 0.0 else cfl / total_rate
+
+
+@pytest.mark.parametrize(
+    ("spacing", "speed", "diffusivity", "cfl"),
+    list(
+        itertools.product(
+            [(1.0,), (0.5, 2.0), (50.0, 50.0, 25.0)],
+            [0.0, 0.3, -2.0],
+            [0.0, 1e-3, 10.0],
+            [0.1, 1.0],
+        )
+    ),
+)
+def test_stable_step_matches_the_sesmax_core_bound(spacing, speed, diffusivity, cfl):
+    """The moved bound equals the one sesmax-core computed at f08f59d.
+
+    sesmax-core computed in Python floats; integrix computes in JAX's default
+    float, so the comparison runs in float64 to check the formula at 1e-12.
+    """
+    speeds = tuple(speed * (axis + 1) for axis in range(len(spacing)))
+    diffusivities = tuple(diffusivity / (axis + 1) for axis in range(len(spacing)))
+    expected = _stable_step_at_f08f59d(spacing, speeds, diffusivities, cfl)
+    with jax.enable_x64(True):
+        got = float(
+            stable_step(spacing, speed=speeds, diffusivity=diffusivities, cfl=cfl)
+        )
+    assert got == pytest.approx(expected, rel=1e-12)

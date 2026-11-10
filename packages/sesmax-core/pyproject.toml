@@ -42,6 +42,9 @@ dependencies = [
     "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-jax-v0.0.6#subdirectory=packages/pipekit-jax",
     # The spatial bases of the forcing bank (only ``geonnax.basis`` is used).
     "geonnax @ git+https://github.com/jejjohnson/geonnax.git@v0.0.11",
+    # The IMEX solver, its step-size controller and the CFL bound
+    # (``sesmax_core.solvers`` re-exports them from ``integrix.march``).
+    "integrix @ git+https://github.com/jejjohnson/integrix.git@v0.0.3",
 ]
 
 [project.optional-dependencies]

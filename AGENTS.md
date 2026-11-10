@@ -24,7 +24,7 @@ The public API of each package is its top-level `__all__`, plus its public submo
 ### Boundaries
 
 - **Tiers.** A package imports only packages in a lower tier; `sesmax_core` imports no component and nothing from `somax` (`tests/test_workspace.py` reads the sources and fails otherwise). Two components never import each other: what they share goes into the core, and what couples them goes into the coupler.
-- **Dependencies.** `sesmax-core`'s base install: JAX, jaxtyping, Equinox, diffrax, lineax, optimistix, einops, paramax, finitevolX, spectraldiffx, pipekit (with pipekit-cycle and pipekit-jax) and geonnax; git dependencies are direct references in `packages/sesmax-core/pyproject.toml`, kept in step with the overrides in the root `pyproject.toml`. An optional dependency goes behind an extra (`[da]` for filterax and vardax, `[flows]`, `[xarray]`, `[checkpoint]`) and an import that raises an `ImportError` naming the extra.
+- **Dependencies.** `sesmax-core`'s base install: JAX, jaxtyping, Equinox, diffrax, lineax, optimistix, einops, paramax, finitevolX, spectraldiffx, pipekit (with pipekit-cycle and pipekit-jax), geonnax and integrix; git dependencies are direct references in `packages/sesmax-core/pyproject.toml`, kept in step with the overrides in the root `pyproject.toml`. An optional dependency goes behind an extra (`[da]` for filterax and vardax, `[flows]`, `[xarray]`, `[checkpoint]`) and an import that raises an `ImportError` naming the extra.
 - **Nobody imports sesmax yet.** When other projects build on it, list them here and keep their imports working: a rename or removal of a public name then goes through a deprecation (the old name keeps working with a `DeprecationWarning` that names the replacement for at least one release).
 
 ## What it is built on
@@ -35,7 +35,7 @@ Each foundation brings a rule. Breaking one runs fine on your example and fails 
 |---|---|---|
 | **uv workspace** | one lock file and one environment for every package | `make install` (`uv sync --all-packages --all-groups`); a new package is a directory under `packages/`, a `[tool.uv.sources]` entry and a `dev` group entry in the root `pyproject.toml`, and a release-please entry. |
 | **JAX and Equinox** | every model, term and step | A step is a pure function of state, parameters and forcing that `jit`, `grad` and `vmap` go through; models and states are `eqx.Module`s; shapes and flags are static fields, physical parameters are leaves. |
-| **The stack** (finitevolX, spectraldiffx, diffrax, lineax, gaussx, vardax, filterax) | stencils, spectral solves, time stepping, linear algebra, bases, assimilation | Compose them; never re-implement a stencil, a solver or a basis here. |
+| **The stack** (finitevolX, spectraldiffx, diffrax, integrix, lineax, gaussx, vardax, filterax) | stencils, spectral solves, time stepping, linear algebra, bases, assimilation | Compose them; never re-implement a stencil, a solver or a basis here. |
 | **pytest + `--doctest-modules`** | the suites and every docstring `Examples:` block | An example's expected output is what the code prints; a stale example is a failing test. |
 
 ## Reuse before you write
@@ -62,7 +62,7 @@ find out whether it exists:
 |---|---|
 | A finite-difference stencil, a C-grid interpolation, a vorticity, divergence or kinetic-energy formula | finitevolX |
 | A spectral derivative, a Helmholtz or Poisson solve | spectraldiffx |
-| A time-stepping loop or a Runge–Kutta scheme | diffrax through `Model.integrate` and `Model.step`; `rollout` for a trajectory; `imex_solver` for a stiff term |
+| A time-stepping loop or a Runge–Kutta scheme | diffrax through `Model.integrate` and `Model.step`; `rollout` for a trajectory; `imex_solver` for a stiff term and `stable_step` for an explicit step bound (`sesmax_core.solvers`, re-exported from `integrix.march`) |
 | `jnp.linalg.inv`, `solve` or a Cholesky on a covariance | lineax, gaussx |
 | An RBF, Fourier, wavelet or EOF basis | the `spatial_from_*` constructors (`geonnax.basis` today, vardax's bases after #25) |
 | Flattening a state pytree into a vector | `state_to_vector`, `make_ensemble` (`sesmax_core.da`), or `jax.flatten_util.ravel_pytree` where the DA stack is not installed |

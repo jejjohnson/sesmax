@@ -72,6 +72,9 @@ plugins:
             merge_init_into_class: true
             heading_level: 3
             filters: ["!^_"]
+            # sesmax_core.solvers re-exports integrix.march functions; griffe
+            # renders an alias only when its target package is loaded.
+            preload_modules: [integrix]
 
 nav:
   - Overview: index.md

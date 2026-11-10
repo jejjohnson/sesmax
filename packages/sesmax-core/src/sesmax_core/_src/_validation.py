@@ -1,9 +1,10 @@
 """Input validators shared by the model factories.
 
-Moved from somax 9cb19b3: the three validators of
+Moved from somax 9cb19b3: the validators of
 ``somax/_src/models/_nondim.py`` (``require_positive``,
-``require_non_negative``, ``reject_derived_kwargs``). The Burger-number
-helpers of that module live in ``sesmax_core._src.gfd``.
+``reject_derived_kwargs``). Its third, ``require_non_negative``, had one
+caller, ``stable_step``, which now lives in ``integrix.march``. The
+Burger-number helpers of that module live in ``sesmax_core._src.gfd``.
 """
 
 from __future__ import annotations
@@ -18,16 +19,6 @@ def require_positive(context: str, **values: float) -> None:
         if not math.isfinite(value) or value <= 0.0:
             raise ValueError(
                 f"{context}: {name} must be a finite positive number; got {value!r}."
-            )
-
-
-def require_non_negative(context: str, **values: float) -> None:
-    """Raise if any named value is negative or not finite."""
-    for name, value in values.items():
-        if not math.isfinite(value) or value < 0.0:
-            raise ValueError(
-                f"{context}: {name} must be a finite non-negative number; "
-                f"got {value!r}."
             )
 
 

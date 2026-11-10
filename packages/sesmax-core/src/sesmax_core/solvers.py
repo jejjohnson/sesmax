@@ -1,4 +1,4 @@
-"""Public surface for sesmax-core's solver helpers.
+"""Public surface for sesmax-core's solver helpers, which live in integrix.
 
 :func:`imex_solver` / :func:`imex_stepsize_controller` build a memory-safe,
 matrix-free IMEX integrator for stiff term-based models (those built with
@@ -8,12 +8,14 @@ stage with a Krylov (GMRES) Newton root-finder — O(N) memory rather than
 O(N^2).
 
 :func:`stable_step` is the largest stable step for an explicit solve, from the
-actual spacings, speeds and diffusivities.
+actual spacings, speeds and diffusivities. It returns a 0-d JAX array (``inf``
+when nothing moves or diffuses) and traces under ``jit``.
 
-Pure JAX / diffrax / lineax / optimistix (all base dependencies), so
-importing this is cheap; it is kept out of ``sesmax_core``'s top-level
-``__init__`` to mirror the module-per-surface layout (cf.
-:mod:`sesmax_core.guards`).
+The three are defined in :mod:`integrix.march` (a base dependency) and
+re-exported here unchanged, so ``sesmax_core.solvers.imex_solver is
+integrix.march.imex_solver``. The module is kept out of ``sesmax_core``'s
+top-level ``__init__`` (except :func:`stable_step`) to mirror the
+module-per-surface layout (cf. :mod:`sesmax_core.guards`).
 
 Example::
 
@@ -31,7 +33,9 @@ Example::
     )
 """
 
-from sesmax_core._src.solvers import (
+from __future__ import annotations
+
+from integrix.march import (
     imex_solver,
     imex_stepsize_controller,
     stable_step,
