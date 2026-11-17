@@ -1,7 +1,7 @@
 """Public surface for sesmax-core's pipekit ``Operator`` bridge.
 
 Import this module to expose sesmax forward models as
-:class:`pipekit.Operator` s. pipekit is a base dependency, so no extra
+:class:`pipekit_ops.Operator` s. pipekit is a base dependency, so no extra
 install step is needed. Kept out of ``sesmax_core``'s top-level
 ``__init__`` so plain ``import sesmax_core`` doesn't import pipekit (the
 core stays structural-only); ``import sesmax_core.operators`` pulls it in.

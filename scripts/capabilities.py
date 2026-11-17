@@ -77,7 +77,7 @@ UPSTREAM: dict[str, list[str]] = {
     "diffrax": ["diffrax"],
     "lineax": ["lineax"],
     "paramax": ["paramax"],
-    "pipekit": ["pipekit"],
+    "pipekit-ops": ["pipekit_ops"],
     "geonnax": ["geonnax.basis"],
 }
 UPSTREAM_BLURB: dict[str, str] = {
@@ -99,7 +99,7 @@ UPSTREAM_BLURB: dict[str, str] = {
         "Constrained and frozen parameters: `positive`, `interval` and `frozen` "
         "wrap its parameterisations, and `Model` unwraps them per call."
     ),
-    "pipekit": (
+    "pipekit-ops": (
         "Composable operators and pipelines: `ModelOp` and `OperatorTerm` are "
         "the bridges to it."
     ),

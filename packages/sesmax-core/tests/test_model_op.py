@@ -11,7 +11,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from jaxtyping import Array, PyTree
-from pipekit import Operator
+from pipekit_ops import Operator
 
 from sesmax_core import Model, Params, State
 from sesmax_core.operators import ModelOp

@@ -88,7 +88,7 @@ Each job then becomes one stage of a `Sequential`, and `Cycle` repeats it.
 
 ```python
 # Shapes: the state is the model's pytree; N_chunk = diagnostic chunks in the run
-from pipekit import Branch, Identity, Retry, Sequential, Sink, Tap, Try
+from pipekit_ops import Branch, Identity, Retry, Sequential, Sink, Tap, Try
 from pipekit_cycle import Cycle
 
 
@@ -127,13 +127,13 @@ The carry-state shrinks from `_ChunkCarry` to the chunk index, because snapshots
 | Job | Today | Use | Why |
 | --- | --- | --- | --- |
 | Repeating chunks | `Cycle` | `pipekit_cycle.Cycle` | already in use |
-| Cadence | `if` in `_ChunkStep` | `pipekit.Branch` | a predicate on the frame |
-| Snapshots, checkpoints, log lines | inline | `pipekit.Sink`, `pipekit.Tap` | the documented purpose of both |
-| Checkpoint retry | a hand-written `for` loop | `pipekit.Retry` inside `pipekit.Try` | same behaviour, measured below |
-| Run identity | git commit in the manifest | `pipekit.hashing.stable_json` and `sha256_hex` on the spec | not `pipeline_hash`, which hashes a closure by name: two different writers with one name hashed alike |
+| Cadence | `if` in `_ChunkStep` | `pipekit_ops.Branch` | a predicate on the frame |
+| Snapshots, checkpoints, log lines | inline | `pipekit_ops.Sink`, `pipekit_ops.Tap` | the documented purpose of both |
+| Checkpoint retry | a hand-written `for` loop | `pipekit_ops.Retry` inside `pipekit_ops.Try` | same behaviour, measured below |
+| Run identity | git commit in the manifest | `pipekit_ops.hashing.stable_json` and `sha256_hex` on the spec | not `pipeline_hash`, which hashes a closure by name: two different writers with one name hashed alike |
 | Advancing a chunk | `model.integrate` | our own `AdvanceChunk` | `ModelOp` and `as_forward_model` integrate over $[0, \Delta t]$ and drop the solver statistics; on a forced Lorenz-96 this was wrong by 11.8 |
-| Monitors | `Monitor` protocol | our own, adapted by `RunMonitors` | they have start and end hooks and may stop a run; `pipekit.Profile` reports only afterwards, and `ThroughputMonitor` needs each chunk's time during the run |
-| Run spec | dataclasses and YAML | our own | `pipekit.dumps` refuses `Sink`, `Tap` and `ModelOp`, which hold closures or models; the spec is the faithful record |
+| Monitors | `Monitor` protocol | our own, adapted by `RunMonitors` | they have start and end hooks and may stop a run; `pipekit_ops.Profile` reports only afterwards, and `ThroughputMonitor` needs each chunk's time during the run |
+| Run spec | dataclasses and YAML | our own | `pipekit_ops.dumps` refuses `Sink`, `Tap` and `ModelOp`, which hold closures or models; the spec is the faithful record |
 | In-graph stepping | none | not `ScanCycle` or `Rollout` | a single `lax.scan` cannot write or stop between chunks; they stay the tools for short differentiable windows |
 
 `pipekit-experiment` is the one package we don't pin yet that fits, and it can wait.

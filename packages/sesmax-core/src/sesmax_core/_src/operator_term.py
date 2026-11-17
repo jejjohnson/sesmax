@@ -25,7 +25,7 @@ The operator is a field of the term, so when it is a pytree
 (``pipekit_jax.JaxOperator``, ``JaxModelOp``, or a ``Graph`` /
 ``Sequential`` of them — ``pipekit_jax`` registers those containers) its
 array leaves are leaves of the term tree and ``eqx.filter_grad`` reaches
-them together with the physics coefficients. A plain ``pipekit.Operator``
+them together with the physics coefficients. A plain ``pipekit_ops.Operator``
 still works, but it is opaque to ``jax.grad``: its internals are not
 leaves, so its parameters are constants.
 
@@ -43,7 +43,7 @@ import jax
 import jax.numpy as jnp
 import pipekit_jax  # noqa: F401  (registers Graph / Sequential as pytrees)
 from jaxtyping import PyTree
-from pipekit import Graph
+from pipekit_ops import Graph
 
 from sesmax_core._src.terms import EXPLICIT, IMPLICIT, Kind, Term
 

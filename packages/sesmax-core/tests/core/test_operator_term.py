@@ -11,8 +11,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from finitevolx import Coriolis2D, Difference2D
-from pipekit import Graph, Input, Lambda
 from pipekit_jax import JaxOperator
+from pipekit_ops import Graph, Input, Lambda
 
 from sesmax_core import Scaled
 from sesmax_core._src.terms import IMPLICIT, partition

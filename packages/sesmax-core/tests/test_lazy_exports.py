@@ -23,7 +23,7 @@ def test_plain_import_does_not_load_pipekit() -> None:
     code = (
         "import sys, sesmax_core\n"
         "loaded = {m.split('.')[0] for m in sys.modules}\n"
-        "stray = loaded & {'pipekit', 'pipekit_jax'}\n"
+        "stray = loaded & {'pipekit', 'pipekit_ops', 'pipekit_jax'}\n"
         "assert not stray, stray\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
