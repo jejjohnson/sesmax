@@ -22,9 +22,10 @@ members = [
 overrides = [
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.6" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
-    { name = "pipekit", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=pipekit-v0.1.4" },
-    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-cycle-v0.0.3" },
-    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-jax-v0.0.6" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.3" },
+    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-ops-v0.2.1" },
+    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-ops-v0.2.1" },
+    { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-ops-v0.2.1" },
 ]
 
 [[package]]
@@ -52,6 +53,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/35/5d/752690df9ef5b76e169e68d6a129fa6d08a7100ca7f754c89495db3c6019/appnope-0.1.4.tar.gz", hash = "sha256:1de3860566df9caf38f01f86f65e0e13e379af54f9e4bee1e66b48f2efffd1ee", size = 4170, upload-time = "2024-02-06T09:43:11.258Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/29/5ecc3a15d5a33e31b26c11426c45c501e439cb865d0bff96315d86443b78/appnope-0.1.4-py2.py3-none-any.whl", hash = "sha256:502575ee11cd7a28c0205f379b525beefebab9d161b7c964670864014ed7213c", size = 4321, upload-time = "2024-02-06T09:43:09.663Z" },
+]
+
+[[package]]
+name = "argminax"
+version = "0.0.4"
+source = { git = "https://github.com/jejjohnson/argminax?tag=v0.0.4#5992322c0c8ed06744254e7d331a83549fb69b21" }
+dependencies = [
+    { name = "equinox" },
+    { name = "gaussx" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "optimistix" },
 ]
 
 [[package]]
@@ -645,12 +660,13 @@ dependencies = [
 [[package]]
 name = "finitevolx"
 version = "0.1.0"
-source = { git = "https://github.com/jejjohnson/finitevolX.git?rev=v0.1.0#831c69f60c6b443be1f7291144c65832f6da62c7" }
+source = { git = "https://github.com/jejjohnson/finitevolX.git?rev=a28525dfc0f36d26ded9ffea285e9832aed5aaae#a28525dfc0f36d26ded9ffea285e9832aed5aaae" }
 dependencies = [
     { name = "beartype" },
     { name = "diffrax" },
     { name = "equinox" },
     { name = "gaussx" },
+    { name = "integrix" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },
@@ -661,8 +677,8 @@ dependencies = [
 
 [package.optional-dependencies]
 pipekit = [
-    { name = "pipekit" },
     { name = "pipekit-jax" },
+    { name = "pipekit-ops" },
 ]
 
 [[package]]
@@ -886,7 +902,7 @@ wheels = [
 [[package]]
 name = "integrix"
 version = "0.0.3"
-source = { git = "https://github.com/jejjohnson/integrix.git?rev=v0.0.3#4385392b90f70d4ab5c3436239286e32595e5bfe" }
+source = { git = "https://github.com/jejjohnson/integrix?rev=v0.0.3#4385392b90f70d4ab5c3436239286e32595e5bfe" }
 dependencies = [
     { name = "diffrax" },
     { name = "einx" },
@@ -2193,29 +2209,29 @@ wheels = [
 ]
 
 [[package]]
-name = "pipekit"
-version = "0.1.4"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=pipekit-v0.1.4#7dca5377083ef2c17605feb237c50a06d5bd34ab" }
-
-[[package]]
 name = "pipekit-cycle"
-version = "0.0.3"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-cycle-v0.0.3#00b6c61fafa586b93ff4cf3bfe676f8ad0a06c3a" }
+version = "0.1.0"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-ops-v0.2.1#8e357a1f3eb82b15e15bf18be4de04d4d9535855" }
 dependencies = [
-    { name = "pipekit" },
+    { name = "pipekit-ops" },
 ]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.0.6"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-jax-v0.0.6#969175ccdff18d08dee8888201fc4bb4227d25a1" }
+version = "0.1.0"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-ops-v0.2.1#8e357a1f3eb82b15e15bf18be4de04d4d9535855" }
 dependencies = [
     { name = "equinox" },
     { name = "jax" },
     { name = "jaxtyping" },
-    { name = "pipekit" },
     { name = "pipekit-cycle" },
+    { name = "pipekit-ops" },
 ]
+
+[[package]]
+name = "pipekit-ops"
+version = "0.2.1"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-ops-v0.2.1#8e357a1f3eb82b15e15bf18be4de04d4d9535855" }
 
 [[package]]
 name = "platformdirs"
@@ -2775,9 +2791,9 @@ dependencies = [
     { name = "lineax" },
     { name = "optimistix" },
     { name = "paramax" },
-    { name = "pipekit" },
     { name = "pipekit-cycle" },
     { name = "pipekit-jax" },
+    { name = "pipekit-ops" },
     { name = "spectraldiffx" },
 ]
 
@@ -2803,10 +2819,10 @@ requires-dist = [
     { name = "einops", specifier = ">=0.8.2" },
     { name = "equinox", specifier = ">=0.13.8" },
     { name = "filterax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/filterax?rev=v0.0.6" },
-    { name = "finitevolx", extras = ["pipekit"], git = "https://github.com/jejjohnson/finitevolX.git?rev=v0.1.0" },
+    { name = "finitevolx", extras = ["pipekit"], git = "https://github.com/jejjohnson/finitevolX.git?rev=a28525dfc0f36d26ded9ffea285e9832aed5aaae" },
     { name = "flowjax", marker = "extra == 'flows'" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix.git?rev=v0.0.3" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.3" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxlib", specifier = ">=0.11.1" },
     { name = "jaxtyping", specifier = ">=0.3.9" },
@@ -2814,11 +2830,11 @@ requires-dist = [
     { name = "optimistix", specifier = ">=0.1" },
     { name = "orbax-checkpoint", marker = "extra == 'checkpoint'", specifier = ">=0.11.37" },
     { name = "paramax", specifier = ">=0.0.5" },
-    { name = "pipekit", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit&rev=pipekit-v0.1.4" },
-    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-cycle-v0.0.3" },
-    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-jax-v0.0.6" },
+    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-ops-v0.2.1" },
+    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-ops-v0.2.1" },
+    { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-ops-v0.2.1" },
     { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1" },
-    { name = "vardax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/vardax?rev=v0.3.0" },
+    { name = "vardax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/vardax?rev=v0.3.5" },
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2026.4.0" },
     { name = "zarr", marker = "extra == 'xarray'", specifier = ">=3.1.6" },
 ]
@@ -3217,22 +3233,24 @@ wheels = [
 
 [[package]]
 name = "vardax"
-version = "0.3.0"
-source = { git = "https://github.com/jejjohnson/vardax?rev=v0.3.0#ddbbae7819891821e5b5b69b6a93f31beca772f4" }
+version = "0.3.5"
+source = { git = "https://github.com/jejjohnson/vardax?rev=v0.3.5#d87878b593cd6f86ee065cdb40cf9a3fc8279dd9" }
 dependencies = [
+    { name = "argminax" },
     { name = "diffrax" },
     { name = "einx" },
     { name = "equinox" },
     { name = "gaussx" },
     { name = "geonnax" },
+    { name = "integrix" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },
     { name = "lineax" },
     { name = "optax" },
     { name = "optimistix" },
-    { name = "pipekit" },
     { name = "pipekit-cycle" },
+    { name = "pipekit-ops" },
 ]
 
 [[package]]

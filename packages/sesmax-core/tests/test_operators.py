@@ -1,7 +1,7 @@
 """somax models as pipekit Operators with serializable flat configs.
 
 Exercises the pipekit bridge (``sesmax_core.operators``): flat-primitive
-``get_config``, faithful ``pipekit.serial`` round-trip, ForwardModel
+``get_config``, faithful ``pipekit_ops.serial`` round-trip, ForwardModel
 conformance, pipeline composition, and driving ``pipekit_cycle.Cycle``.
 
 These require pipekit (a base somax dependency); the ``importorskip``
@@ -14,11 +14,11 @@ import jax.numpy as jnp
 import pytest
 
 
-pytest.importorskip("pipekit")
+pytest.importorskip("pipekit_ops")
 pytest.importorskip("pipekit_cycle")
 
-from pipekit import dumps, loads
 from pipekit_cycle import Cycle, ForwardModel
+from pipekit_ops import dumps, loads
 
 from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
 from sesmax_core.operators import ModelOp
@@ -63,7 +63,7 @@ def test_model_not_in_config():
 
 
 # ----------------------------------------------------------------------
-# pipekit.serial round-trip
+# pipekit_ops.serial round-trip
 # ----------------------------------------------------------------------
 
 

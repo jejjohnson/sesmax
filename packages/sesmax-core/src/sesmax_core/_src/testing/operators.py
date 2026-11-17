@@ -18,7 +18,10 @@ class Burgers2DOp(ModelOp):
     All constructor arguments are JSON primitives, so::
 
         op = Burgers2DOp(nx=32, ny=32, nu=0.05, dt=1e-3)
-        assert pipekit.loads(pipekit.dumps(op)).get_config() == op.get_config()
+        assert (
+            pipekit_ops.loads(pipekit_ops.dumps(op)).get_config()
+            == op.get_config()
+        )
 
     round-trips the build recipe. ``op(state)`` advances the Burgers
     state by one ``dt`` step; the Operator drives ``pipekit_cycle.Cycle``

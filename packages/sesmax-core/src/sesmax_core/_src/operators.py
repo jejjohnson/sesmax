@@ -4,12 +4,12 @@ sesmax's *core* never imports pipekit — models satisfy ``pipekit_cycle``'s
 ``ForwardModel`` *structurally* (via ``Model.step``). pipekit is a
 base dependency (always installed), so this module — the opposite end —
 is always available: it exposes sesmax models as first-class
-:class:`pipekit.Operator` s.
+:class:`pipekit_ops.Operator` s.
 
 Why a companion Operator instead of making the model itself an Operator?
 A sesmax model is an ``eqx.Module`` whose fields are grids, finitevolx
 operators, and assembled term trees — none of them JSON primitives, so
-the model can't round-trip through ``pipekit.serial``. Two forms bridge
+the model can't round-trip through ``pipekit_ops.serial``. Two forms bridge
 the gap:
 
 - :class:`ModelOp` wraps *any* built model
@@ -21,7 +21,7 @@ the gap:
   instead carry the
   model's *flat primitive construction recipe* (``nx``, ``nu``, ``dt``,
   …). Because every config value is a primitive,
-  :func:`pipekit.dumps` / :func:`pipekit.loads` round-trips them
+  :func:`pipekit_ops.dumps` / :func:`pipekit_ops.loads` round-trips them
   faithfully — rebuilding the model on construction. This is the
   serializable counterpart to the eqx.Module numeric core.
 
@@ -44,7 +44,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pipekit import Operator
+from pipekit_ops import Operator
 
 
 class ModelOp(Operator):
@@ -60,7 +60,7 @@ class ModelOp(Operator):
     Serialization: the wrapped model is an ``eqx.Module`` (grids,
     finitevolx operators, term trees — not JSON primitives), so this
     general form is **not** faithfully round-trippable through
-    ``pipekit.serial`` — it sets ``forbid_in_yaml = True`` and an empty
+    ``pipekit_ops.serial`` — it sets ``forbid_in_yaml = True`` and an empty
     auto-config. Subclasses whose construction is a *flat primitive
     recipe* (``Burgers2DOp`` in ``sesmax_core.testing``) re-enable the
     round-trip by rebuilding the model from those primitives.

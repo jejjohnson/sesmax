@@ -24,8 +24,8 @@ pytest.importorskip("vardax")
 import diffrax as dfx
 import gaussx
 import lineax as lx
-from pipekit import Operator
 from pipekit_cycle import DAState
+from pipekit_ops import Operator
 from vardax import (
     Batch1D,
     IncrementalFourDVar,

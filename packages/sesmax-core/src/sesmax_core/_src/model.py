@@ -308,7 +308,7 @@ class Model(eqx.Module):
         Part of the :class:`pipekit_cycle.ForwardModel` contract (``step``,
         ``dt``, ``state_signature``). ``None`` means the model does not
         advertise a shape/dtype signature; structural, no pipekit import.
-        Override to return a ``pipekit.Signature`` if a model tracks named
+        Override to return a ``pipekit_ops.Signature`` if a model tracks named
         dimensions.
         """
         return None
