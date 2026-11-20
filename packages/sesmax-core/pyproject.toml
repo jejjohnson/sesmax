@@ -50,6 +50,9 @@ dependencies = [
     "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-ops",
     "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-cycle",
     "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-jax",
+    # The reference density the wind-stress operators default to; geophysix
+    # owns the physical constants.
+    "geophysix @ git+https://github.com/jejjohnson/geophysix.git@v0.0.2",
     # The spatial bases of the forcing bank (only ``geonnax.basis`` is used).
     "geonnax @ git+https://github.com/jejjohnson/geonnax.git@v0.0.11",
     # The IMEX solver, its step-size controller and the CFL bound
@@ -96,5 +99,6 @@ packages = ["src/sesmax_core"]
 # package across the graph, and a source takes precedence over the direct
 # reference above (which pip users still get).
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
+geophysix = { git = "https://github.com/jejjohnson/geophysix.git", tag = "v0.0.2" }
 gridax = { git = "https://github.com/jejjohnson/gridax.git", tag = "gridax-v0.1.0", subdirectory = "packages/gridax" }
 gridax-jax = { git = "https://github.com/jejjohnson/gridax.git", tag = "gridax-jax-v0.2.0", subdirectory = "packages/gridax-jax" }
