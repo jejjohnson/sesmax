@@ -22,6 +22,7 @@ References
 from __future__ import annotations
 
 import jax.numpy as jnp
+from geophysix.seawater import LINEAR_EOS
 from gridax import (
     CartesianGrid2D,
     CartesianGrid3D,
@@ -64,7 +65,8 @@ class WindStress2D(AbstractForcing):
         dry U-faces and ``dv_wind`` at dry V-faces (via ``jnp.where``, so a
         zero dry-cell ``dz_top`` or NaN-filled land never leaks NaN).
     rho0 : float, optional
-        Reference density [kg/m^3].  Default ``1025.0``.
+        Reference density [kg/m^3].  Default
+        ``geophysix.seawater.LINEAR_EOS.reference_density`` (1025.0).
 
     Examples
     --------
@@ -94,7 +96,7 @@ class WindStress2D(AbstractForcing):
         self,
         grid: CartesianGrid2D,
         mask: Mask2D | None = None,
-        rho0: float = 1025.0,
+        rho0: float = LINEAR_EOS.reference_density,
     ) -> None:
         self.grid = grid
         self.mask = mask
@@ -191,7 +193,8 @@ class WindCurl2D(AbstractForcing):
         ``jnp.where`` before the stencil (so NaN-filled land cannot leak)
         and the output is zeroed on dry X-points (``mask.xy_corner_strict``).
     rho0 : float, optional
-        Reference density [kg/m^3].  Default ``1025.0``.
+        Reference density [kg/m^3].  Default
+        ``geophysix.seawater.LINEAR_EOS.reference_density`` (1025.0).
 
     Examples
     --------
@@ -212,7 +215,7 @@ class WindCurl2D(AbstractForcing):
 
     grid: CartesianGrid2D
     mask: Mask2D | None = None
-    rho0: float = 1025.0
+    rho0: float = LINEAR_EOS.reference_density
 
     def __call__(
         self,
@@ -284,7 +287,8 @@ class WindStress3D(AbstractForcing):
         ``dz_top`` division there, so zero dry-cell thickness or NaN-filled
         land never leaks NaN.
     rho0 : float, optional
-        Reference density [kg/m^3].  Default ``1025.0``.
+        Reference density [kg/m^3].  Default
+        ``geophysix.seawater.LINEAR_EOS.reference_density`` (1025.0).
 
     Examples
     --------
@@ -307,7 +311,7 @@ class WindStress3D(AbstractForcing):
         self,
         grid: CartesianGrid3D,
         mask: Mask3D | None = None,
-        rho0: float = 1025.0,
+        rho0: float = LINEAR_EOS.reference_density,
     ) -> None:
         self.grid = grid
         self.mask = mask

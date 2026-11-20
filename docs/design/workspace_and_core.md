@@ -155,7 +155,7 @@ Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were
 | `core/transforms.py` | `StateAffine`; `StratificationProfile`, `ModalTransform` | `StateAffine` to `sesmax_core.scales`; the layered pieces to `sesmax_core.gfd` | split by concept |
 | `core/helmholtz.py` | the periodic, Dirichlet, Neumann and multimodal Helmholtz caches over spectraldiffx | moved to `sesmax_core.gfd`, then removed on 5 Nov 2026 because no model used them | none |
 | `models/_nondim.py` | `require_positive`, `require_non_negative`, `reject_derived_kwargs`; `resolve_burger`, `burger_to_g_prime`, `resolve_burger_spherical` | validators to `sesmax_core._validation`; Burger helpers to `sesmax_core.gfd` | split by concept |
-| `constants/` | physical constants | `sesmax_core.constants` | none |
+| `constants/` | physical constants | not moved: nothing imported them, and geophysix owns them (`geophysix.constants.STANDARD`, `geophysix.earth.SPHERE`) | none |
 | `domain/` | `Domain`, `TimeDomain` | `sesmax_core.domain` | none |
 | `solvers.py` | `imex_solver`, `imex_stepsize_controller` (Krylov Newton) | `sesmax_core.solvers` | none |
 | `guards.py` | `guard_finite`, `guard_positive`, `guard_ceiling` | `sesmax_core.guards` | none |
