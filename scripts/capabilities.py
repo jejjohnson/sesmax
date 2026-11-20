@@ -111,7 +111,40 @@ UPSTREAM_BLURB: dict[str, str] = {
 
 # Names two homes may bind to different objects, and why, e.g.
 # {"Mean": "stats.Mean is the statistic, aggregation.Mean the reducer"}.
+_MOVED_FROM_GRIDAX_JAX = (
+    "AbstractForcing",
+    "ForcingProduct",
+    "ForcingSum",
+    "LinearDrag2D",
+    "LinearDrag3D",
+    "QuadraticDrag2D",
+    "QuadraticDrag3D",
+    "RayleighDamping2D",
+    "RayleighDamping3D",
+    "TimeVaryingForcing",
+    "WindCurl2D",
+    "WindStress2D",
+    "WindStress3D",
+    "barotropic_filter",
+    "build_coupling_matrix",
+    "decompose_vertical_modes",
+    "layer_to_mode",
+    "linear_drag",
+    "linear_drag_tendency",
+    "mode_to_layer",
+    "multilayer",
+    "quadratic_drag_tendency",
+    "rayleigh_relaxation",
+    "rayleigh_tendency",
+    "wind_stress_tendency",
+)
+
 ALLOWED_SHARED_NAMES: dict[str, str] = {
+    **dict.fromkeys(
+        _MOVED_FROM_GRIDAX_JAX,
+        "moved here from gridax-jax; the pinned finitevolX (a28525d) still "
+        "carries its own copy until the remaining stencil imports move to gridax",
+    ),
     "Diffusion2D": (
         "sesmax_core.testing.Diffusion2D is the test-problem model, "
         "finitevolx.Diffusion2D the stencil operator"

@@ -84,6 +84,7 @@ nav:
   - Forcing: forcing.md
   - Scales: scales.md
   - Layered fluids: gfd.md
+  - Vertical modes: vertical.md
   - Domains: domain.md
   - Solvers: solvers.md
   - Training rollouts: train.md

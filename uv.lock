@@ -843,6 +843,35 @@ wheels = [
 ]
 
 [[package]]
+name = "gridax"
+version = "0.1.0"
+source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&tag=gridax-jax-v0.2.0#abe2e29193138b331d1c1dd6d8aa7f29eb977400" }
+dependencies = [
+    { name = "jaxtyping" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+
+[[package]]
+name = "gridax-jax"
+version = "0.2.0"
+source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax-jax&tag=gridax-jax-v0.2.0#abe2e29193138b331d1c1dd6d8aa7f29eb977400" }
+dependencies = [
+    { name = "beartype" },
+    { name = "diffrax" },
+    { name = "equinox" },
+    { name = "gaussx" },
+    { name = "gridax" },
+    { name = "integrix" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "scipy" },
+    { name = "spectraldiffx" },
+]
+
+[[package]]
 name = "griffelib"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2784,6 +2813,8 @@ dependencies = [
     { name = "equinox" },
     { name = "finitevolx", extra = ["pipekit"] },
     { name = "geonnax" },
+    { name = "gridax" },
+    { name = "gridax-jax" },
     { name = "integrix" },
     { name = "jax" },
     { name = "jaxlib" },
@@ -2822,6 +2853,8 @@ requires-dist = [
     { name = "finitevolx", extras = ["pipekit"], git = "https://github.com/jejjohnson/finitevolX.git?rev=a28525dfc0f36d26ded9ffea285e9832aed5aaae" },
     { name = "flowjax", marker = "extra == 'flows'" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
+    { name = "gridax", git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&tag=gridax-v0.1.0" },
+    { name = "gridax-jax", git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax-jax&tag=gridax-jax-v0.2.0" },
     { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.3" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxlib", specifier = ">=0.11.1" },

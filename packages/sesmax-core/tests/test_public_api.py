@@ -33,6 +33,7 @@ SUBMODULES: list[str] = [
     "terms",
     "testing",
     "train",
+    "vertical",
 ]
 
 

@@ -56,6 +56,37 @@ from sesmax_core._src.forcing_bank import (
     spatial_from_wavelet,
     tile_in_time,
 )
+from sesmax_core._src.forcing_ops._base import (
+    AbstractForcing,
+    ForcingProduct,
+    ForcingSum,
+    TimeVaryingForcing,
+)
+from sesmax_core._src.forcing_ops.drag import (
+    LinearDrag2D,
+    LinearDrag3D,
+    QuadraticDrag2D,
+    QuadraticDrag3D,
+)
+from sesmax_core._src.forcing_ops.functional import (
+    linear_drag_tendency,
+    quadratic_drag_tendency,
+    rayleigh_tendency,
+    wind_stress_tendency,
+)
+from sesmax_core._src.forcing_ops.rayleigh import (
+    RayleighDamping2D,
+    RayleighDamping3D,
+)
+from sesmax_core._src.forcing_ops.relaxation import (
+    linear_drag,
+    rayleigh_relaxation,
+)
+from sesmax_core._src.forcing_ops.wind import (
+    WindCurl2D,
+    WindStress2D,
+    WindStress3D,
+)
 from sesmax_core._src.gfd.modal import ModalTransform, StratificationProfile
 from sesmax_core._src.io import (
     append_to_dataset,
@@ -104,23 +135,32 @@ if TYPE_CHECKING:
 __version__ = "0.1.0"  # x-release-please-version
 
 __all__ = [
+    "AbstractForcing",
     "BasisForcing",
     "Compose",
     "ConstantForcing",
     "ConstantInTime",
     "Diagnostics",
+    "ForcingProduct",
     "ForcingProtocol",
+    "ForcingSum",
     "ForcingTerm",
     "FourierInTime",
     "GaussianWindowsInTime",
     "HatInTime",
     "InterpolatedForcing",
+    "LinearDrag2D",
+    "LinearDrag3D",
     "ModalTransform",
     "Model",
     "NoForcing",
     "OperatorTerm",
     "Params",
     "PhysConsts",
+    "QuadraticDrag2D",
+    "QuadraticDrag3D",
+    "RayleighDamping2D",
+    "RayleighDamping3D",
     "Scaled",
     "ScaledModel",
     "Scales",
@@ -135,9 +175,13 @@ __all__ = [
     "Term",
     "TermFn",
     "TermModel",
+    "TimeVaryingForcing",
     "TransformedForcing",
     "VectorBasisForcing",
     "VectorSpatialBasis",
+    "WindCurl2D",
+    "WindStress2D",
+    "WindStress3D",
     "__version__",
     "add_to",
     "add_vector_to",
@@ -151,10 +195,15 @@ __all__ = [
     "frozen",
     "implicit",
     "interval",
+    "linear_drag",
+    "linear_drag_tendency",
     "load_dataset",
     "matern_spectral_density",
     "partition",
     "positive",
+    "quadratic_drag_tendency",
+    "rayleigh_relaxation",
+    "rayleigh_tendency",
     "save_dataset",
     "scales_attrs",
     "snapshots_to_dataset",
@@ -171,6 +220,7 @@ __all__ = [
     "tile_in_time",
     "trainable_mask",
     "transform_attrs",
+    "wind_stress_tendency",
 ]
 
 
