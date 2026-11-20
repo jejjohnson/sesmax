@@ -39,6 +39,12 @@ dependencies = [
     # (finitevolX#409) after its last tag, v0.1.0; pinned to main at a28525d.
     "finitevolx[pipekit] @ git+https://github.com/jejjohnson/finitevolX.git@a28525dfc0f36d26ded9ffea285e9832aed5aaae",
     "spectraldiffx @ git+https://github.com/jejjohnson/spectraldiffx.git@0.1.1",
+    # The grids, masks and C-grid operators the forcing and the barotropic
+    # filter are written on (gridax, the array-API package), and the JAX-only
+    # multigrid solver that ``barotropic_filter`` takes as its Helmholtz solve
+    # (gridax-jax).
+    "gridax @ git+https://github.com/jejjohnson/gridax.git@gridax-v0.1.0#subdirectory=packages/gridax",
+    "gridax-jax @ git+https://github.com/jejjohnson/gridax.git@gridax-jax-v0.2.0#subdirectory=packages/gridax-jax",
     # Every pipekit package at the one tag pipekit-ops-v0.2.1: per-package
     # tags make uv report conflicting URLs for pipekit-ops.
     "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-ops",
@@ -90,3 +96,5 @@ packages = ["src/sesmax_core"]
 # package across the graph, and a source takes precedence over the direct
 # reference above (which pip users still get).
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.1" }
+gridax = { git = "https://github.com/jejjohnson/gridax.git", tag = "gridax-v0.1.0", subdirectory = "packages/gridax" }
+gridax-jax = { git = "https://github.com/jejjohnson/gridax.git", tag = "gridax-jax-v0.2.0", subdirectory = "packages/gridax-jax" }

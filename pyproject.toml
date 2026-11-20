@@ -145,6 +145,9 @@ markers = [
     "slow: takes over ~1 s; deselect with -m 'not slow'",
     "integration: end-to-end workflows, optional dependencies, external tools",
 ]
+# The moved gridax tests share one input module (grids, masks and fields),
+# which sits on the path as ``gridax_inputs``.
+pythonpath = ["packages/sesmax-core/tests/support"]
 # importlib mode lets two packages each have a tests/test_public_api.py.
 addopts = """\
     --import-mode=importlib \

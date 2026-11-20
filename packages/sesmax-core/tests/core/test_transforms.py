@@ -5,9 +5,9 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import pytest
-from finitevolx import build_coupling_matrix, decompose_vertical_modes
 
 from sesmax_core import ModalTransform, StratificationProfile
+from sesmax_core.vertical import build_coupling_matrix, decompose_vertical_modes
 
 
 # MQGeometry 3-layer double-gyre stratification (Thiry et al. 2024) — unequal
@@ -223,7 +223,7 @@ class TestModalTransform:
         ev_general = jnp.sort(jnp.real(jnp.linalg.eigvals(A)))
         assert jnp.allclose(jnp.sort(mt.eigenvalues), ev_general, atol=1e-6)
 
-    def test_delegates_the_transforms_to_finitevolx(self):
+    def test_delegates_the_transforms_to_vertical_modes(self):
         mt = ModalTransform.from_physics(H=_MQG_H, g_prime=_MQG_GP, f0=_MQG_F0)
         A = build_coupling_matrix(jnp.asarray(_MQG_H), jnp.asarray(_MQG_GP))
         radii, Cl2m, Cm2l = decompose_vertical_modes(A, _MQG_F0)

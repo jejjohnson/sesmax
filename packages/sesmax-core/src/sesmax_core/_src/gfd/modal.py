@@ -9,8 +9,12 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import build_coupling_matrix, decompose_vertical_modes
 from jaxtyping import Array, Float
+
+from sesmax_core._src.vertical.vertical_modes import (
+    build_coupling_matrix,
+    decompose_vertical_modes,
+)
 
 
 class StratificationProfile(eqx.Module):
@@ -156,10 +160,10 @@ class StratificationProfile(eqx.Module):
 class ModalTransform(eqx.Module):
     """Precomputed layer-to-mode and mode-to-layer transforms.
 
-    Computed from physical parameters (H, g_prime, f0) by finitevolX:
+    Computed from physical parameters (H, g_prime, f0) by ``sesmax_core.vertical``:
     ``build_coupling_matrix`` builds the layer coupling matrix A, and
     ``decompose_vertical_modes`` diagonalises it. A vertical mode is only
-    defined up to a scale, so ``Cl2m`` and ``Cm2l`` are finitevolX's pair, which
+    defined up to a scale, so ``Cl2m`` and ``Cm2l`` are that module's pair, which
     scales the basis by the first layer; only their round trip means anything.
 
     Attributes:
@@ -182,7 +186,8 @@ class ModalTransform(eqx.Module):
     ) -> ModalTransform:
         """Build transform from physical parameters.
 
-        Delegates the coupling matrix and its eigendecomposition to finitevolX.
+        Delegates the coupling matrix and its eigendecomposition to
+        ``sesmax_core.vertical``.
 
         Args:
             H: Layer depths (top to bottom).
@@ -196,8 +201,9 @@ class ModalTransform(eqx.Module):
         gp_arr = jnp.asarray(g_prime, dtype=float)
         coupling = build_coupling_matrix(H_arr, gp_arr)
         rossby_radii, Cl2m, Cm2l = decompose_vertical_modes(coupling, f0)
-        # Λ = C_l2m A C_m2l, read from the transforms because finitevolX returns
-        # only the radii, and inverting those would fail at f0 = 0
+        # Λ = C_l2m A C_m2l, read from the transforms because
+        # ``decompose_vertical_modes`` returns only the radii, and inverting
+        # those would fail at f0 = 0
         modal_coupling = Cl2m @ coupling @ Cm2l
         # A is positive semi-definite. A negative barotropic eigenvalue from
         # round-off would flip the sign of the gravest denominators in the PV

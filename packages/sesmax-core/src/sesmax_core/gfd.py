@@ -2,8 +2,9 @@
 
 :class:`StratificationProfile` holds a layered fluid's thicknesses and
 reduced gravities; :class:`ModalTransform` projects between layers and
-vertical modes, with the eigendecomposition delegated to finitevolX. An
-ocean and an atmosphere share them, so they live in the core.
+vertical modes, with the eigendecomposition delegated to
+:mod:`sesmax_core.vertical`. An ocean and an atmosphere share them, so they
+live in the core.
 
 All are also importable from the top-level ``sesmax_core``.
 """
