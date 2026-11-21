@@ -133,9 +133,12 @@ _MOVED_FROM_GRIDAX_JAX = (
     "linear_drag_tendency",
     "mode_to_layer",
     "multilayer",
+    "pressure_from_divergence",
+    "pv_inversion",
     "quadratic_drag_tendency",
     "rayleigh_relaxation",
     "rayleigh_tendency",
+    "streamfunction_from_vorticity",
     "wind_stress_tendency",
 )
 

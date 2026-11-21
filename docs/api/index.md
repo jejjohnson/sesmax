@@ -16,7 +16,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Terms](terms.md) | `Term`, `TermFn`, `Sum`, `Scaled`, `Compose`, `explicit`, `implicit`, `partition`, `build_diffrax_terms`, `OperatorTerm` |
 | [Forcing](forcing.md) | `ForcingProtocol` and the constant, seasonal and interpolated forcings; `AbstractForcing`, `ForcingSum`, `ForcingProduct`, `TimeVaryingForcing`, the wind, drag and Rayleigh operators and their tendency functions, `linear_drag`, `rayleigh_relaxation`; `SpatialBasis`, `TemporalBasis`, `BasisForcing`, `ForcingTerm`, the vector versions; the `spatial_from_*` constructors, `tile_in_time`, `GaussianWindowsInTime`, `HatInTime`, `matern_spectral_density` |
 | [Scales](scales.md) | `Scales`, `StateAffine`, `ScaledModel` |
-| [Layered fluids](gfd.md) | `StratificationProfile`, `ModalTransform` |
+| [Layered fluids](gfd.md) | `StratificationProfile`, `ModalTransform`, `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion` |
 | [Vertical modes](vertical.md) | `build_coupling_matrix`, `decompose_vertical_modes`, `layer_to_mode`, `mode_to_layer`, `multilayer`, `barotropic_filter` |
 | [Domains](domain.md) | `Domain`, `TimeDomain` |
 | [Solvers](solvers.md) | `imex_solver`, `imex_stepsize_controller`, `stable_step` |
