@@ -88,6 +88,11 @@ from sesmax_core._src.forcing_ops.wind import (
     WindStress2D,
     WindStress3D,
 )
+from sesmax_core._src.gfd.inversion import (
+    pressure_from_divergence,
+    pv_inversion,
+    streamfunction_from_vorticity,
+)
 from sesmax_core._src.gfd.modal import ModalTransform, StratificationProfile
 from sesmax_core._src.io import (
     append_to_dataset,
@@ -202,6 +207,8 @@ __all__ = [
     "matern_spectral_density",
     "partition",
     "positive",
+    "pressure_from_divergence",
+    "pv_inversion",
     "quadratic_drag_tendency",
     "rayleigh_relaxation",
     "rayleigh_tendency",
@@ -219,6 +226,7 @@ __all__ = [
     "spatial_from_wavelet",
     "stable_step",
     "state_to_dataset",
+    "streamfunction_from_vorticity",
     "tile_in_time",
     "trainable_mask",
     "transform_attrs",
