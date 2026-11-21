@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0](https://github.com/jejjohnson/sesmax/compare/sesmax-core-v0.1.0...sesmax-core-v0.1.0) (2026-11-21)
+
+
+### Features
+
+* **core:** forcing, vertical modes, relaxation and the barotropic filter, moved from gridax-jax ([#122](https://github.com/jejjohnson/sesmax/issues/122)) ([e40d702](https://github.com/jejjohnson/sesmax/commit/e40d702f8758b3a69f28008cc5503ec695cb6560))
+* **core:** solve_pde integrates a right-hand-side function with state and tendency corrections at every stage ([#128](https://github.com/jejjohnson/sesmax/issues/128)) ([a13567e](https://github.com/jejjohnson/sesmax/commit/a13567ecf46248e2dd0b8ba98b9d23af8f20e2e1)), closes [#127](https://github.com/jejjohnson/sesmax/issues/127)
+
 ## 0.1.0 (2026-11-10)
 
 
