@@ -36,6 +36,7 @@ from sesmax_core._src.basis import (
     control_filter,
 )
 from sesmax_core._src.checkpoint import SimulationCheckpointer
+from sesmax_core._src.driver import solve_pde
 from sesmax_core._src.forcing import (
     ConstantForcing,
     ForcingProtocol,
@@ -207,6 +208,7 @@ __all__ = [
     "save_dataset",
     "scales_attrs",
     "snapshots_to_dataset",
+    "solve_pde",
     "spatial_from_divfree",
     "spatial_from_eof",
     "spatial_from_fourier",
