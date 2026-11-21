@@ -182,6 +182,7 @@ so the solve runs on $E$ with a corrected right-hand side (gaussx's `lift_known_
 
 ## Examples
 
+- [Inversion methods compared](../notebooks/inversion_methods.ipynb): the spectral, capacitance, CG and multigrid methods of $(\nabla^2 - \lambda)\psi = f$ run on a rectangle, a basin, a circle and a notch with a variable coefficient, comparing CG iteration counts, residuals and timings, with a short check of known boundary values.
 - [Streamfunction inversion](../notebooks/streamfunction_inversion.ipynb): the same Poisson equation needs DST-I when $\psi$ lives at X points and DST-II at T points, shown on a Lamb–Oseen vortex with the velocity recovered from $\psi$ and a convergence test.
 - [Pressure Poisson](../notebooks/pressure_poisson.ipynb): solving $\nabla^2 p = \nabla \cdot \mathbf{u}$ and projecting a velocity field to be divergence-free.
 - [Helmholtz screening](../notebooks/helmholtz_screening.ipynb): how $\lambda = 1/L_d^2$ shortens the reach of an isolated PV anomaly, with Dirichlet and Neumann walls and the solve under `jit`, `vmap` and `grad`.

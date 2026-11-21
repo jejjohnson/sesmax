@@ -52,6 +52,7 @@ project:
         - file: notebooks/lorenz96t_simulation.ipynb
     - file: guide/elliptic_inversions.md
       children:
+        - file: notebooks/inversion_methods.ipynb
         - file: notebooks/streamfunction_inversion.ipynb
         - file: notebooks/pressure_poisson.ipynb
         - file: notebooks/helmholtz_screening.ipynb
