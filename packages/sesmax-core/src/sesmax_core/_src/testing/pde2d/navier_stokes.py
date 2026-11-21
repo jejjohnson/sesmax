@@ -13,12 +13,12 @@ from finitevolx import (
     Interpolation2D,
     Mask2D,
     enforce_periodic,
-    streamfunction_from_vorticity,
 )
 from jaxtyping import Array, Float, PyTree
 from spectraldiffx import solve_helmholtz_2d
 
 from sesmax_core._src._validation import require_positive
+from sesmax_core._src.gfd.inversion import streamfunction_from_vorticity
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
