@@ -20,12 +20,14 @@ members = [
     "sesmax-workspace",
 ]
 overrides = [
-    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.6" },
+    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.11" },
+    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.8.1" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.3" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.9" },
     { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-ops-v0.2.1" },
     { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-ops-v0.2.1" },
     { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-ops-v0.2.1" },
+    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?rev=0.1.2" },
 ]
 
 [[package]]
@@ -760,8 +762,8 @@ wheels = [
 
 [[package]]
 name = "functax"
-version = "0.0.1"
-source = { git = "https://github.com/jejjohnson/functax?rev=e7eb8f9423666a0f32fcda1aa5ac88611d823fcc#e7eb8f9423666a0f32fcda1aa5ac88611d823fcc" }
+version = "0.0.11"
+source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.11#4889ce196b4594839cf4bc472f6f731da641191b" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -777,8 +779,8 @@ jax = [
 
 [[package]]
 name = "gaussx"
-version = "0.6.6"
-source = { git = "https://github.com/jejjohnson/gaussx?rev=v0.6.6#600e5a0b3fff410b94602848e5cd8febda8def02" }
+version = "0.8.1"
+source = { git = "https://github.com/jejjohnson/gaussx?rev=v0.8.1#7916a544147a53fae5b6572d742f22e488b19018" }
 dependencies = [
     { name = "einx" },
     { name = "equinox" },
@@ -804,8 +806,8 @@ dependencies = [
 
 [[package]]
 name = "geophysix"
-version = "0.0.2"
-source = { git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.2#b6b0ba2e73ce4533595b07f2877e6948e47c6f01" }
+version = "0.0.3"
+source = { git = "https://github.com/jejjohnson/geophysix?tag=v0.0.3#65b1faab906a4b2abfc743eacac4f21745c00d67" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -852,9 +854,10 @@ wheels = [
 
 [[package]]
 name = "gridax"
-version = "0.1.0"
-source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&tag=gridax-jax-v0.2.0#abe2e29193138b331d1c1dd6d8aa7f29eb977400" }
+version = "0.2.0"
+source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&rev=01d8320a6a1b434e67e121bf8e3bbb3ff7418368#01d8320a6a1b434e67e121bf8e3bbb3ff7418368" }
 dependencies = [
+    { name = "geophysix" },
     { name = "jaxtyping" },
     { name = "numpy" },
     { name = "scipy" },
@@ -862,13 +865,14 @@ dependencies = [
 
 [[package]]
 name = "gridax-jax"
-version = "0.2.0"
-source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax-jax&tag=gridax-jax-v0.2.0#abe2e29193138b331d1c1dd6d8aa7f29eb977400" }
+version = "0.3.0"
+source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax-jax&rev=01d8320a6a1b434e67e121bf8e3bbb3ff7418368#01d8320a6a1b434e67e121bf8e3bbb3ff7418368" }
 dependencies = [
     { name = "beartype" },
     { name = "diffrax" },
     { name = "equinox" },
     { name = "gaussx" },
+    { name = "geophysix" },
     { name = "gridax" },
     { name = "integrix" },
     { name = "jax" },
@@ -938,8 +942,8 @@ wheels = [
 
 [[package]]
 name = "integrix"
-version = "0.0.3"
-source = { git = "https://github.com/jejjohnson/integrix?rev=v0.0.3#4385392b90f70d4ab5c3436239286e32595e5bfe" }
+version = "0.0.9"
+source = { git = "https://github.com/jejjohnson/integrix?rev=v0.0.9#f971343ca17480e28177b904e7a2db4935458ced" }
 dependencies = [
     { name = "diffrax" },
     { name = "einx" },
@@ -2862,10 +2866,10 @@ requires-dist = [
     { name = "finitevolx", extras = ["pipekit"], git = "https://github.com/jejjohnson/finitevolX.git?rev=a28525dfc0f36d26ded9ffea285e9832aed5aaae" },
     { name = "flowjax", marker = "extra == 'flows'" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
-    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.2" },
-    { name = "gridax", git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&tag=gridax-v0.1.0" },
-    { name = "gridax-jax", git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax-jax&tag=gridax-jax-v0.2.0" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.3" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.3" },
+    { name = "gridax", git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&rev=01d8320a6a1b434e67e121bf8e3bbb3ff7418368" },
+    { name = "gridax-jax", git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax-jax&rev=01d8320a6a1b434e67e121bf8e3bbb3ff7418368" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.9" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxlib", specifier = ">=0.11.1" },
     { name = "jaxtyping", specifier = ">=0.3.9" },
@@ -2876,7 +2880,7 @@ requires-dist = [
     { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-ops-v0.2.1" },
     { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-ops-v0.2.1" },
     { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-ops-v0.2.1" },
-    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1" },
+    { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.2" },
     { name = "vardax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/vardax?rev=v0.3.5" },
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2026.4.0" },
     { name = "zarr", marker = "extra == 'xarray'", specifier = ">=3.1.6" },
@@ -3059,16 +3063,16 @@ wheels = [
 
 [[package]]
 name = "spectraldiffx"
-version = "0.1.1"
-source = { git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.1#1de770b70dc111f0f735fd589eb1f030a6114dda" }
+version = "0.1.2"
+source = { git = "https://github.com/jejjohnson/spectraldiffx.git?rev=0.1.2#3d7d6aaa4730a6afcde486f266402bfd48ef8c4c" }
 dependencies = [
     { name = "equinox" },
+    { name = "functax", extra = ["jax"] },
     { name = "gaussx" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },
     { name = "numpy" },
-    { name = "scipy" },
 ]
 
 [[package]]

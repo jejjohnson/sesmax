@@ -50,6 +50,13 @@ project:
         - file: notebooks/lorenz63_simulation.ipynb
         - file: notebooks/lorenz96_simulation.ipynb
         - file: notebooks/lorenz96t_simulation.ipynb
+    - file: guide/elliptic_inversions.md
+      children:
+        - file: notebooks/inversion_methods.ipynb
+        - file: notebooks/streamfunction_inversion.ipynb
+        - file: notebooks/pressure_poisson.ipynb
+        - file: notebooks/helmholtz_screening.ipynb
+        - file: notebooks/inhomogeneous_bcs_tutorial.ipynb
     - title: Rotating shallow water
       children:
         - file: notebooks/step14_gravity_waves_1d.ipynb
