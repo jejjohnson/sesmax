@@ -57,7 +57,7 @@ Most of the numerics belongs to other libraries, and the workspace composes them
 - 🛰️ **One model, several methods**: the same model goes to vardax's 4D-Var through `VardaxForwardModel` and to filterax's ensemble filters through `FilteraxDynamics`.
 - ➕ **Models from terms**: a right-hand side is a sum of `Term`s, so we can swap a drag or a closure without rewriting the model, and `jax.grad` reaches every coefficient.
 - 🌬️ **Forcings as controls**: `BasisForcing` writes a forcing as a few coefficients, each with a prior standard deviation, and `WindowOperator` inverts for them.
-- 🔁 **Gradients through a window**: `rollout` is one checkpointed scan, and `rollout_loss` differentiates it with respect to any parameter.
+- 🔁 **Gradients through a window**: `rollout` is one scan over the window, and `rollout_loss` checkpoints it, so `jax.grad` reaches every parameter of the model.
 - 🔒 **Parameters that stay physical**: `positive`, `interval` and `frozen` keep a parameter in bounds or out of the gradient.
 - 🧪 **Test problems included**: the Lorenz systems, the PDEs on the way to Navier–Stokes, and linear and nonlinear shallow water are in `sesmax_core.testing`.
 - 🧱 **Tiers that hold**: a package imports only from the tiers below it, and a test in the workspace fails when one does not.
@@ -73,7 +73,7 @@ We ask four things of every model here. They decide what goes in, so anything th
 | Honest about its error | an overconfident prior ignores data | `BasisForcing`, `WindowOperator` |
 | Learnable | data corrects the model | `rollout_loss`, `trainable_mask` |
 
-**Cheap.** A minimiser of $`\mathcal{J}`$ runs the model and its adjoint once per iteration, and a filter runs it once per member. Simple dynamics (shallow water, quasi-geostrophy, slab and bucket models) are enough over a window inside the predictability time of the scales they resolve, so we leave out full physics suites and multi-decade runs.
+**Cheap.** A minimiser of $`\mathcal{J}`$ runs the model and its adjoint at every iteration, and a filter runs the model once per member. Simple dynamics (shallow water, quasi-geostrophy, slab and bucket models) are enough over a window inside the predictability time of the scales they resolve, so we leave out full physics suites and multi-decade runs.
 
 **Good where the observations look.** A model earns its place when it beats the best statistical prior (optimal interpolation, a Gaussian process) given the same observations. That test is a gate of each component; the first is the ocean's, on sea-surface height.
 
@@ -83,12 +83,12 @@ We ask four things of every model here. They decide what goes in, so anything th
 
 ## 📥 Install
 
-Nothing is on PyPI yet; the packages are installed from this repository with [uv](https://docs.astral.sh/uv/), and they need Python 3.12 or newer. From a clone, one command installs the workspace:
+Nothing is on PyPI yet; the packages are installed from this repository with [uv](https://docs.astral.sh/uv/), and they need Python 3.12 or newer. From a clone, one command installs every package with its extras and the development tools, which is what the quickstart needs:
 
 ```bash
 git clone https://github.com/jejjohnson/sesmax.git
 cd sesmax
-uv sync --package sesmax
+uv sync
 ```
 
 In your own project, depend on `sesmax-core`. The libraries of the stack pin each other at different git tags, so a plain `pip install` of the git URL stops at a conflict; name the source, and copy the `override-dependencies` list of this repository's [`pyproject.toml`](pyproject.toml), which holds one tag for each:
@@ -106,7 +106,7 @@ override-dependencies = [
 sesmax-core = { git = "https://github.com/jejjohnson/sesmax.git", subdirectory = "packages/sesmax-core" }
 ```
 
-The `da` extra adds filterax and vardax, which the quickstart uses. The other extras are in the [core's README](packages/sesmax-core/README.md#-install).
+The `da` extra adds filterax and vardax, which the quickstart uses. The umbrella `sesmax` has no release yet; it waits for the ocean. The other extras are in the [core's README](packages/sesmax-core/README.md#-install).
 
 ## 🌪️ Quickstart: one window of Lorenz-96, two methods
 
@@ -216,7 +216,7 @@ rmse = jnp.sqrt(einx.mean("run [k] -> run", (ends - truth[-1]) ** 2))
 print(rmse.round(2))
 ```
 
-This prints `[1.6  0.11 0.14]`, the root-mean-square error of the forty variables at the end of the window. The background forecast has drifted to `1.6`. 4D-Var brings it down to `0.11` and the filter to `0.14`, both below the observation noise of `0.2`, although half of the variables were never seen. Neither method knows that the model is Lorenz-96, so another model of the workspace takes its place by changing `model` and the state it starts from.
+This prints `[1.6  0.11 0.14]`, the root-mean-square error of the forty variables at the end of the window. The background forecast has drifted to `1.6`. 4D-Var brings it down to `0.11` and the filter to `0.14`, both below the observation noise of `0.2`, although half of the variables were never seen. Neither method knows that the model is Lorenz-96. To use another one, change `model`, its state and the sizes, and keep the two assimilation blocks.
 
 The [core's README](packages/sesmax-core/README.md) inverts for an unknown source in shallow water, and the [4D-Var](https://jejjohnson.github.io/sesmax/data-assimilation-4dvar/) and [ETKF](https://jejjohnson.github.io/sesmax/data-assimilation-etkf/) notebooks go further into each method.
 
@@ -254,7 +254,7 @@ somax stays the working ocean package until `sesmax-ocean` is in.
 
 ## 🧩 Ecosystem
 
-sesmax is in the GeoModels layer of the [GeoStack](https://github.com/jejjohnson/geostack), beside [plumax](https://github.com/jejjohnson/plumax) (methane plumes) and [radtrax](https://github.com/jejjohnson/radtrax) (radiative transfer). It owns the models and their contracts, and composes the rest:
+sesmax is in the GeoModels layer of the [GeoStack](https://github.com/jejjohnson/geostack), beside [plumax](https://github.com/jejjohnson/plumax) (plumes and their sources) and [radtrax](https://github.com/jejjohnson/radtrax) (radiative transfer). It owns the models and their contracts, and composes the rest:
 
 | Concern | Owner |
 |---|---|
