@@ -2,18 +2,24 @@
 
 from __future__ import annotations
 
+import diffrax as dfx
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+import numpy as np
 import pytest
+from functax.interp import Cubic, CubicSpline, Linear, Pchip
 
 from sesmax_core import (
     ConstantForcing,
     ForcingProtocol,
     InterpolatedForcing,
+    Model,
     NoForcing,
     SeasonalWindForcing,
 )
+from sesmax_core.forcing import TimeVaryingForcing
+from sesmax_core.solvers import imex_stepsize_controller
 
 
 class DummyGrid(eqx.Module):
@@ -175,3 +181,110 @@ class TestInterpolatedForcing:
         values = jnp.array([0.0, 1.0])
         with pytest.raises(ValueError, match="Unknown method"):
             InterpolatedForcing.from_data(ts, values, method="spline")
+
+
+class _Forced(Model):
+    """dx/dt = -x + u(t)."""
+
+    forcing: InterpolatedForcing
+
+    def vector_field(self, t, state, args=None):
+        return -state + self.forcing(t, None)
+
+    def apply_boundary_conditions(self, state):
+        return state
+
+
+class TestInterpolatedForcingSchemes:
+    """Any functax 1-D scheme, through integrix's SampledPath (#130)."""
+
+    ts = np.array([0.0, 0.5, 2.0, 3.0, 4.0])
+
+    def test_linear_scheme_equals_the_linear_method(self):
+        with jax.enable_x64(True):
+            ts = jnp.asarray(self.ts)
+            values = jnp.stack([jnp.sin(ts), jnp.cos(ts)], axis=-1)
+            path = InterpolatedForcing.from_data(ts, values, method="linear")
+            scheme = InterpolatedForcing.from_data(ts, values, method=Linear())
+            # inside the samples and past both ends
+            for t in np.linspace(-1.0, 5.0, 25):
+                expected = path(t, DummyGrid())
+                np.testing.assert_allclose(
+                    scheme(t, DummyGrid()), expected, rtol=0.0, atol=1e-12
+                )
+
+    @pytest.mark.parametrize("method", ["linear", "cubic", Linear(), Pchip()], ids=str)
+    def test_step_ts_are_the_sample_times(self, method):
+        ts = jnp.asarray(self.ts, dtype=jnp.float32)
+        forcing = InterpolatedForcing.from_data(ts, jnp.sin(ts), method=method)
+        assert jnp.array_equal(forcing.step_ts, ts)
+
+    def test_pchip_keeps_non_negative_samples_non_negative(self):
+        ts = jnp.asarray(self.ts, dtype=jnp.float32)
+        discharge = jnp.array([0.0, 0.0, 4.0, 0.0, 1.0])
+        forcing = InterpolatedForcing.from_data(ts, discharge, method=Pchip())
+        read = jax.vmap(lambda t: forcing(t, None))(jnp.linspace(0.0, 4.0, 1000))
+        assert float(read.min()) >= 0.0
+
+    def test_cubic_spline_reproduces_a_cubic(self):
+        with jax.enable_x64(True):
+            ts = jnp.asarray(self.ts)
+            forcing = InterpolatedForcing.from_data(ts, ts**3, method=CubicSpline())
+            np.testing.assert_allclose(forcing(1.3, DummyGrid()), 1.3**3, rtol=1e-12)
+
+    def test_outside_is_the_schemes_to_choose(self):
+        ts = jnp.asarray(self.ts, dtype=jnp.float32)
+        held = InterpolatedForcing.from_data(ts, ts, method=Linear(), outside="clamp")
+        assert held(6.0, DummyGrid()) == 4.0
+        assert InterpolatedForcing.from_data(ts, ts, method=Linear())(6.0, None) == 6.0
+        with pytest.raises(ValueError, match="always extrapolates"):
+            InterpolatedForcing.from_data(ts, ts, outside="clamp")
+
+    def test_rejects_what_is_not_a_scheme_and_uneven_times_for_cubic(self):
+        ts = jnp.asarray(self.ts, dtype=jnp.float32)
+        with pytest.raises(ValueError, match="'scheme' must be"):
+            InterpolatedForcing.from_data(ts, ts, method=jnp.interp)
+        with pytest.raises(ValueError, match="CubicSpline or Pchip"):
+            InterpolatedForcing.from_data(ts, ts, method=Cubic())
+
+    def test_feeds_a_time_varying_forcing(self):
+        ts = jnp.asarray(self.ts, dtype=jnp.float32)
+        forcing = InterpolatedForcing.from_data(ts, ts**2, method=Pchip())
+        operator = TimeVaryingForcing(lambda u, q: u * q, forcing.path.evaluate)
+        assert jnp.isclose(operator(2.0, jnp.array(3.0)), 12.0)
+
+    @pytest.mark.parametrize(
+        "method", [CubicSpline(), Pchip()], ids=["spline", "pchip"]
+    )
+    def test_gradient_in_the_samples_through_integrate(self, method):
+        def final(values, forcing_ts):
+            forcing = InterpolatedForcing.from_data(forcing_ts, values, method=method)
+            # 0.25 divides every sample spacing
+            solution = _Forced(forcing).integrate(jnp.zeros(()), 0.0, 4.0, 0.25)
+            return solution.ys[-1]
+
+        with jax.enable_x64(True):
+            ts = jnp.asarray(self.ts)
+            values = jnp.sin(ts) + 0.1 * ts
+            gradient = jax.jit(jax.grad(final))(values, ts)
+            step = 1e-6
+            for k in range(ts.size):
+                shift = step * jnp.eye(ts.size)[k]
+                difference = final(values + shift, ts) - final(values - shift, ts)
+                np.testing.assert_allclose(
+                    gradient[k], difference / (2 * step), rtol=1e-6, atol=1e-8
+                )
+
+    def test_adaptive_steps_land_on_the_samples(self):
+        ts = jnp.asarray(self.ts, dtype=jnp.float32)
+        forcing = InterpolatedForcing.from_data(ts, jnp.sin(ts), method=Pchip())
+        controller = imex_stepsize_controller(step_ts=forcing.step_ts)
+        solution = _Forced(forcing).integrate(
+            jnp.zeros(()),
+            0.0,
+            4.0,
+            0.3,
+            stepsize_controller=controller,
+            saveat=dfx.SaveAt(steps=True),
+        )
+        assert set(self.ts[1:]) <= {float(t) for t in solution.ts}

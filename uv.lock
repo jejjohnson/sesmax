@@ -20,10 +20,10 @@ members = [
     "sesmax-workspace",
 ]
 overrides = [
-    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.11" },
+    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.13" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.8.1" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.9" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.10" },
     { name = "pipekit-array", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-ops-v0.2.1" },
     { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-ops-v0.2.1" },
     { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-ops-v0.2.1" },
@@ -730,8 +730,8 @@ wheels = [
 
 [[package]]
 name = "functax"
-version = "0.0.11"
-source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.11#4889ce196b4594839cf4bc472f6f731da641191b" }
+version = "0.0.13"
+source = { git = "https://github.com/jejjohnson/functax?rev=v0.0.13#718ba0648383eab298e9b11bf281be76ff3a374a" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -912,8 +912,8 @@ wheels = [
 
 [[package]]
 name = "integrix"
-version = "0.0.9"
-source = { git = "https://github.com/jejjohnson/integrix?rev=v0.0.9#f971343ca17480e28177b904e7a2db4935458ced" }
+version = "0.0.10"
+source = { git = "https://github.com/jejjohnson/integrix?rev=v0.0.10#463ad778f7280f1b14189e941d89f8c34bd69c82" }
 dependencies = [
     { name = "diffrax" },
     { name = "einx" },
@@ -2801,6 +2801,7 @@ dependencies = [
     { name = "diffrax" },
     { name = "einops" },
     { name = "equinox" },
+    { name = "functax", extra = ["jax"] },
     { name = "geonnax" },
     { name = "geophysix" },
     { name = "gridax", extra = ["jax", "pipekit"] },
@@ -2841,10 +2842,11 @@ requires-dist = [
     { name = "equinox", specifier = ">=0.13.8" },
     { name = "filterax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/filterax?rev=v0.0.6" },
     { name = "flowjax", marker = "extra == 'flows'" },
+    { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.13" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
     { name = "geophysix", git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.3" },
     { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&rev=494d73d7b11b2607942d43b24dfb05f9a29f9437" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.9" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.10" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxlib", specifier = ">=0.11.1" },
     { name = "jaxtyping", specifier = ">=0.3.9" },

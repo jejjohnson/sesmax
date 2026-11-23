@@ -218,7 +218,7 @@ The repetition is re-implementation under other names, which a body comparison c
 | Solver, controller, adjoint and step budget | pipekit-jax `DiffraxForwardModel` | plumax `solver_kwargs`, `_pick_solver`; vardax `_DynamicalForwardModel`; the core's `integrate(**kw)` | reuse it (SC-1) |
 | One step as a `ForwardModel` | pipekit-jax `DiffraxForwardModel` | plumax `EulerianForwardModel`; the core's `ModelOp`, `VardaxForwardModel`, `FilteraxDynamics` | plumax drops its adapter; the core keeps what adds flattening or pipelines |
 | Explicit Runge–Kutta schemes | diffrax, finitevolX `RK3SSP` and others | no copies found | use them through `solver=` |
-| Time-varying fields | diffrax interpolation, through the core's `InterpolatedForcing` | plumax `WindSchedule`, `interpolate_in_time`, `_time_bracket`, `_interpolated_emission` | plumax can move at S4 |
+| Time-varying fields | a diffrax path, through the core's `InterpolatedForcing`: diffrax's own interpolations, or integrix's `SampledPath` over any functax 1-D scheme | plumax `WindSchedule`, `interpolate_in_time`, `_time_bracket`, `_interpolated_emission` | plumax can move at S4 |
 | Vertical modes | finitevolX `decompose_vertical_modes`, fixed in its #252 | nothing since `ModalTransform.from_physics` delegated to it | see below the table |
 | Helmholtz and Poisson solves | spectraldiffx | nothing since the core's `HelmholtzCache` family, which only forwarded to it, was removed | call spectraldiffx directly |
 | Spatial bases | geonnax `basis` | vardax's constructors and the core's `spatial_from_*`, both delegating to it | see below the table |
