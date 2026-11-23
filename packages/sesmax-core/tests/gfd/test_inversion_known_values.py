@@ -6,7 +6,7 @@ boundary, its discrete right-hand side from the same five-point operator the sol
 invert, and the exact field as ``known_values``; it is recovered on every wet cell.
 
 What changed: the imports (the functions from ``sesmax_core.gfd``, the rest from public
-``gridax_jax`` names; calls were already keyword-only past ``dy``). Dropped:
+``gridax.solvers`` names; calls were already keyword-only past ``dy``). Dropped:
 ``test_pressure_cg_raises`` and ``test_pressure_spectral_raises``, which only checked
 that ``pressure_from_divergence`` raises ``ValueError`` on ``known_values=``, a
 parameter it no longer has.
@@ -18,7 +18,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax_jax import (
+from gridax.solvers import (
     SolveDomain,
     build_capacitance_solver,
     build_multigrid_solver,

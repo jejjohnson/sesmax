@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import CartesianGrid2D
+from gridax import CartesianGrid2D
 from jaxtyping import Array, Float
 
 from sesmax_core._src.gfd.inversion import streamfunction_from_vorticity

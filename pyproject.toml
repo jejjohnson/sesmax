@@ -16,16 +16,16 @@ members = ["packages/*"]
 
 [tool.uv]
 # filterax pins gaussx to a commit while vardax asks for a bare ``gaussx`` and
-# finitevolX needs gaussx >= 0.6.5: force one tag across the graph. finitevolX
+# gridax needs gaussx >= 0.8.1: force one tag across the graph. gridax
 # and vardax pin pipekit at their own tags: force sesmax-core's one tag,
 # pipekit-ops-v0.2.1, everywhere (bump these with
 # packages/sesmax-core/pyproject.toml).
 override-dependencies = [
     "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.8.1",
-    # finitevolX sources spectraldiffx 0.1.1; gridax-jax needs 0.1.2.
+    # gridax needs spectraldiffx 0.1.2; hold one URL form across the graph.
     "spectraldiffx @ git+https://github.com/jejjohnson/spectraldiffx.git@0.1.2",
-    # finitevolX sources integrix by `tag =`, which uv reads as a different URL
-    # from sesmax-core's; hold one. gridax-jax needs integrix >= 0.0.9.
+    # gridax sources integrix by `tag =`, which uv reads as a different URL
+    # from sesmax-core's; hold one. gridax needs integrix >= 0.0.9.
     "integrix @ git+https://github.com/jejjohnson/integrix@v0.0.9",
     # spectraldiffx 0.1.2 pins functax v0.0.6 and integrix 0.0.9 pins
     # v0.0.11; resolve the newer one, as gridax does.

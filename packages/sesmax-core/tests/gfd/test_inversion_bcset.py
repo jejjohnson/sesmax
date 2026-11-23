@@ -2,7 +2,8 @@
 
 Moved from gridax tests/test_elliptic_bcset.py at gridax 01d8320 (sesmax#126). Only the
 imports changed: the functions come from ``sesmax_core.gfd`` (their calls were already
-keyword-only past ``dy``) and the rest from public ``gridax`` / ``gridax_jax`` names.
+keyword-only past ``dy``) and the rest from public ``gridax`` and ``gridax.solvers``
+names.
 No test was dropped. In ``test_neumann_array_zero_is_dct`` the zero face values are
 built inside the test, because the x64 fixture is not on while the module is collected.
 """
@@ -14,7 +15,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from gridax import BoundaryConditionSet, Dirichlet1D, Mask2D, Neumann1D, Periodic1D
-from gridax_jax import coast_ring, masked_laplacian
+from gridax.solvers import coast_ring, masked_laplacian
 
 from sesmax_core.gfd import (
     pressure_from_divergence,

@@ -228,7 +228,7 @@ class TestIncompressibleNS2D:
         )
 
     def test_channel_and_box_take_no_mask(self):
-        from finitevolx import CartesianGrid2D, Mask2D
+        from gridax import CartesianGrid2D, Mask2D
 
         grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
         mask = Mask2D.from_dimensions(grid.Ny, grid.Nx)

@@ -293,7 +293,7 @@ class StateAffine(eqx.Module):
                 A field the dynamics never touch has exactly zero
                 sample variance, and dividing by it would produce
                 inf/NaN.
-            mask: Optional finitevolx ``Mask2D``/``Mask3D``. Dry cells
+            mask: Optional gridax ``Mask2D``/``Mask3D``. Dry cells
                 are excluded from the statistics and are given the
                 identity ``(0, 1)``, so masked fields round-trip
                 unchanged and land sentinels cannot contaminate wet
@@ -557,7 +557,7 @@ def _masked_moments(
 ) -> tuple[Array, Array]:
     """``(mean, std)`` over ``axis``, excluding dry cells, floored at ``eps``.
 
-    Mirrors ``finitevolx.masked_moments``. Dry cells return ``(0, 1)``
+    Mirrors ``gridax.masked_moments``. Dry cells return ``(0, 1)``
     so that ``(x - loc) / scale`` leaves them untouched, and the floor
     is applied to the *variance* as ``eps**2`` rather than to the
     standard deviation: the value is identical, but ``sqrt`` has an

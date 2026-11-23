@@ -20,8 +20,8 @@ the pieces built from the grid and the mask (gridax) and the generic solves
 
 Moved from gridax-jax's ``solvers/elliptic.py`` at gridax ``01d8320``
 (sesmax#126, geostack#291 rule 3), with the arithmetic unchanged: every
-method returns arrays bit for bit equal to gridax-jax's
-(``tests/gfd/test_inversion_parity.py``). The CG solve is gaussx's
+method returned arrays bit for bit equal to gridax-jax's when it moved
+(sesmax#129). The CG solve is gaussx's
 ``linear_solve_with_info`` in place of gridax-jax's deprecated ``solve_cg``,
 which it reproduces bit for bit; ``method="multigrid"`` is new.
 """
@@ -38,28 +38,22 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from gridax import BoundaryConditionSet, Dirichlet1D, Mask2D, Neumann1D, Periodic1D
-from gridax_jax import (
+from gridax.solvers import (
     CapacitanceSolver,
     MultigridSolver,
     SolveDomain,
     coast_ring,
     make_spectral_preconditioner,
+    masked_face_dirichlet_laplacian,
     masked_laplacian,
+    masked_neumann_laplacian,
+    project_zero_mean,
     solve_helmholtz_dct1,
     solve_helmholtz_dct2,
     solve_helmholtz_dst1,
     solve_helmholtz_dst2,
     solve_helmholtz_fft,
-)
-
-# The T-point masked operators with the wall on the cell faces, and the
-# zero-mean gauge of the singular Neumann problem: built from the mask, so
-# gridax's (rule 4), and not yet public there (gridax#475 publishes them).
-from gridax_jax._src.solvers.iterative import (
-    _masked_face_dirichlet_laplacian,
-    _masked_neumann_laplacian,
-    _project_zero_mean,
-    _wet_components,
+    wet_components,
 )
 from jaxtyping import Array, Bool, Float
 from scipy import ndimage
@@ -220,7 +214,7 @@ def _check_cg_bc(bc: str, staggering: str, method: str = "cg") -> None:
     """Raise unless a mask-based CG solve can honour ``bc`` for this staggering.
 
     CG takes the coast condition from ``bc``: ``"dst"`` is Dirichlet on the
-    coast nodes (`gridax_jax.masked_laplacian`), ``"dct"`` is zero flux
+    coast nodes (`gridax.solvers.masked_laplacian`), ``"dct"`` is zero flux
     through the coast faces (T points only). A periodic ``"fft"`` has no
     meaning on a masked domain.
     """
@@ -254,7 +248,7 @@ def _cg_masked_solve(
     The wall is where the spectral solve of the same staggering puts it:
 
     * ψ (X), ``"dst"``: ψ = 0 on the dry nodes next to the wet ones
-      (`gridax_jax.masked_laplacian`), the C-grid wall nodes.
+      (`gridax.solvers.masked_laplacian`), the C-grid wall nodes.
     * p (T), ``"dst"``: p = 0 on the wet-dry *faces*, half a cell out
       (the DST-II wall).
     * p (T), ``"dct"``: zero flux through every wet-dry face (the DCT-II
@@ -269,9 +263,9 @@ def _cg_masked_solve(
     if staggering == "X":
         operator = masked_laplacian
     elif bc == "dst":
-        operator = _masked_face_dirichlet_laplacian
+        operator = masked_face_dirichlet_laplacian
     else:
-        operator = _masked_neumann_laplacian
+        operator = masked_neumann_laplacian
 
     def _matvec(x: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
         return operator(x, solve_mask, dx, dy, lambda_=lambda_)
@@ -283,7 +277,7 @@ def _cg_masked_solve(
     project = None
     if bc == "dct" and _is_zero(lambda_):
         try:
-            labels, counts = _wet_components(np.asarray(solve_mask))
+            labels, counts = wet_components(np.asarray(solve_mask))
         except jax.errors.TracerArrayConversionError:
             # Traced mask: one component, labels = 1 on the wet cells and
             # counts = [1, n_wet].
@@ -293,7 +287,7 @@ def _cg_masked_solve(
         def project(u: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
             # u <- u - mean(u over its wet component): the consistent rhs and
             # the zero-mean member of the solution family p + c.
-            return _project_zero_mean(u, solve_mask, labels, counts)
+            return project_zero_mean(u, solve_mask, labels, counts)
 
         b = project(b)
     x = _cg(_matvec, b, preconditioner)
@@ -338,7 +332,7 @@ def _v_cycle_preconditioner(
     if multigrid_solver is None:
         raise ValueError(
             "method='multigrid' requires a pre-built MultigridSolver "
-            "(see gridax_jax.build_multigrid_solver)"
+            "(see gridax.solvers.build_multigrid_solver)"
         )
     if staggering == "T" and bc == "dst":
         raise ValueError(
@@ -378,7 +372,7 @@ def _solve_capacitance_method(
     if capacitance_solver is None:
         raise ValueError(
             "method='capacitance' requires a pre-built CapacitanceSolver "
-            "(see gridax_jax.build_capacitance_solver)"
+            "(see gridax.solvers.build_capacitance_solver)"
         )
     # The solver's precomputed arrays are float64 under x64: keep the rhs dtype.
     return capacitance_solver(rhs).astype(rhs.dtype)
@@ -567,7 +561,7 @@ def _check_faces_cover_outer_coast(wet: Array) -> None:
             "Non-zero Dirichlet1D face values need a basin whose outer coast "
             "lies on the four walls (a rectangle; islands are allowed and stay "
             f"at zero), but {n_off} outer coast nodes are on no face.  For a "
-            "general coastline pass known_values on gridax_jax.coast_ring(mask)."
+            "general coastline pass known_values on gridax.solvers.coast_ring(mask)."
         )
 
 
@@ -621,7 +615,7 @@ def _known_value_domain(
     known_mask: Array | None,
     staggering: str,
 ) -> SolveDomain:
-    """The `gridax_jax.SolveDomain` of a solve with known values.
+    """The `gridax.solvers.SolveDomain` of a solve with known values.
 
     Mask-based methods use the caller's ``mask`` (required); the known
     values sit on its coast ring (the dry cells adjacent to the wet cells).
@@ -815,10 +809,10 @@ def streamfunction_from_vorticity(
       ``bc`` unless ``preconditioner`` is given.
     * ``"capacitance"``: the spectral solve with a capacitance-matrix
       correction for the coast. Needs a ``capacitance_solver`` from
-      `gridax_jax.build_capacitance_solver`.
+      `gridax.solvers.build_capacitance_solver`.
     * ``"multigrid"``: CG preconditioned by one V-cycle of a multigrid
       hierarchy. Needs ``mask`` and a ``multigrid_solver`` from
-      `gridax_jax.build_multigrid_solver` built on the same mask and λ;
+      `gridax.solvers.build_multigrid_solver` built on the same mask and λ;
       it agrees with ``"cg"`` to the CG tolerance in fewer steps.
 
     Args:

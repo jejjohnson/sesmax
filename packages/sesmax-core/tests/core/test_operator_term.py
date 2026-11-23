@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from finitevolx import Coriolis2D, Difference2D
+from gridax import Coriolis2D, Difference2D
 from pipekit_jax import JaxOperator
 from pipekit_ops import Graph, Input, Lambda
 
@@ -311,9 +311,9 @@ def test_output_mapping_errors_are_explicit():
         )
 
 
-def test_a_finitevolx_tier_b_graph_matches_gravity_plus_coriolis():
-    """The epic's target: finitevolx.pipekit ops wired as a Graph, one Term."""
-    import finitevolx.pipekit as fp
+def test_a_gridax_tier_b_graph_matches_gravity_plus_coriolis():
+    """The epic's target: gridax.pipekit ops wired as a Graph, one Term."""
+    import gridax.pipekit as fp
 
     model = _model()
     gravity, coriolis = _summands(model)

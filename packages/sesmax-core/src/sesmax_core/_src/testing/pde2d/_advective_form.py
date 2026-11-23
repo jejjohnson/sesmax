@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import jax.numpy as jnp
-from finitevolx import (
+from gridax import (
     Advection2D as FVXAdvection2D,
     Difference2D,
     Interpolation2D,

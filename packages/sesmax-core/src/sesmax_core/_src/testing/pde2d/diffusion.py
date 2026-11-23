@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import CartesianGrid2D, Difference2D, Mask2D, enforce_periodic
+from gridax import CartesianGrid2D, Difference2D, Mask2D, enforce_periodic
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src._validation import require_positive

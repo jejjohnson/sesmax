@@ -1,11 +1,11 @@
 """finitevolX Tier-B operators for model ``diagnose()`` methods.
 
-The C-grid models compute their diagnostics with ``finitevolx.pipekit``
+The C-grid models compute their diagnostics with ``gridax.pipekit``
 operators (``KineticEnergy``, ``RelativeVorticity``, ``PotentialVorticity``,
 ``TotalEnergy``, ``DomainIntegral``, …) instead of re-implementing them, so a
 stagger or ghost-ring convention lives in one place.
 
-``finitevolx.pipekit`` imports pipekit, so it is imported lazily — on the
+``gridax.pipekit`` imports pipekit, so it is imported lazily — on the
 first ``diagnose()`` call, not when a model module is imported.
 """
 
@@ -18,8 +18,8 @@ from jaxtyping import Array
 
 
 def fvx_ops() -> ModuleType:
-    """The ``finitevolx.pipekit`` module (imported on first use)."""
-    import finitevolx.pipekit as fp
+    """The ``gridax.pipekit`` module (imported on first use)."""
+    import gridax.pipekit as fp
 
     return fp
 

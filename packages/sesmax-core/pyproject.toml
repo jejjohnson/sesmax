@@ -35,20 +35,13 @@ dependencies = [
     # bounded parameter in an unconstrained space, so an optimiser can never
     # step a viscosity or a drag negative.
     "paramax>=0.0.5",
-    # finitevolX's [pipekit] extra moved to pipekit-ops on main
-    # (finitevolX#409) after its last tag, v0.1.0; pinned to main at a28525d.
-    "finitevolx[pipekit] @ git+https://github.com/jejjohnson/finitevolX.git@a28525dfc0f36d26ded9ffea285e9832aed5aaae",
     "spectraldiffx @ git+https://github.com/jejjohnson/spectraldiffx.git@0.1.2",
-    # The grids, masks and C-grid operators the forcing and the barotropic
-    # filter are written on (gridax, the array-API package), and the JAX-only
-    # pieces built from the grid and the mask (gridax-jax): the multigrid
-    # solver that ``barotropic_filter`` takes as its Helmholtz solve, and the
-    # masked operators, solve domains and capacitance wall placement the
-    # inversions in ``sesmax_core.gfd`` are composed from. Pinned to gridax
-    # main at 01d8320 (gridax#479, the solves from gaussx), which no release
-    # holds yet.
-    "gridax @ git+https://github.com/jejjohnson/gridax.git@01d8320a6a1b434e67e121bf8e3bbb3ff7418368#subdirectory=packages/gridax",
-    "gridax-jax @ git+https://github.com/jejjohnson/gridax.git@01d8320a6a1b434e67e121bf8e3bbb3ff7418368#subdirectory=packages/gridax-jax",
+    # The grids, masks and C-grid operators every grid-based model is written
+    # on, with gridax.solvers (the ``jax`` extra: masked operators, multigrid,
+    # capacitance) and gridax.pipekit (the ``pipekit`` extra: the diagnostic
+    # graphs). Pinned to gridax main at 5de277f (gridax#483, gridax-jax folded
+    # into gridax), which no release holds yet.
+    "gridax[jax,pipekit] @ git+https://github.com/jejjohnson/gridax.git@5de277fcdd42f3412262e4f37d1618f95b70bc44#subdirectory=packages/gridax",
     # Every pipekit package at the one tag pipekit-ops-v0.2.1: per-package
     # tags make uv report conflicting URLs for pipekit-ops.
     "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-ops",
@@ -99,10 +92,9 @@ allow-direct-references = true
 packages = ["src/sesmax_core"]
 
 [tool.uv.sources]
-# finitevolX sources spectraldiffx by git *tag*; uv needs the same form for one
+# gridax sources spectraldiffx by git *tag*; uv needs the same form for one
 # package across the graph, and a source takes precedence over the direct
 # reference above (which pip users still get).
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.2" }
 geophysix = { git = "https://github.com/jejjohnson/geophysix.git", tag = "v0.0.3" }
-gridax = { git = "https://github.com/jejjohnson/gridax.git", rev = "01d8320a6a1b434e67e121bf8e3bbb3ff7418368", subdirectory = "packages/gridax" }
-gridax-jax = { git = "https://github.com/jejjohnson/gridax.git", rev = "01d8320a6a1b434e67e121bf8e3bbb3ff7418368", subdirectory = "packages/gridax-jax" }
+gridax = { git = "https://github.com/jejjohnson/gridax.git", rev = "5de277fcdd42f3412262e4f37d1618f95b70bc44", subdirectory = "packages/gridax" }

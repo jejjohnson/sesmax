@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from finitevolx import Advection1D, Interpolation1D
+from gridax import Advection1D, Interpolation1D
 from jaxtyping import Array, Float
 
 

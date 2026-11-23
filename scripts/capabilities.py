@@ -72,7 +72,7 @@ PACKAGES: list[str] = sorted(
 # Libraries the package builds on, as {distribution: [public modules]}, with a
 # one-paragraph blurb each.
 UPSTREAM: dict[str, list[str]] = {
-    "finitevolx": ["finitevolx"],
+    "gridax": ["gridax", "gridax.solvers"],
     "spectraldiffx": ["spectraldiffx"],
     "diffrax": ["diffrax"],
     "lineax": ["lineax"],
@@ -81,7 +81,7 @@ UPSTREAM: dict[str, list[str]] = {
     "geonnax": ["geonnax.basis"],
 }
 UPSTREAM_BLURB: dict[str, str] = {
-    "finitevolx": (
+    "gridax": (
         "Finite-volume stencils on Arakawa C-grids: the grids, interpolation, "
         "differences, advection, diffusion, boundary conditions and the elliptic "
         "solves every grid-based model here calls."
@@ -111,46 +111,10 @@ UPSTREAM_BLURB: dict[str, str] = {
 
 # Names two homes may bind to different objects, and why, e.g.
 # {"Mean": "stats.Mean is the statistic, aggregation.Mean the reducer"}.
-_MOVED_FROM_GRIDAX_JAX = (
-    "AbstractForcing",
-    "ForcingProduct",
-    "ForcingSum",
-    "LinearDrag2D",
-    "LinearDrag3D",
-    "QuadraticDrag2D",
-    "QuadraticDrag3D",
-    "RayleighDamping2D",
-    "RayleighDamping3D",
-    "TimeVaryingForcing",
-    "WindCurl2D",
-    "WindStress2D",
-    "WindStress3D",
-    "barotropic_filter",
-    "build_coupling_matrix",
-    "decompose_vertical_modes",
-    "layer_to_mode",
-    "linear_drag",
-    "linear_drag_tendency",
-    "mode_to_layer",
-    "multilayer",
-    "pressure_from_divergence",
-    "pv_inversion",
-    "quadratic_drag_tendency",
-    "rayleigh_relaxation",
-    "rayleigh_tendency",
-    "streamfunction_from_vorticity",
-    "wind_stress_tendency",
-)
-
 ALLOWED_SHARED_NAMES: dict[str, str] = {
-    **dict.fromkeys(
-        _MOVED_FROM_GRIDAX_JAX,
-        "moved here from gridax-jax; the pinned finitevolX (a28525d) still "
-        "carries its own copy until the remaining stencil imports move to gridax",
-    ),
     "Diffusion2D": (
         "sesmax_core.testing.Diffusion2D is the test-problem model, "
-        "finitevolx.Diffusion2D the stencil operator"
+        "gridax.Diffusion2D the stencil operator"
     ),
 }
 

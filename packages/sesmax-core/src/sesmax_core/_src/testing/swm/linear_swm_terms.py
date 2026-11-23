@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import (
+from gridax import (
     CartesianGrid2D,
     Coriolis2D,
     Difference2D,
@@ -72,7 +72,7 @@ class LinearSWMGravityWave(Term):
     not retrace a jitted step.
 
     Args:
-        diff: finitevolx C-grid difference operator.
+        diff: gridax C-grid difference operator.
         g: Gravitational acceleration (differentiable leaf).
         H0: Mean layer depth (differentiable leaf).
     """
@@ -95,7 +95,7 @@ class LinearSWMCoriolis(Term):
     r"""Coriolis kernel: ``du/dt += f*v``, ``dv/dt -= f*u`` (no height term).
 
     Args:
-        coriolis: finitevolx C-grid Coriolis operator.
+        coriolis: gridax C-grid Coriolis operator.
         f_field: Precomputed Coriolis parameter field ``f(y)``.
     """
 
@@ -117,7 +117,7 @@ class LinearSWMDiffusion(Term):
     leaf). Stiff — tag implicit for IMEX integration.
 
     Args:
-        diff: finitevolx C-grid difference operator.
+        diff: gridax C-grid difference operator.
         kind: IMEX integration label (``"explicit"`` by default).
     """
 

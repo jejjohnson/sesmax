@@ -27,7 +27,7 @@ in `AGENTS.md`.
      `AGENTS.md`;
    - a grep of `packages/*/src/` for the key operation or formula.
 3. Also flag, wherever they appear in the diff:
-   - a finite-difference stencil, a C-grid interpolation, a vorticity, divergence or kinetic-energy formula → finitevolX;
+   - a finite-difference stencil, a C-grid interpolation, a vorticity, divergence or kinetic-energy formula → gridax;
    - a spectral derivative or a Helmholtz / Poisson solve → spectraldiffx;
    - a hand-written time-stepping loop or Runge–Kutta scheme → diffrax through `Model.integrate` and `Model.step`, `rollout`, `imex_solver`;
    - `jnp.linalg.inv`, `solve` or a Cholesky on a covariance → lineax or gaussx;
