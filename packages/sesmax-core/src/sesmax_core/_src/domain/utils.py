@@ -127,42 +127,6 @@ def bounds_and_step_to_points(xmin: float, xmax: float, dx: float) -> int:
     return length_and_step_to_points(Lx=Lx, dx=dx)
 
 
-def check_stagger(dx: tuple, stagger: tuple[str] | None = None):
-    """Creates stagger values based on semantic names.
-    Useful for C-Grid operations
-
-    Args:
-    -----
-        dx (Iterable): the step sizes
-        stagger (Iterable): the stagger direction
-
-    Returns:
-    --------
-        stagger (Iterable): the stagger values (as a fraction
-            of dx).
-    """
-    if stagger is None:
-        stagger = (None,) * len(dx)
-
-    msg = "Length of stagger and dx is off"
-    msg += f"\ndx: {len(dx)}"
-    msg += f"\nstagger: {len(stagger)}"
-    assert len(dx) == len(stagger), msg
-
-    stagger_values = list()
-    for istagger in stagger:
-        if istagger is None:
-            stagger_values.append(0.0)
-        elif istagger == "right":
-            stagger_values.append(0.5)
-        elif istagger == "left":
-            stagger_values.append(-0.5)
-        else:
-            raise ValueError("Unrecognized command")
-
-    return stagger_values
-
-
 def check_tuple_inputs(x) -> tuple:
     if isinstance(x, tuple):
         return x

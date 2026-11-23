@@ -540,9 +540,9 @@ Finite-volume stencils on Arakawa C-grids: the grids, interpolation, differences
 | `BiharmonicDiffusion2D` | class | Biharmonic (∇⁴) diffusion operator on a 2-D Arakawa C-grid. |
 | `BiharmonicDiffusion3D` | class | Biharmonic (nabla^4) diffusion operator on a 3-D Arakawa C-grid. |
 | `BoundaryConditionSet` | class | Apply a different boundary condition on each domain face. |
-| `CartesianGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
-| `CartesianGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
-| `CartesianGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CartesianCGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CartesianCGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CartesianCGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
 | `Coriolis2D` | class | Coriolis force operator for 2-D Arakawa C-grids. |
 | `Coriolis3D` | class | Coriolis force operator for 3-D Arakawa C-grids. |
 | `CurvilinearGrid1D` | class | 1-D curvilinear C-grid with a uniform metric. |
@@ -586,8 +586,8 @@ Finite-volume stencils on Arakawa C-grids: the grids, interpolation, differences
 | `SphericalDiffusion3D` | class | Horizontal tracer diffusion on a 3-D spherical Arakawa C-grid. |
 | `SphericalDivergence2D` | class | Horizontal divergence on a 2-D spherical Arakawa C-grid. |
 | `SphericalDivergence3D` | class | 3-D spherical divergence (vmap over z-levels). |
-| `SphericalGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
-| `SphericalGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
+| `SphericalCGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
+| `SphericalCGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
 | `SphericalLaplacian2D` | class | Spherical Laplacian on a 2-D Arakawa C-grid. |
 | `SphericalLaplacian3D` | class | 3-D spherical Laplacian (vmap over z-levels). |
 | `SphericalMomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D spherical C-grid. |
@@ -880,7 +880,7 @@ Spectral derivatives and the fast Poisson and Helmholtz solves, with periodic, D
 | `SphericalFilter1D` | class | 1D spectral filter on the Gauss–Legendre latitude grid. |
 | `SphericalFilter2D` | class | 2D spectral filter on the full sphere lat-lon grid. |
 | `SphericalGrid1D` | class | Gauss-Legendre grid for the latitude (colatitude) direction. |
-| `SphericalGrid2D` | class | Full sphere latitude-longitude pseudo-spectral grid. |
+| `SphericalCGrid2D` | class | Full sphere latitude-longitude pseudo-spectral grid. |
 | `SphericalHarmonicTransform` | class | Full 2D Spherical Harmonic Transform (SHT). |
 | `SphericalHelmholtzDecomposition` | class | Helmholtz decomposition of a horizontal vector field on the sphere. |
 | `SphericalHelmholtzSolver` | class | Spectral Helmholtz solver on the sphere:  (∇² − α) φ = f. |

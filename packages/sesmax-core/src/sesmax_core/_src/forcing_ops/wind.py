@@ -24,8 +24,8 @@ from __future__ import annotations
 import jax.numpy as jnp
 from geophysix.seawater import LINEAR_EOS
 from gridax import (
-    CartesianGrid2D,
-    CartesianGrid3D,
+    CartesianCGrid2D,
+    CartesianCGrid3D,
     Interpolation2D,
     Mask2D,
     Mask3D,
@@ -58,7 +58,7 @@ class WindStress2D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid2D
+    grid : CartesianCGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
         Optional land/ocean mask.  When provided, ``du_wind`` is zeroed at
@@ -73,10 +73,10 @@ class WindStress2D(AbstractForcing):
     Idealised double-gyre wind ``tau_x = -tau0 * cos(2 pi y / Ly)``:
 
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid2D
+    >>> from gridax import CartesianCGrid2D
     >>> from sesmax_core.forcing import WindStress2D
-    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0e6, 1.0e6)
-    >>> y = (jnp.arange(grid.Ny) - 0.5) * grid.dy
+    >>> grid = CartesianCGrid2D.from_interior(8, 8, 1.0e6, 1.0e6)
+    >>> y = (jnp.arange(grid.Ny) - 0.5) * grid.spacing("y")
     >>> tau_x = (
     ...     -0.1
     ...     * jnp.cos(2 * jnp.pi * y / grid.Ly)[:, None]
@@ -87,14 +87,14 @@ class WindStress2D(AbstractForcing):
     >>> du_wind, dv_wind = wind(tau_x, tau_y, dz_top=50.0)
     """
 
-    grid: CartesianGrid2D
+    grid: CartesianCGrid2D
     mask: Mask2D | None
     rho0: float
     interp: Interpolation2D
 
     def __init__(
         self,
-        grid: CartesianGrid2D,
+        grid: CartesianCGrid2D,
         mask: Mask2D | None = None,
         rho0: float = LINEAR_EOS.reference_density,
     ) -> None:
@@ -127,8 +127,8 @@ class WindStress2D(AbstractForcing):
             ``(du_wind, dv_wind)`` at U- and V-points, zero in the ghost
             ring.  When ``self.mask`` is set, dry faces are zeroed.
         """
-        mu = None if self.mask is None else self.mask.u
-        mv = None if self.mask is None else self.mask.v
+        mu = None if self.mask is None else self.mask.wet(at="U")
+        mv = None if self.mask is None else self.mask.wet(at="V")
         return self._tendency(tau_x, tau_y, dz_top, mu, mv)
 
     def _tendency(
@@ -186,12 +186,12 @@ class WindCurl2D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid2D
+    grid : CartesianCGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
         Optional land/ocean mask.  Dry T-point stress is zeroed with
         ``jnp.where`` before the stencil (so NaN-filled land cannot leak)
-        and the output is zeroed on dry X-points (``mask.xy_corner_strict``).
+        and the output is zeroed on dry X-points (``mask.wet(at="X", kind="strict")``).
     rho0 : float, optional
         Reference density [kg/m^3].  Default
         ``geophysix.seawater.LINEAR_EOS.reference_density`` (1025.0).
@@ -199,10 +199,12 @@ class WindCurl2D(AbstractForcing):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid2D
+    >>> from gridax import CartesianCGrid2D
     >>> from sesmax_core.forcing import WindCurl2D
-    >>> grid = CartesianGrid2D.from_interior(32, 32, 5.12e6, 5.12e6)
-    >>> y = (jnp.arange(grid.Ny) - 0.5) * grid.dy  # T-point y, ghosts included
+    >>> grid = CartesianCGrid2D.from_interior(32, 32, 5.12e6, 5.12e6)
+    >>> y = (jnp.arange(grid.Ny) - 0.5) * grid.spacing(
+    ...     "y"
+    ... )  # T-point y, ghosts included
     >>> tau_x = (
     ...     -0.1
     ...     * jnp.cos(2 * jnp.pi * y / grid.Ly)[:, None]
@@ -213,7 +215,7 @@ class WindCurl2D(AbstractForcing):
     (34, 34)
     """
 
-    grid: CartesianGrid2D
+    grid: CartesianCGrid2D
     mask: Mask2D | None = None
     rho0: float = LINEAR_EOS.reference_density
 
@@ -241,8 +243,8 @@ class WindCurl2D(AbstractForcing):
             zero ghost ring.
         """
         if self.mask is not None:
-            tau_x = mask_where(tau_x, self.mask.h)
-            tau_y = mask_where(tau_y, self.mask.h)
+            tau_x = mask_where(tau_x, self.mask.wet())
+            tau_y = mask_where(tau_y, self.mask.wet())
         # tau_x_on_u[j, i+1/2] = 1/2 (tau_x[j, i] + tau_x[j, i+1]), every row
         tau_x_on_u = (
             jnp.zeros_like(tau_x).at[:, :-1].set(0.5 * (tau_x[:, :-1] + tau_x[:, 1:]))
@@ -253,11 +255,11 @@ class WindCurl2D(AbstractForcing):
         )  # [Ny, Nx]; row Ny-1 is outside the domain
         # curl[j+1/2, i+1/2] = d(tau_y)/dx - d(tau_x)/dy  at X-points
         curl = interior(
-            diff_x_fwd_2d(tau_y_on_v) / self.grid.dx
-            - diff_y_fwd_2d(tau_x_on_u) / self.grid.dy,
+            diff_x_fwd_2d(tau_y_on_v) / self.grid.spacing("x")
+            - diff_y_fwd_2d(tau_x_on_u) / self.grid.spacing("y"),
             tau_x_on_u,
         )
-        mx = None if self.mask is None else self.mask.xy_corner_strict
+        mx = None if self.mask is None else self.mask.wet(at="X", kind="strict")
         # H on the X interior; 1 at dry corners so a zero dry thickness cannot give 0/0
         h_int = safe_denominator(interior_or_scalar(H), mx)
         # F[j+1/2, i+1/2] = curl / (rho0 H)
@@ -279,11 +281,11 @@ class WindStress3D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid3D
+    grid : CartesianCGrid3D
         The underlying 3-D grid.
     mask : Mask3D or None, optional
-        Optional land/ocean mask.  The ``k_top`` slices of ``mask.u`` /
-        ``mask.v`` zero dry faces (via ``jnp.where``) and guard the
+        Optional land/ocean mask.  The ``k_top`` slices of ``mask.wet(at="U")`` /
+        ``mask.wet(at="V")`` zero dry faces (via ``jnp.where``) and guard the
         ``dz_top`` division there, so zero dry-cell thickness or NaN-filled
         land never leaks NaN.
     rho0 : float, optional
@@ -293,23 +295,23 @@ class WindStress3D(AbstractForcing):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid3D
+    >>> from gridax import CartesianCGrid3D
     >>> from sesmax_core.forcing import WindStress3D
-    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> grid = CartesianCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> wind = WindStress3D(grid=grid)
     >>> tau = 0.1 * jnp.ones((grid.Ny, grid.Nx))
-    >>> du_wind, dv_wind = wind(tau, tau, dz_top=grid.dz)
+    >>> du_wind, dv_wind = wind(tau, tau, dz_top=grid.spacing("z"))
     >>> du_wind.shape
     (6, 8, 8)
     """
 
-    grid: CartesianGrid3D
+    grid: CartesianCGrid3D
     mask: Mask3D | None
     _wind2d: WindStress2D
 
     def __init__(
         self,
-        grid: CartesianGrid3D,
+        grid: CartesianCGrid3D,
         mask: Mask3D | None = None,
         rho0: float = LINEAR_EOS.reference_density,
     ) -> None:
@@ -344,8 +346,8 @@ class WindStress3D(AbstractForcing):
             dry faces are zeroed.
         """
         k_top = self.grid.Nz - 2
-        mu = None if self.mask is None else self.mask.u[k_top]
-        mv = None if self.mask is None else self.mask.v[k_top]
+        mu = None if self.mask is None else self.mask.wet(at="U")[k_top]
+        mv = None if self.mask is None else self.mask.wet(at="V")[k_top]
         du_2d, dv_2d = self._wind2d._tendency(tau_x, tau_y, dz_top, mu, mv)
 
         # Inject at the top interior z-level k_top = Nz - 2.

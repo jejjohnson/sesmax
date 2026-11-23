@@ -72,8 +72,8 @@ class TestLinearShallowWater2D:
         model = LinearShallowWater2D.create(
             nx=nx, ny=ny, Lx=Lx, Ly=Ly, g=g, f0=f0, H0=H0, bc="periodic"
         )
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
-        y = jnp.arange(model.grid.Ny) * model.grid.dy
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
+        y = jnp.arange(model.grid.Ny) * model.grid.spacing("y")
         X, Y = jnp.meshgrid(x, y)
 
         # Gaussian height perturbation

@@ -11,7 +11,7 @@ from __future__ import annotations
 import dataclasses
 import math
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import equinox as eqx
@@ -22,6 +22,7 @@ import jax.tree_util as jtu
 import numpy as np
 from jaxtyping import Array, PyTree
 
+from sesmax_core._src.fields import is_field, map_fields, values
 from sesmax_core._src.scales import Scales
 
 
@@ -59,15 +60,6 @@ DEFAULT_FIELD_KINDS: dict[str, str] = {
     "psi": "streamfunction",
 }
 
-#: Fallback C-grid staggering per field *name*, same caveat as above;
-#: :attr:`~sesmax_core._src.types.State.mask_locations` wins.
-DEFAULT_FIELD_MASK_LOCATION: dict[str, str] = {
-    "u": "u",
-    "v": "v",
-    "q": "xy_corner",
-    "zeta": "xy_corner",
-}
-
 
 def _field_kind(state_cls: type, name: str) -> str | None:
     """Semantic kind of ``state_cls.name``, or ``None`` if unknown."""
@@ -75,14 +67,6 @@ def _field_kind(state_cls: type, name: str) -> str | None:
     if name in declared:
         return declared[name]
     return DEFAULT_FIELD_KINDS.get(name)
-
-
-def _mask_location(state_cls: type | None, name: str) -> str:
-    """C-grid location of ``state_cls.name``; T-points if unknown."""
-    declared = getattr(state_cls, "mask_locations", {}) if state_cls else {}
-    if name in declared:
-        return declared[name]
-    return DEFAULT_FIELD_MASK_LOCATION.get(name, "h")
 
 
 class StateAffine(eqx.Module):
@@ -103,8 +87,8 @@ class StateAffine(eqx.Module):
     ML input/output pipelines, and by ``ScaledModel``.
 
     Attributes:
-        loc: Pytree matching the state's structure; each leaf is
-            broadcastable against the corresponding field.
+        loc: Pytree matching the state's structure, with a plain array or
+            number per field; each is broadcastable against the field.
         scale: Pytree of the same structure. Leaves must be non-zero.
 
     Notes:
@@ -122,13 +106,13 @@ class StateAffine(eqx.Module):
 
     def forward(self, state: PyTree) -> PyTree:
         """Map a state into transformed coordinates: ``(x - loc) / scale``."""
-        return jtu.tree_map(
+        return map_fields(
             lambda x, loc, scale: (x - loc) / scale, state, self.loc, self.scale
         )
 
     def inverse(self, state: PyTree) -> PyTree:
         """Map a transformed state back: ``x * scale + loc``."""
-        return jtu.tree_map(
+        return map_fields(
             lambda y, loc, scale: y * scale + loc, state, self.loc, self.scale
         )
 
@@ -148,10 +132,11 @@ class StateAffine(eqx.Module):
         """
         terms = jtu.tree_map(
             lambda x, scale: jnp.sum(
-                jnp.broadcast_to(jnp.log(jnp.abs(scale)), jnp.shape(x))
+                jnp.broadcast_to(jnp.log(jnp.abs(scale)), jnp.shape(values(x)))
             ),
             state,
             self.scale,
+            is_leaf=is_field,
         )
         leaves = jtu.tree_leaves(terms)
         total = sum(leaves) if leaves else jnp.asarray(0.0)
@@ -182,8 +167,8 @@ class StateAffine(eqx.Module):
     def identity(cls, state: PyTree) -> StateAffine:
         """The no-op transform matching ``state``'s structure."""
         return cls(
-            loc=jtu.tree_map(lambda _: 0.0, state),
-            scale=jtu.tree_map(lambda _: 1.0, state),
+            loc=jtu.tree_map(lambda _: 0.0, state, is_leaf=is_field),
+            scale=jtu.tree_map(lambda _: 1.0, state, is_leaf=is_field),
         )
 
     @classmethod
@@ -279,6 +264,7 @@ class StateAffine(eqx.Module):
         per_gridpoint: bool = False,
         eps: float = 1e-8,
         mask: Any | None = None,
+        at: Mapping[str, str] | None = None,
     ) -> StateAffine:
         """Build a standardising transform from stacked samples.
 
@@ -297,21 +283,25 @@ class StateAffine(eqx.Module):
                 are excluded from the statistics and are given the
                 identity ``(0, 1)``, so masked fields round-trip
                 unchanged and land sentinels cannot contaminate wet
-                cells. The C-grid location is taken from the state's
-                :attr:`~sesmax_core._src.types.State.mask_locations`,
-                falling back to :data:`DEFAULT_FIELD_MASK_LOCATION`.
+                cells. A `gridax.CField` is masked on the point it
+                sits on, and an array on the one ``at`` gives.
 
                 With ``per_gridpoint=False`` the wet-cell statistics
                 are still a single number per field, but they are
                 broadcast back over the grid so that dry cells keep
                 the identity ``(0, 1)``.
 
+            at: The point of each array field on a mask, by field name:
+                ``"T"`` (the default), ``"U"``, ``"V"``, ``"X"`` or
+                ``"W"``. Not for a `gridax.CField`, which knows its own.
+
         Returns:
             A ``StateAffine`` whose ``loc``/``scale`` share the state's
             structure.
 
         Raises:
-            ValueError: If ``eps`` is not finite and strictly positive.
+            ValueError: If ``eps`` is not finite and strictly positive,
+                or ``at`` names a field that is not an array of the state.
         """
         if not math.isfinite(eps) or eps <= 0.0:
             raise ValueError(
@@ -320,12 +310,10 @@ class StateAffine(eqx.Module):
                 f"scale, so zero leaves a constant field with a scale of "
                 f"zero and a transform that cannot be inverted."
             )
-        names = _leaf_field_names(states)
+        points = _leaf_points(states, at or {})
 
-        state_cls = type(states)
-
-        def moments(name: str, samples: Array) -> tuple[Array, Array]:
-            wet = _field_mask(mask, name, samples, state_cls=state_cls)
+        def moments(point: Any, samples: Array) -> _Moments:
+            wet = _field_mask(mask, point, samples)
             axis: int | tuple[int, ...]
             axis = 0 if per_gridpoint else tuple(range(jnp.ndim(samples)))
             mean, std = _masked_moments(samples, wet, axis=axis, eps=eps)
@@ -341,7 +329,7 @@ class StateAffine(eqx.Module):
                 jnp.where(dry_safe, std, 1.0),
             )
 
-        pairs = _tree_map_with_names(moments, states, names)
+        pairs = _tree_map_with(moments, states, points)
         return cls(
             loc=jtu.tree_map(lambda p: p.mean, pairs),
             scale=jtu.tree_map(lambda p: p.std, pairs),
@@ -381,8 +369,8 @@ def _state_field_names(state_cls: type) -> tuple[str, ...]:
 
     ``dataclasses.fields`` rather than ``__dataclass_fields__``: the
     latter also lists ``ClassVar`` pseudo-fields, which is how a state
-    declares its ``scale_kinds`` and ``mask_locations``, and those are
-    metadata about the state rather than part of it. Static fields
+    declares its ``scale_kinds``, and those are metadata about the state
+    rather than part of it. Static fields
     (``eqx.field(static=True)``, such as a shape) are skipped too: they
     are not pytree leaves, and the affine map leaves them at their
     defaults.
@@ -436,7 +424,7 @@ def _leaf_field_names(state: PyTree) -> list[str]:
     """Field names of ``state``'s leaves, in tree-flatten order.
 
     Falls back to empty names for pytrees that are not modules, which
-    simply means no mask location is inferred for those leaves.
+    simply means that ``at`` cannot name those leaves.
     """
     if not getattr(type(state), "__dataclass_fields__", None):
         return [""] * len(jtu.tree_leaves(state))
@@ -447,12 +435,34 @@ def _leaf_field_names(state: PyTree) -> list[str]:
     return names
 
 
-def _tree_map_with_names(
-    fn: Callable[[str, Array], Any], tree: PyTree, names: list[str]
+def _leaf_points(state: PyTree, at: Mapping[str, str]) -> list[Any]:
+    """The point of each leaf of a state: its stagger, or the one ``at`` gives."""
+    names = _leaf_field_names(state)
+    fields = jtu.tree_leaves(state, is_leaf=is_field)
+    if len(fields) != len(names):  # pragma: no cover - a CField is one leaf
+        raise ValueError("a CField holds one array")
+    arrays = {n for n, x in zip(names, fields, strict=True) if not is_field(x)}
+    unknown = sorted(set(at) - arrays)
+    if unknown:
+        raise ValueError(
+            f"StateAffine.from_samples: at names {unknown}, which are not array "
+            f"fields of the state; those are {sorted(arrays)}"
+        )
+    return [
+        x.stagger if is_field(x) else at.get(name, "T")
+        for name, x in zip(names, fields, strict=True)
+    ]
+
+
+def _tree_map_with(
+    fn: Callable[[Any, Array], Any], tree: PyTree, extra: list[Any]
 ) -> PyTree:
-    """``tree_map`` that also passes each leaf's field name."""
-    leaves, treedef = jtu.tree_flatten(tree)
-    mapped = [fn(name, leaf) for name, leaf in zip(names, leaves, strict=True)]
+    """``tree_map`` over the arrays of the fields, with the entries of ``extra``.
+
+    The result has a plain leaf per field, located or not.
+    """
+    leaves, treedef = jtu.tree_flatten(tree, is_leaf=is_field)
+    mapped = [fn(x, values(leaf)) for x, leaf in zip(extra, leaves, strict=True)]
     return jtu.tree_unflatten(treedef, mapped)
 
 
@@ -531,20 +541,11 @@ def _check_nonzero_scales(scales: dict[str, Any]) -> None:
             )
 
 
-def _field_mask(
-    mask: Any | None,
-    name: str,
-    samples: Array,
-    *,
-    state_cls: type | None = None,
-) -> Array | None:
+def _field_mask(mask: Any | None, point: Any, samples: Array) -> Array | None:
     """Boolean wet-cell array for one field, broadcast against ``samples``."""
     if mask is None:
         return None
-    location = _mask_location(state_cls, name)
-    wet = getattr(mask, location, None)
-    if wet is None:  # pragma: no cover - defensive, masks carry these fields
-        wet = mask.h
+    wet = jnp.asarray(mask.wet(at=point), dtype=bool)
     return jnp.broadcast_to(wet, jnp.shape(samples))
 
 

@@ -25,7 +25,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import BoundaryConditionSet, CartesianGrid2D, Dirichlet1D, Mask2D
+from gridax import BC, CartesianCGrid2D, Dirichlet, Mask2D
 from gridax.solvers import (
     build_capacitance_solver,
     dst1_eigenvalues,
@@ -199,7 +199,7 @@ class TestStreamfunctionCG:
 
     def test_with_cgrid_mask(self, cgrid_mask):
         """CG with Mask2D extracts psi mask."""
-        Ny, Nx = cgrid_mask.h.shape
+        Ny, Nx = cgrid_mask.wet().shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
         rhs = jnp.sin(jnp.arange(Ny, dtype=float)[:, None] * jnp.pi / Ny) * jnp.cos(
@@ -210,7 +210,7 @@ class TestStreamfunctionCG:
         )
         assert psi.shape == (Ny, Nx)
         # Should be zero outside the psi mask
-        psi_mask = np.array(cgrid_mask.xy_corner_strict)
+        psi_mask = np.array(cgrid_mask.wet(at="X", kind="strict"))
         outside = np.array(psi) * (~psi_mask)
         np.testing.assert_allclose(outside, 0.0, atol=1e-12)
 
@@ -272,7 +272,7 @@ class TestStreamfunctionCapacitance:
     @pytest.mark.slow
     def test_with_cgrid_mask_solver(self, cgrid_mask):
         """Capacitance solver built from Mask2D."""
-        Ny, Nx = cgrid_mask.h.shape
+        Ny, Nx = cgrid_mask.wet().shape
         dx = 1.0 / (Nx - 1)
         dy = 1.0 / (Ny - 1)
         solver = build_capacitance_solver(
@@ -285,7 +285,7 @@ class TestStreamfunctionCapacitance:
             rhs, dx, dy, method="capacitance", lambda_=-1.0, capacitance_solver=solver
         )
         # psi = 0 on the X wall nodes and every other dry node
-        wet = np.asarray(cgrid_mask.xy_corner_strict)
+        wet = np.asarray(cgrid_mask.wet(at="X", kind="strict"))
         np.testing.assert_array_equal(np.array(psi)[~wet], 0.0)
 
     def test_capacitance_requires_solver(self, dirichlet_grid):
@@ -655,18 +655,22 @@ class TestWallPlacement:
     def test_x_dst_matches_masked_laplacian_cg(self):
         """Spectral DST equals CG on the rectangle's Mask2D (dry neighbours = 0)."""
         n = 16
-        grid = CartesianGrid2D.from_interior(n, n, 1.0, 1.0)
+        grid = CartesianCGrid2D.from_interior(n, n, 1.0, 1.0)
         m = np.zeros((n + 2, n + 2), dtype=bool)
         m[1:-1, 1:-1] = True
         mask = Mask2D.from_mask(m)
         rng = np.random.default_rng(0)
         rhs = jnp.asarray(rng.standard_normal((n + 2, n + 2)))
         lam = 4.0
-        psi_sp = streamfunction_from_vorticity(rhs, grid.dx, grid.dy, lambda_=lam)
+        psi_sp = streamfunction_from_vorticity(
+            rhs, grid.spacing("x"), grid.spacing("y"), lambda_=lam
+        )
 
-        m_psi = jnp.asarray(mask.xy_corner_strict, dtype=float)
+        m_psi = jnp.asarray(mask.wet(at="X", kind="strict"), dtype=float)
         psi_cg, info = _cg(
-            lambda p: masked_laplacian(p, m_psi, grid.dx, grid.dy, lambda_=lam),
+            lambda p: masked_laplacian(
+                p, m_psi, grid.spacing("x"), grid.spacing("y"), lambda_=lam
+            ),
             rhs * m_psi,
             rtol=1e-14,
             atol=1e-14,
@@ -677,7 +681,12 @@ class TestWallPlacement:
         np.testing.assert_allclose(psi_sp, psi_cg * m_psi, atol=1e-10)
         # The default-tolerance wrapper agrees to CG's rtol/atol (1e-6).
         psi_cg_w = streamfunction_from_vorticity(
-            rhs, grid.dx, grid.dy, lambda_=lam, method="cg", mask=mask
+            rhs,
+            grid.spacing("x"),
+            grid.spacing("y"),
+            lambda_=lam,
+            method="cg",
+            mask=mask,
         )
         np.testing.assert_allclose(psi_sp, psi_cg_w, atol=1e-6)
 
@@ -696,7 +705,7 @@ class TestWallPlacement:
 
     @pytest.mark.slow
     def test_mask2d_pressure_uses_h_mask(self):
-        """pressure_from_divergence(method='cg', Mask2D) solves on mask.h."""
+        """pressure_from_divergence(method='cg', Mask2D) solves on mask.wet()."""
         n = 8
         m = np.zeros((n + 2, n + 2), dtype=bool)
         m[1:-1, 1:-1] = True
@@ -705,7 +714,7 @@ class TestWallPlacement:
         rhs = jnp.asarray(rng.standard_normal((n + 2, n + 2)))
         p_m = pressure_from_divergence(rhs, 0.1, 0.1, method="cg", mask=mask)
         p_h = pressure_from_divergence(
-            rhs, 0.1, 0.1, method="cg", mask=jnp.asarray(mask.h, dtype=float)
+            rhs, 0.1, 0.1, method="cg", mask=jnp.asarray(mask.wet(), dtype=float)
         )
         np.testing.assert_allclose(p_m, p_h, atol=1e-12)
         assert float(jnp.max(jnp.abs(p_m[1:-1, -2]))) > 0  # last T column is wet
@@ -823,7 +832,7 @@ def test_matches_cg_on_cap_island_basin():
     rel = float(jnp.max(jnp.abs(psi_cap - psi_cg)) / jnp.max(jnp.abs(psi_cg)))
     assert rel < 1e-5  # was 0.285 before the fix
     np.testing.assert_array_equal(
-        np.asarray(psi_cap)[~np.asarray(mask.xy_corner_strict)], 0.0
+        np.asarray(psi_cap)[~np.asarray(mask.wet(at="X", kind="strict"))], 0.0
     )
 
 
@@ -831,12 +840,10 @@ def test_matches_cg_on_cap_island_basin():
 def test_capacitance_known_values_on_mask2d_faces():
     """#303 with capacitance: all four Dirichlet faces on the Mask2D wall, exact."""
     mask = Mask2D.from_mask(_cap_island_basin())
-    wet = jnp.asarray(mask.xy_corner_strict)
+    wet = jnp.asarray(mask.wet(at="X", kind="strict"))
     lam = 4.0
     faces = {"south": -0.2, "north": 1.0, "west": 0.5, "east": 2.0}
-    bc = BoundaryConditionSet(
-        **{k: Dirichlet1D(k, value=v) for k, v in faces.items()}, mask=mask
-    )
+    bc = BC(**{face: Dirichlet(value) for face, value in faces.items()})
     f = _cap_rhs()
     solver = build_capacitance_solver(mask, CAP_DX, CAP_DY, lambda_=lam)
     psi = streamfunction_from_vorticity(
@@ -846,6 +853,7 @@ def test_capacitance_known_values_on_mask2d_faces():
         bc=bc,
         lambda_=lam,
         method="capacitance",
+        mask=mask,
         capacitance_solver=solver,
     )
     np.testing.assert_allclose(psi[0, 1:-2], faces["south"], atol=1e-12)

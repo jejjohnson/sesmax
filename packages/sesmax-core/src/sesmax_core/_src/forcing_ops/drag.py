@@ -26,8 +26,8 @@ from __future__ import annotations
 
 import jax.numpy as jnp
 from gridax import (
-    CartesianGrid2D,
-    CartesianGrid3D,
+    CartesianCGrid2D,
+    CartesianCGrid3D,
     Interpolation2D,
     Mask2D,
     Mask3D,
@@ -59,7 +59,7 @@ class LinearDrag2D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid2D
+    grid : CartesianCGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
         Optional land/ocean mask.  When provided, ``du_drag`` is zeroed at
@@ -69,22 +69,22 @@ class LinearDrag2D(AbstractForcing):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid2D
+    >>> from gridax import CartesianCGrid2D
     >>> from sesmax_core.forcing import LinearDrag2D
-    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> grid = CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> drag = LinearDrag2D(grid=grid)
     >>> u = jnp.ones((grid.Ny, grid.Nx))
     >>> v = jnp.ones((grid.Ny, grid.Nx))
     >>> du_drag, dv_drag = drag(u, v, r=1e-7)
     """
 
-    grid: CartesianGrid2D
+    grid: CartesianCGrid2D
     mask: Mask2D | None
     interp: Interpolation2D
 
     def __init__(
         self,
-        grid: CartesianGrid2D,
+        grid: CartesianCGrid2D,
         mask: Mask2D | None = None,
     ) -> None:
         self.grid = grid
@@ -118,8 +118,8 @@ class LinearDrag2D(AbstractForcing):
         if self.mask is not None:
             # Zero dry velocities first: NaN-filled land would otherwise give
             # NaN gradients through -r * u even where the output is masked.
-            u = mask_where(u, self.mask.u)
-            v = mask_where(v, self.mask.v)
+            u = mask_where(u, self.mask.wet(at="U"))
+            v = mask_where(v, self.mask.wet(at="V"))
 
         # r_on_u[j, i+1/2] = 1/2 * (r[j, i] + r[j, i+1])
         r_on_u = on_face_interior(r, self.interp.T_to_U)
@@ -133,7 +133,9 @@ class LinearDrag2D(AbstractForcing):
 
         if self.mask is None:
             return du_drag, dv_drag
-        return mask_where(du_drag, self.mask.u), mask_where(dv_drag, self.mask.v)
+        return mask_where(du_drag, self.mask.wet(at="U")), mask_where(
+            dv_drag, self.mask.wet(at="V")
+        )
 
 
 class QuadraticDrag2D(AbstractForcing):
@@ -155,7 +157,7 @@ class QuadraticDrag2D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid2D
+    grid : CartesianCGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
         Optional land/ocean mask.  When provided, ``du_drag`` is zeroed at
@@ -165,22 +167,22 @@ class QuadraticDrag2D(AbstractForcing):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid2D
+    >>> from gridax import CartesianCGrid2D
     >>> from sesmax_core.forcing import QuadraticDrag2D
-    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> grid = CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> drag = QuadraticDrag2D(grid=grid)
     >>> u = jnp.ones((grid.Ny, grid.Nx))
     >>> v = jnp.zeros((grid.Ny, grid.Nx))
     >>> du_drag, dv_drag = drag(u, v, cd=2.5e-3, h_bot=100.0)
     """
 
-    grid: CartesianGrid2D
+    grid: CartesianCGrid2D
     mask: Mask2D | None
     interp: Interpolation2D
 
     def __init__(
         self,
-        grid: CartesianGrid2D,
+        grid: CartesianCGrid2D,
         mask: Mask2D | None = None,
     ) -> None:
         self.grid = grid
@@ -215,8 +217,8 @@ class QuadraticDrag2D(AbstractForcing):
             ``(du_drag, dv_drag)`` at U- and V-points, zero in the ghost
             ring.  When ``self.mask`` is set, dry faces are zeroed.
         """
-        mu = None if self.mask is None else self.mask.u
-        mv = None if self.mask is None else self.mask.v
+        mu = None if self.mask is None else self.mask.wet(at="U")
+        mv = None if self.mask is None else self.mask.wet(at="V")
         return self._tendency(u, v, cd, h_bot, mu, mv)
 
     def _tendency(
@@ -296,31 +298,31 @@ class LinearDrag3D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid3D
+    grid : CartesianCGrid3D
         The underlying 3-D grid.
     mask : Mask3D or None, optional
-        Optional land/ocean mask.  The ``k_bot`` slices of ``mask.u`` /
-        ``mask.v`` zero dry faces via ``jnp.where``, so NaN-filled land
+        Optional land/ocean mask.  The ``k_bot`` slices of ``mask.wet(at="U")`` /
+        ``mask.wet(at="V")`` zero dry faces via ``jnp.where``, so NaN-filled land
         never leaks into the output.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid3D
+    >>> from gridax import CartesianCGrid3D
     >>> from sesmax_core.forcing import LinearDrag3D
-    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> grid = CartesianCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> drag = LinearDrag3D(grid=grid)
     >>> u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
     >>> du_drag, dv_drag = drag(u, u, r=1e-7)
     """
 
-    grid: CartesianGrid3D
+    grid: CartesianCGrid3D
     mask: Mask3D | None
     _drag2d: LinearDrag2D
 
     def __init__(
         self,
-        grid: CartesianGrid3D,
+        grid: CartesianCGrid3D,
         mask: Mask3D | None = None,
     ) -> None:
         self.grid = grid
@@ -357,12 +359,12 @@ class LinearDrag3D(AbstractForcing):
         if self.mask is not None:
             # Zero dry velocities first so NaN-filled land cannot give NaN
             # gradients through -r * u.
-            u_k = mask_where(u_k, self.mask.u[_K_BOT])
-            v_k = mask_where(v_k, self.mask.v[_K_BOT])
+            u_k = mask_where(u_k, self.mask.wet(at="U")[_K_BOT])
+            v_k = mask_where(v_k, self.mask.wet(at="V")[_K_BOT])
         du_2d, dv_2d = self._drag2d(u_k, v_k, r)
         if self.mask is not None:
-            du_2d = mask_where(du_2d, self.mask.u[_K_BOT])
-            dv_2d = mask_where(dv_2d, self.mask.v[_K_BOT])
+            du_2d = mask_where(du_2d, self.mask.wet(at="U")[_K_BOT])
+            dv_2d = mask_where(dv_2d, self.mask.wet(at="V")[_K_BOT])
         return _inject_bottom(du_2d, dv_2d, u, v)
 
 
@@ -382,31 +384,31 @@ class QuadraticDrag3D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid3D
+    grid : CartesianCGrid3D
         The underlying 3-D grid.
     mask : Mask3D or None, optional
-        Optional land/ocean mask.  The ``k_bot`` slices of ``mask.u`` /
-        ``mask.v`` zero dry faces via ``jnp.where``, so NaN-filled land
+        Optional land/ocean mask.  The ``k_bot`` slices of ``mask.wet(at="U")`` /
+        ``mask.wet(at="V")`` zero dry faces via ``jnp.where``, so NaN-filled land
         never leaks into the output.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid3D
+    >>> from gridax import CartesianCGrid3D
     >>> from sesmax_core.forcing import QuadraticDrag3D
-    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> grid = CartesianCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> drag = QuadraticDrag3D(grid=grid)
     >>> u = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
-    >>> du_drag, dv_drag = drag(u, u, cd=2.5e-3, h_bot=grid.dz)
+    >>> du_drag, dv_drag = drag(u, u, cd=2.5e-3, h_bot=grid.spacing("z"))
     """
 
-    grid: CartesianGrid3D
+    grid: CartesianCGrid3D
     mask: Mask3D | None
     _drag2d: QuadraticDrag2D
 
     def __init__(
         self,
-        grid: CartesianGrid3D,
+        grid: CartesianCGrid3D,
         mask: Mask3D | None = None,
     ) -> None:
         self.grid = grid
@@ -443,7 +445,7 @@ class QuadraticDrag3D(AbstractForcing):
             ``k = 1`` and in the ghost ring.  When ``self.mask`` is
             set, dry faces are zeroed.
         """
-        mu = None if self.mask is None else self.mask.u[_K_BOT]
-        mv = None if self.mask is None else self.mask.v[_K_BOT]
+        mu = None if self.mask is None else self.mask.wet(at="U")[_K_BOT]
+        mv = None if self.mask is None else self.mask.wet(at="V")[_K_BOT]
         du_2d, dv_2d = self._drag2d._tendency(u[_K_BOT], v[_K_BOT], cd, h_bot, mu, mv)
         return _inject_bottom(du_2d, dv_2d, u, v)

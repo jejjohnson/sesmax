@@ -27,8 +27,8 @@ from sesmax_core.testing import Burgers2DOp
 
 def _gaussian_state(model) -> Burgers2DState:
     grid = model.grid
-    x = jnp.arange(grid.Nx) * grid.dx
-    y = jnp.arange(grid.Ny) * grid.dy
+    x = jnp.arange(grid.Nx) * grid.spacing("x")
+    y = jnp.arange(grid.Ny) * grid.spacing("y")
     X, Y = jnp.meshgrid(x, y)
     g = jnp.exp(-0.5 * (((X - 1.0) / 0.3) ** 2 + ((Y - 1.0) / 0.3) ** 2))
     return Burgers2DState(u=g, v=g)
@@ -48,7 +48,8 @@ def test_get_config_is_flat_primitives():
         "Lx": 2.0,
         "Ly": 2.0,
         "nu": 0.05,
-        "method": "upwind1",
+        "scheme": "Upwind",
+        "order": 1,
         "imex": False,
         "dt": 0.001,
     }
@@ -68,7 +69,9 @@ def test_model_not_in_config():
 
 
 def test_serial_round_trip_config():
-    op = Burgers2DOp(nx=16, ny=16, nu=0.05, method="upwind1", imex=False, dt=0.002)
+    op = Burgers2DOp(
+        nx=16, ny=16, nu=0.05, scheme="Upwind", order=1, imex=False, dt=0.002
+    )
     restored = loads(dumps(op))
     assert isinstance(restored, Burgers2DOp)
     assert restored.get_config() == op.get_config()

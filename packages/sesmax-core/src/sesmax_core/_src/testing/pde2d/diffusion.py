@@ -4,14 +4,21 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-import equinox as eqx
 import jax.numpy as jnp
-from gridax import CartesianGrid2D, Difference2D, Mask2D, enforce_periodic
+from gridax import (
+    CartesianCGrid2D,
+    CField,
+    Difference2D,
+    Mask2D,
+    fill_ghosts,
+)
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src._validation import require_positive
+from sesmax_core._src.fields import each, values
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
+from sesmax_core._src.testing.pde2d._advective_form import PERIODIC
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
 
 
@@ -32,7 +39,7 @@ class Diffusion2DState(State):
         u: Scalar field on T-points, shape ``(Ny, Nx)``.
     """
 
-    u: Array
+    u: Array | CField
 
     # ``u`` here is a T-point scalar, not a C-grid velocity: it is the
     # transported quantity, and the velocity is a separate coefficient.
@@ -40,7 +47,6 @@ class Diffusion2DState(State):
     # scale for it in ``Scales`` and the nondimensionalisation leaves
     # it alone rather than dividing it by ``U``.
     scale_kinds: ClassVar[dict[str, str]] = {"u": "tracer"}
-    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
 
 
 class Diffusion2DDiagnostics(Diagnostics):
@@ -66,7 +72,7 @@ class Diffusion2D(Model):
     """
 
     params: Diffusion2DParams
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     diff: Difference2D
     mask: Mask2D | None
 
@@ -74,17 +80,20 @@ class Diffusion2D(Model):
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> Diffusion2DState:
         r"""Compute tendency: du/dt = nu * laplacian(u)."""
-        du_dt = self.params.nu * self.diff.laplacian(state.u)
+        # du/dt = nu ∇²u
+        du_dt = each(lambda lap: self.params.nu * lap, self.diff.laplacian(state.u))
         return Diffusion2DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> Diffusion2DState:
         """Apply periodic boundary conditions."""
-        return Diffusion2DState(u=enforce_periodic(state.u))
+        return fill_ghosts(state, self.grid, Diffusion2DState(u=PERIODIC))
 
     def diagnose(self, state: PyTree) -> Diffusion2DDiagnostics:
         """Compute energy diagnostic."""
-        interior = state.u[1:-1, 1:-1]
-        energy = 0.5 * jnp.sum(interior**2) * self.grid.dx * self.grid.dy
+        interior = values(state.u)[1:-1, 1:-1]
+        energy = (
+            0.5 * jnp.sum(interior**2) * self.grid.spacing("x") * self.grid.spacing("y")
+        )
         return Diffusion2DDiagnostics(energy=energy)
 
     @staticmethod
@@ -153,7 +162,7 @@ class Diffusion2D(Model):
         Returns:
             A ``Diffusion2D`` model instance.
         """
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         params = Diffusion2DParams(nu=as_parameter(nu))
         diff = Difference2D(grid=grid, mask=mask)
         return Diffusion2D(params=params, grid=grid, diff=diff, mask=mask)

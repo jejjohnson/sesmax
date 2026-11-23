@@ -1,11 +1,12 @@
-"""``BoundaryConditionSet`` as ``bc=`` of the elliptic inversions.
+"""A ``gridax.BC`` as ``bc=`` of the elliptic inversions.
 
 Moved from gridax tests/test_elliptic_bcset.py at gridax 01d8320 (sesmax#126). Only the
 imports changed: the functions come from ``sesmax_core.gfd`` (their calls were already
 keyword-only past ``dy``) and the rest from public ``gridax`` and ``gridax.solvers``
 names.
-No test was dropped. In ``test_neumann_array_zero_is_dct`` the zero face values are
-built inside the test, because the x64 fixture is not on while the module is collected.
+The mask is an argument of the solve: ``BC`` holds conditions only. In
+``test_neumann_array_zero_is_dct`` the zero face values are built inside the test,
+because the x64 fixture is not on while the module is collected.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import BoundaryConditionSet, Dirichlet1D, Mask2D, Neumann1D, Periodic1D
+from gridax import BC, Dirichlet, Mask2D, Neumann, Outflow, Periodic
 from gridax.solvers import coast_ring, masked_laplacian
 
 from sesmax_core.gfd import (
@@ -49,32 +50,21 @@ def _laplacian(psi: jnp.ndarray, lambda_: float) -> jnp.ndarray:
     return masked_laplacian(psi, jnp.ones_like(psi), DX, DY, lambda_=lambda_)
 
 
-def _dirichlet(south=0.0, north=0.0, west=0.0, east=0.0, mask=None):
-    return BoundaryConditionSet(
-        south=Dirichlet1D("south", value=south),
-        north=Dirichlet1D("north", value=north),
-        west=Dirichlet1D("west", value=west),
-        east=Dirichlet1D("east", value=east),
-        mask=mask,
+def _dirichlet(south=0.0, north=0.0, west=0.0, east=0.0):
+    return BC(
+        x=(Dirichlet(west), Dirichlet(east)), y=(Dirichlet(south), Dirichlet(north))
     )
 
 
 def _neumann(value=0.0):
-    return BoundaryConditionSet(
-        south=Neumann1D("south", value=value),
-        north=Neumann1D("north", value=value),
-        west=Neumann1D("west", value=value),
-        east=Neumann1D("east", value=value),
-    )
+    return BC(x=Neumann(value), y=Neumann(value))
 
 
 class TestTransformDispatch:
     @pytest.mark.slow
     def test_closed_is_dst(self):
         rhs = _rhs()
-        psi = streamfunction_from_vorticity(
-            rhs, DX, DY, bc=BoundaryConditionSet.closed(), lambda_=2.0
-        )
+        psi = streamfunction_from_vorticity(rhs, DX, DY, bc=_dirichlet(), lambda_=2.0)
         ref = streamfunction_from_vorticity(rhs, DX, DY, bc="dst", lambda_=2.0)
         np.testing.assert_array_equal(psi, ref)
 
@@ -88,7 +78,7 @@ class TestTransformDispatch:
     def test_periodic_is_fft(self):
         rhs = _rhs()
         psi = streamfunction_from_vorticity(
-            rhs, DX, DY, bc=BoundaryConditionSet.periodic(), lambda_=3.0
+            rhs, DX, DY, bc=BC(x=Periodic(), y=Periodic()), lambda_=3.0
         )
         ref = streamfunction_from_vorticity(rhs, DX, DY, bc="fft", lambda_=3.0)
         np.testing.assert_array_equal(psi, ref)
@@ -97,44 +87,21 @@ class TestTransformDispatch:
     def test_pv_inversion_array_lambda(self):
         pv = jnp.stack([_rhs(), 2.0 * _rhs()])
         lambdas = jnp.array([1.0, 4.0])
-        psi = pv_inversion(pv, DX, DY, lambdas, bc=BoundaryConditionSet.closed())
+        psi = pv_inversion(pv, DX, DY, lambdas, bc=_dirichlet())
         ref = pv_inversion(pv, DX, DY, lambdas, bc="dst")
         np.testing.assert_array_equal(psi, ref)
 
 
-class TestMaskExtraction:
+class TestMask:
     @pytest.mark.slow
-    def test_cg_uses_bc_mask(self):
+    def test_cg_takes_the_mask_beside_the_bc(self):
         mask = _basin_mask()
         rhs = _rhs() * mask
         psi = streamfunction_from_vorticity(
-            rhs, DX, DY, bc=BoundaryConditionSet.closed(mask=mask), method="cg"
+            rhs, DX, DY, bc=_dirichlet(), method="cg", mask=mask
         )
         ref = streamfunction_from_vorticity(rhs, DX, DY, method="cg", mask=mask)
         np.testing.assert_allclose(psi, ref, atol=1e-12)
-
-    def test_mask_twice_raises(self):
-        mask = _basin_mask()
-        with pytest.raises(ValueError, match="not both"):
-            streamfunction_from_vorticity(
-                _rhs(),
-                DX,
-                DY,
-                bc=BoundaryConditionSet.closed(mask=mask),
-                method="cg",
-                mask=mask,
-            )
-
-    def test_spectral_rejects_bc_mask(self):
-        """The spectral path is rectangular: a bc.mask raises (#303)."""
-        with pytest.raises(ValueError, match=r"cannot honour bc\.mask"):
-            streamfunction_from_vorticity(
-                _rhs(), DX, DY, bc=BoundaryConditionSet.closed(mask=_basin_mask())
-            )
-        with pytest.raises(ValueError, match=r"cannot honour bc\.mask"):
-            streamfunction_from_vorticity(
-                _rhs(), DX, DY, bc=_dirichlet(north=1.0, mask=_basin_mask2d())
-            )
 
 
 class TestInhomogeneousDirichletFaces:
@@ -162,11 +129,11 @@ class TestInhomogeneousDirichletFaces:
         ref = streamfunction_from_vorticity(rhs, DX, DY, known_values=g)
         np.testing.assert_array_equal(psi, ref)
 
-    def test_cg_with_bc_mask_matches_spectral(self):
+    def test_cg_with_a_mask_matches_spectral(self):
         mask = _basin_mask2d()
         rhs = _rhs()
         psi_cg = streamfunction_from_vorticity(
-            rhs, DX, DY, bc=_dirichlet(north=0.1, mask=mask), method="cg"
+            rhs, DX, DY, bc=_dirichlet(north=0.1), method="cg", mask=mask
         )
         psi_sp = streamfunction_from_vorticity(rhs, DX, DY, bc=_dirichlet(north=0.1))
         np.testing.assert_allclose(psi_cg, psi_sp, atol=CG_TOL)
@@ -195,14 +162,14 @@ class TestInhomogeneousDirichletFaces:
         in ``xy_corner_strict``, and silently dropped by the lifting.
         """
         mask = _basin_mask2d()
-        wet = jnp.asarray(mask.xy_corner_strict)
+        wet = jnp.asarray(mask.wet(at="X", kind="strict"))
         lam = 4.0
         faces = {"south": -0.2, "north": 1.0, "west": 0.5, "east": 2.0}
         kw = {"mask": mask} if method == "cg" else {}
-        bc = _dirichlet(**faces, **kw)
+        bc = _dirichlet(**faces)
         rhs = _rhs()
         psi = streamfunction_from_vorticity(
-            rhs, DX, DY, bc=bc, lambda_=lam, method=method
+            rhs, DX, DY, bc=bc, lambda_=lam, method=method, **kw
         )
         # The coast ring carries the requested values exactly (set by the lift).
         np.testing.assert_allclose(psi[0, 1:-2], faces["south"], atol=1e-12)
@@ -233,8 +200,9 @@ class TestInhomogeneousDirichletFaces:
                 jnp.zeros((NY, NX)),
                 DX,
                 DY,
-                bc=_dirichlet(1.0, 1.0, 1.0, 1.0, mask=mask),
+                bc=_dirichlet(1.0, 1.0, 1.0, 1.0),
                 method="cg",
+                mask=mask,
             )
 
     def test_island_in_rectangle_is_accepted(self):
@@ -246,10 +214,11 @@ class TestInhomogeneousDirichletFaces:
             jnp.zeros((NY, NX)),
             DX,
             DY,
-            bc=_dirichlet(1.0, 1.0, 1.0, 1.0, mask=mask),
+            bc=_dirichlet(1.0, 1.0, 1.0, 1.0),
             method="cg",
+            mask=mask,
         )
-        wet = np.asarray(mask.xy_corner_strict) > 0.5
+        wet = np.asarray(mask.wet(at="X", kind="strict")) > 0.5
         coast = np.asarray(coast_ring(wet))
         island_coast = coast.copy()
         island_coast[[0, NY - 2], :] = False
@@ -261,24 +230,19 @@ class TestInhomogeneousDirichletFaces:
 
 class TestErrors:
     def test_mixed_face_types(self):
-        bc = BoundaryConditionSet(
-            south=Dirichlet1D("south", value=0.0),
-            north=Dirichlet1D("north", value=0.0),
-            west=Periodic1D("west"),
-            east=Periodic1D("east"),
-        )
+        bc = BC(x=Periodic(), y=Dirichlet(0.0))
         with pytest.raises(ValueError, match="no mixing"):
             streamfunction_from_vorticity(_rhs(), DX, DY, bc=bc)
 
     def test_missing_face(self):
-        bc = BoundaryConditionSet(south=Dirichlet1D("south", value=0.0))
+        bc = BC(south=Dirichlet(0.0))
         with pytest.raises(ValueError, match="all four faces"):
             streamfunction_from_vorticity(_rhs(), DX, DY, bc=bc)
 
     def test_unsupported_face_type(self):
-        with pytest.raises(ValueError, match="Outflow1D"):
+        with pytest.raises(ValueError, match="Outflow"):
             streamfunction_from_vorticity(
-                _rhs(), DX, DY, bc=BoundaryConditionSet.open()
+                _rhs(), DX, DY, bc=BC(x=Outflow(), y=Outflow())
             )
 
     def test_inhomogeneous_neumann(self):

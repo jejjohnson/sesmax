@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from geophysix.seawater import LINEAR_EOS
-from gridax import CartesianGrid2D, CartesianGrid3D
+from gridax import CartesianCGrid2D, CartesianCGrid3D
 
 from sesmax_core.forcing import WindCurl2D, WindStress2D, WindStress3D
 
 
 def test_default_rho0_is_the_linear_eos_reference_density() -> None:
-    grid2d = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
-    grid3d = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    grid2d = CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
+    grid3d = CartesianCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     defaults = [
         WindStress2D(grid2d).rho0,
         WindCurl2D(grid2d).rho0,

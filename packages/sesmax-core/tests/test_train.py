@@ -50,12 +50,16 @@ def _model(kappa: float = 0.0) -> LinearSWM2DTermModel:
 
 def _bump(model) -> LinearSW2DState:
     g = model.grid
-    x = jnp.arange(g.Nx) * g.dx
-    y = jnp.arange(g.Ny) * g.dy
+    x = jnp.arange(g.Nx) * g.spacing("x")
+    y = jnp.arange(g.Ny) * g.spacing("y")
     X, Y = jnp.meshgrid(x, y)
-    s = g.Nx * g.dx / 8
+    s = g.Nx * g.spacing("x") / 8
     h = jnp.exp(
-        -0.5 * (((X - g.Nx * g.dx / 2) / s) ** 2 + ((Y - g.Ny * g.dy / 2) / s) ** 2)
+        -0.5
+        * (
+            ((X - g.Nx * g.spacing("x") / 2) / s) ** 2
+            + ((Y - g.Ny * g.spacing("y") / 2) / s) ** 2
+        )
     )
     return model.apply_boundary_conditions(
         LinearSW2DState(h=h, u=jnp.zeros_like(h), v=jnp.zeros_like(h))

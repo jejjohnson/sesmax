@@ -317,7 +317,7 @@ def test_a_gridax_tier_b_graph_matches_gravity_plus_coriolis():
 
     model = _model()
     gravity, coriolis = _summands(model)
-    G = fp.as_grid_spec(model.grid)
+    G = model.grid
     g, H0 = float(gravity.g), float(gravity.H0)
     h, u, v = Input("h"), Input("u"), Input("v")
     cor = CoriolisOp(coriolis=coriolis.coriolis, f=coriolis.f_field)(u, v)

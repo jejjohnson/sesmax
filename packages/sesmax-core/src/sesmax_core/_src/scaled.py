@@ -27,10 +27,10 @@ from typing import Any
 
 import diffrax as dfx
 import equinox as eqx
-import jax.tree_util as jtu
 import paramax
 from jaxtyping import PyTree
 
+from sesmax_core._src.fields import map_fields
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
 from sesmax_core._src.state_affine import StateAffine
@@ -102,7 +102,7 @@ class ScaledModel(Model):
         """
         inner_state = self.transform.inverse(state)
         tendency = self.inner.vector_field(t * self.time_scale, inner_state, args)
-        return jtu.tree_map(
+        return map_fields(
             lambda d, scale: self.time_scale * d / scale,
             tendency,
             self.transform.scale,
@@ -257,7 +257,7 @@ def _rescale_term(
 
         def rescaled(t: float, y: PyTree, args: PyTree | None = None) -> PyTree:
             tendency = inner_vector_field(t * time_scale, transform.inverse(y), args)
-            return jtu.tree_map(
+            return map_fields(
                 lambda d, scale: time_scale * d / scale, tendency, transform.scale
             )
 

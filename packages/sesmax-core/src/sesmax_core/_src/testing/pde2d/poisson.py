@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import CartesianGrid2D
+from gridax import (
+    CartesianCGrid2D,
+)
 from jaxtyping import Array, Float
 
 from sesmax_core._src.gfd.inversion import streamfunction_from_vorticity
@@ -23,7 +25,7 @@ class PoissonSolver2D(eqx.Module):
             or ``"periodic"``).
     """
 
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     bc_type: str = eqx.field(static=True, default="dirichlet")
 
     def solve(self, rhs: Float[Array, "Ny Nx"]) -> Float[Array, "Ny Nx"]:
@@ -37,7 +39,9 @@ class PoissonSolver2D(eqx.Module):
         """
         bc_map = {"dirichlet": "dst", "neumann": "dct", "periodic": "fft"}
         bc = bc_map[self.bc_type]
-        return streamfunction_from_vorticity(rhs, self.grid.dx, self.grid.dy, bc=bc)
+        return streamfunction_from_vorticity(
+            rhs, self.grid.spacing("x"), self.grid.spacing("y"), bc=bc
+        )
 
     @staticmethod
     def create(
@@ -59,7 +63,7 @@ class PoissonSolver2D(eqx.Module):
         Returns:
             A ``PoissonSolver2D`` instance.
         """
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         return PoissonSolver2D(grid=grid, bc_type=bc)
 
 
@@ -74,7 +78,7 @@ class LaplaceSolver2D(eqx.Module):
         bc_type: Boundary condition type.
     """
 
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     bc_type: str = eqx.field(static=True, default="dirichlet")
 
     def solve(self) -> Float[Array, "Ny Nx"]:
@@ -86,7 +90,9 @@ class LaplaceSolver2D(eqx.Module):
         rhs = jnp.zeros((self.grid.Ny, self.grid.Nx))
         bc_map = {"dirichlet": "dst", "neumann": "dct", "periodic": "fft"}
         bc = bc_map[self.bc_type]
-        return streamfunction_from_vorticity(rhs, self.grid.dx, self.grid.dy, bc=bc)
+        return streamfunction_from_vorticity(
+            rhs, self.grid.spacing("x"), self.grid.spacing("y"), bc=bc
+        )
 
     @staticmethod
     def create(
@@ -97,7 +103,7 @@ class LaplaceSolver2D(eqx.Module):
         bc: str = "dirichlet",
     ) -> LaplaceSolver2D:
         """Convenience factory."""
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         return LaplaceSolver2D(grid=grid, bc_type=bc)
 
 
@@ -115,7 +121,7 @@ class HelmholtzSolver2D(eqx.Module):
         lambda_: Helmholtz parameter (screening coefficient).
     """
 
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     bc_type: str = eqx.field(static=True, default="dirichlet")
     lambda_: float = eqx.field(static=True, default=1.0)
 
@@ -131,7 +137,11 @@ class HelmholtzSolver2D(eqx.Module):
         bc_map = {"dirichlet": "dst", "neumann": "dct", "periodic": "fft"}
         bc = bc_map[self.bc_type]
         return streamfunction_from_vorticity(
-            rhs, self.grid.dx, self.grid.dy, bc=bc, lambda_=self.lambda_
+            rhs,
+            self.grid.spacing("x"),
+            self.grid.spacing("y"),
+            bc=bc,
+            lambda_=self.lambda_,
         )
 
     @staticmethod
@@ -156,5 +166,5 @@ class HelmholtzSolver2D(eqx.Module):
         Returns:
             A ``HelmholtzSolver2D`` instance.
         """
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         return HelmholtzSolver2D(grid=grid, bc_type=bc, lambda_=lambda_)

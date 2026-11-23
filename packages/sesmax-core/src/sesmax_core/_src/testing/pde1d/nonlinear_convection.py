@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import Advection1D, CartesianGrid1D, Interpolation1D, Mask1D
+from gridax import (
+    Advection1D,
+    CartesianCGrid1D,
+    CField,
+    Interpolation1D,
+    Mask1D,
+)
+from gridax.schemes import Scheme, Upwind
 from jaxtyping import Array, PyTree
 
+from sesmax_core._src.fields import values
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
 from sesmax_core._src.testing.pde1d._burgers_flux import burgers_tendency
-from sesmax_core._src.testing.pde1d._ghosts import fill_ghosts
+from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 from sesmax_core._src.types import Diagnostics, State
+
+
+#: The default scheme of the advective face values.
+UPWIND = Upwind(1)
 
 
 class NonlinearConvection1DState(State):
@@ -23,10 +35,7 @@ class NonlinearConvection1DState(State):
         u: Scalar field on T-points, shape ``(Nx,)`` including ghost cells.
     """
 
-    u: Array
-
-    # ``u`` here is a T-point scalar, not a C-grid velocity.
-    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
+    u: Array | CField
 
 
 class NonlinearConvection1DDiagnostics(Diagnostics):
@@ -50,15 +59,15 @@ class NonlinearConvection1D(Model):
         interp: Interpolation operator.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
-        method: Reconstruction method for advection (default ``"upwind1"``).
+        scheme: Scheme of the advective face values (default ``Upwind(1)``).
     """
 
-    grid: CartesianGrid1D = eqx.field(static=True)
+    grid: CartesianCGrid1D
     advection: Advection1D
     interp: Interpolation1D
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
-    method: str = eqx.field(static=True, default="upwind1")
+    scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
@@ -69,19 +78,19 @@ class NonlinearConvection1D(Model):
             self.advection,
             self.interp,
             periodic=self.periodic,
-            method=self.method,
+            scheme=self.scheme,
         )
         return NonlinearConvection1DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> NonlinearConvection1DState:
         """Apply boundary conditions to the state."""
         return NonlinearConvection1DState(
-            u=fill_ghosts(state.u, periodic=self.periodic)
+            u=fill_ends(state.u, self.grid, periodic=self.periodic)
         )
 
     def diagnose(self, state: PyTree) -> NonlinearConvection1DDiagnostics:
         """Compute energy diagnostic."""
-        energy = 0.5 * jnp.sum(state.u[1:-1] ** 2) * self.grid.dx
+        energy = 0.5 * jnp.sum(values(state.u)[1:-1] ** 2) * self.grid.spacing("x")
         return NonlinearConvection1DDiagnostics(energy=energy)
 
     @staticmethod
@@ -105,7 +114,7 @@ class NonlinearConvection1D(Model):
         Args:
             nx: Interior grid cells.
             **create_kw: Forwarded to :meth:`create` (``periodic``,
-                ``method``, ``mask``).
+                ``scheme``, ``mask``).
 
         Returns:
             ``(model, scales)``. ``scales.dt_from_cfl(C, nx)`` gives a
@@ -123,7 +132,7 @@ class NonlinearConvection1D(Model):
         nx: int = 100,
         Lx: float = 2.0,
         periodic: bool = True,
-        method: str = "upwind1",
+        scheme: Scheme = UPWIND,
         mask: Mask1D | None = None,
     ) -> NonlinearConvection1D:
         """Convenience factory.
@@ -132,13 +141,13 @@ class NonlinearConvection1D(Model):
             nx: Number of interior grid cells.
             Lx: Domain length.
             periodic: Use periodic BCs if True, Dirichlet if False.
-            method: Advection reconstruction method.
+            scheme: Scheme of the advective face values.
             mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
 
         Returns:
             A ``NonlinearConvection1D`` model instance.
         """
-        grid = CartesianGrid1D.from_interior(nx, Lx)
+        grid = CartesianCGrid1D.from_interior(nx, Lx)
         advection = Advection1D(grid=grid, mask=mask)
         interp = Interpolation1D(grid=grid, mask=mask)
         return NonlinearConvection1D(
@@ -147,5 +156,5 @@ class NonlinearConvection1D(Model):
             interp=interp,
             mask=mask,
             periodic=periodic,
-            method=method,
+            scheme=scheme,
         )

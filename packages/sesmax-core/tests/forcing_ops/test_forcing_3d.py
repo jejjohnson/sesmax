@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import CartesianGrid3D
+from gridax import CartesianCGrid3D
 from gridax_inputs import (
     make_grid_3d,
     make_h_field_3d,
@@ -31,7 +31,7 @@ from sesmax_core.forcing import (
 
 @pytest.fixture
 def grid():
-    return CartesianGrid3D.from_interior(6, 5, 4, 1.0, 1.0, 1.0)
+    return CartesianCGrid3D.from_interior(6, 5, 4, 1.0, 1.0, 1.0)
 
 
 def _field3d(grid, value=1.0):
@@ -166,7 +166,9 @@ class TestMasks3D:
         grid, mask = make_grid_3d(), make_mask_3d()
         u, v, h = make_u_field_3d(), make_v_field_3d(), make_h_field_3d()
         tau = jnp.ones((grid.Ny, grid.Nx))
-        mu, mv, mh = (np.asarray(m) for m in (mask.u, mask.v, mask.h))
+        mu, mv, mh = (
+            np.asarray(m) for m in (mask.wet(at="U"), mask.wet(at="V"), mask.wet())
+        )
         for du, dv in [
             WindStress3D(grid, mask=mask)(tau, tau, 10.0),
             LinearDrag3D(grid, mask=mask)(u, v, 0.1),
@@ -219,7 +221,9 @@ class TestMaskNaNSafety3D:
     def test_zero_thickness_and_nan_land(self):
         grid, mask = make_grid_3d(), make_mask_3d()
         k_top, k_bot = grid.Nz - 2, 1
-        mu, mv, mh = (np.asarray(m) for m in (mask.u, mask.v, mask.h))
+        mu, mv, mh = (
+            np.asarray(m) for m in (mask.wet(at="U"), mask.wet(at="V"), mask.wet())
+        )
         tau = jnp.ones((grid.Ny, grid.Nx))
         dz_top = jnp.where(mh[k_top], 50.0, 0.0)
         h_bot = jnp.where(mh[k_bot], 50.0, 0.0)
@@ -241,7 +245,7 @@ class TestMaskNaNSafety3D:
     def test_grad_finite_with_zero_land_thickness(self):
         grid, mask = make_grid_3d(), make_mask_3d()
         k_bot = 1
-        h_bot = jnp.where(np.asarray(mask.h)[k_bot], 50.0, 0.0)
+        h_bot = jnp.where(np.asarray(mask.wet())[k_bot], 50.0, 0.0)
         u, v = make_u_field_3d(), make_v_field_3d()
         drag = QuadraticDrag3D(grid, mask=mask)
 
@@ -254,7 +258,9 @@ class TestMaskNaNSafety3D:
     @pytest.mark.slow
     def test_grad_wrt_coefficients_finite_with_nan_land(self):
         grid, mask = make_grid_3d(), make_mask_3d()
-        mu, mv, mh = (np.asarray(m) for m in (mask.u, mask.v, mask.h))
+        mu, mv, mh = (
+            np.asarray(m) for m in (mask.wet(at="U"), mask.wet(at="V"), mask.wet())
+        )
         u = jnp.where(mu, make_u_field_3d(), jnp.nan)
         v = jnp.where(mv, make_v_field_3d(), jnp.nan)
         q = jnp.where(mh, make_h_field_3d(), jnp.nan)
@@ -275,8 +281,8 @@ class TestMaskNaNSafety3D:
 
     def test_quadratic_coastal_faces_match_zero_land(self):
         grid, mask = make_grid_3d(), make_mask_3d()
-        u = jnp.where(np.asarray(mask.u), make_u_field_3d(), jnp.nan)
-        v = jnp.where(np.asarray(mask.v), make_v_field_3d(), jnp.nan)
+        u = jnp.where(np.asarray(mask.wet(at="U")), make_u_field_3d(), jnp.nan)
+        v = jnp.where(np.asarray(mask.wet(at="V")), make_v_field_3d(), jnp.nan)
         quad = QuadraticDrag3D(grid, mask=mask)
         du, dv = quad(u, v, cd=1e-3, h_bot=10.0)
         du_ref, dv_ref = quad(

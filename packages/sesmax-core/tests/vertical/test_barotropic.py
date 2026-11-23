@@ -11,7 +11,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import diff_x_fwd_2d, divergence_2d, interior
+from gridax import diff_x_bwd_2d, diff_x_fwd_2d, diff_y_bwd_2d, interior
 from gridax.solvers import build_multigrid_solver
 
 from sesmax_core.vertical import barotropic_filter
@@ -72,7 +72,8 @@ class TestBarotropicFilterWiring:
         )
         u_bt = jnp.sum(hu * u, axis=-3)
         v_bt = jnp.sum(hv * v, axis=-3)
-        expected = divergence_2d(u_bt, v_bt, dx, dy) / (g * tau * dt)
+        div = diff_x_bwd_2d(u_bt) / dx + diff_y_bwd_2d(v_bt) / dy
+        expected = interior(div, u_bt) / (g * tau * dt)
         np.testing.assert_allclose(captured["rhs"], expected, atol=1e-12)
 
     def test_correction_is_minus_scaled_gradient(self):

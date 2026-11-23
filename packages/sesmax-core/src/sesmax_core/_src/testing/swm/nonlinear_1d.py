@@ -2,15 +2,28 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
-
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import Advection1D, CartesianGrid1D, Difference1D, Interpolation1D, Mask1D
+from gridax import (
+    Advection1D,
+    CartesianCGrid1D,
+    CField,
+    Difference1D,
+    Interpolation1D,
+    Mask1D,
+    laplacian,
+)
+from gridax.schemes import Scheme, Upwind
 from jaxtyping import Array, PyTree
 
+from sesmax_core._src.fields import each, placed, values
 from sesmax_core._src.model import Model
+from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 from sesmax_core._src.types import Diagnostics, Params, PhysConsts, State, as_parameter
+
+
+#: The default scheme of the advective face values.
+UPWIND = Upwind(1)
 
 
 class NonlinearSW1DState(State):
@@ -22,12 +35,9 @@ class NonlinearSW1DState(State):
         v: y-velocity on T-points (Coriolis coupling), shape ``(Nx,)``.
     """
 
-    h: Array
-    u: Array
-    v: Array
-
-    # The 1-D Coriolis partner sits at T-points.
-    mask_locations: ClassVar[dict[str, str]] = {"v": "h"}
+    h: Array | CField
+    u: Array | CField
+    v: Array | CField
 
 
 class NonlinearSW1DParams(Params):
@@ -85,17 +95,17 @@ class NonlinearShallowWater1D(Model):
         interp: Interpolation operators.
         advection: Advection operator.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
-        method: Advection reconstruction method.
+        scheme: Scheme of the advective face values.
     """
 
     params: NonlinearSW1DParams
     consts: NonlinearSW1DPhysConsts = eqx.field(static=True)
-    grid: CartesianGrid1D = eqx.field(static=True)
+    grid: CartesianCGrid1D
     diff: Difference1D
     interp: Interpolation1D
     advection: Advection1D
     mask: Mask1D | None
-    method: str = eqx.field(static=True, default="upwind1")
+    scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
@@ -112,44 +122,55 @@ class NonlinearShallowWater1D(Model):
         wall = "closed" if self.mask is not None else "open"
 
         # Mass equation: dh/dt = -d(hu)/dx (via advection operator)
-        dh_dt = self.advection(h, u, method=self.method, wall=wall)
+        dh_dt = self.advection(h, u, scheme=self.scheme, wall=wall)
 
         # Momentum advection: -u * du/dx, implemented in conservative
         # flux form as -d(u^2 / 2)/dx using the existing advection operator.
-        du_adv = 0.5 * self.advection(u, u, method=self.method, wall=wall)
+        # The momentum cells are the U points, so u is the cell value too.
+        u_cells = placed(values(u), u, "T")
+        flux_form = values(self.advection(u_cells, u, scheme=self.scheme, wall=wall))
+        du_adv = placed(flux_form, u, "U")
 
         # Pressure gradient: -g * dh/dx
-        pressure_grad = -g * self.diff.diff_x_T_to_U(h)
+        dh_dx = self.diff.diff_x_T_to_U(h)
 
         # Coriolis
         v_on_U = self.interp.T_to_U(v)
         u_on_T = self.interp.U_to_T(u)
 
-        du_dt = du_adv + pressure_grad + f0 * v_on_U
-        dv_dt = -f0 * u_on_T
-
-        # Diffusion
-        du_dt = du_dt + nu * self.diff.laplacian(u)
-        dv_dt = dv_dt + nu * self.diff.laplacian(v)
-
-        # Bottom drag
-        du_dt = du_dt - kappa * u
-        dv_dt = dv_dt - kappa * v
+        # Advection, pressure gradient and Coriolis, then diffusion and drag
+        du_dt = each(
+            lambda adv, dh, v_u, lap, u: (
+                0.5 * adv + -g * dh + f0 * v_u + nu * lap - kappa * u
+            ),
+            du_adv,
+            dh_dx,
+            v_on_U,
+            laplacian(u, self.grid, at="U", mask=self.mask),
+            u,
+        )
+        dv_dt = each(
+            lambda u_t, lap, v: -f0 * u_t + nu * lap - kappa * v,
+            u_on_T,
+            laplacian(v, self.grid, at="T", mask=self.mask),
+            v,
+        )
 
         return NonlinearSW1DState(h=dh_dt, u=du_dt, v=dv_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> NonlinearSW1DState:
         """Apply periodic boundary conditions."""
-        h = state.h.at[0].set(state.h[-2]).at[-1].set(state.h[1])
-        u = state.u.at[0].set(state.u[-2]).at[-1].set(state.u[1])
-        v = state.v.at[0].set(state.v[-2]).at[-1].set(state.v[1])
-        return NonlinearSW1DState(h=h, u=u, v=v)
+        return NonlinearSW1DState(
+            h=fill_ends(state.h, self.grid, periodic=True, at="T"),
+            u=fill_ends(state.u, self.grid, periodic=True, at="U"),
+            v=fill_ends(state.v, self.grid, periodic=True, at="T"),
+        )
 
     def diagnose(self, state: PyTree) -> NonlinearSW1DDiagnostics:
         """Compute energy and mass."""
         g = self.consts.gravity
-        dx = self.grid.dx
-        h, u, v = state.h, state.u, state.v
+        dx = self.grid.spacing("x")
+        h, u, v = values(state.h), values(state.u), values(state.v)
         interior = slice(1, -1)
         energy = (
             0.5
@@ -171,7 +192,7 @@ class NonlinearShallowWater1D(Model):
         H0: float = 100.0,
         lateral_viscosity: float = 0.0,
         bottom_drag: float = 0.0,
-        method: str = "upwind1",
+        scheme: Scheme = UPWIND,
         mask: Mask1D | None = None,
     ) -> NonlinearShallowWater1D:
         """Convenience factory.
@@ -184,13 +205,13 @@ class NonlinearShallowWater1D(Model):
             H0: Mean layer depth (m).
             lateral_viscosity: Harmonic viscosity (m²/s).
             bottom_drag: Linear bottom drag (1/s).
-            method: Advection reconstruction method.
+            scheme: Scheme of the advective face values.
             mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
 
         Returns:
             A ``NonlinearShallowWater1D`` model instance.
         """
-        grid = CartesianGrid1D.from_interior(nx, Lx)
+        grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = NonlinearSW1DParams(
             lateral_viscosity=as_parameter(lateral_viscosity),
             bottom_drag=as_parameter(bottom_drag),
@@ -207,5 +228,5 @@ class NonlinearShallowWater1D(Model):
             interp=interp,
             advection=advection,
             mask=mask,
-            method=method,
+            scheme=scheme,
         )

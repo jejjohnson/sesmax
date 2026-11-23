@@ -19,13 +19,13 @@ from sesmax_core.vertical import multilayer
 
 @pytest.fixture
 def grid2d():
-    return fvx.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+    return fvx.CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
 
 
 @pytest.fixture
 def grid3d():
     # 4 interior z-levels → Nz = 6 total (including ghost layers at k=0, k=5)
-    return fvx.CartesianGrid3D.from_interior(8, 8, 4, 1.0, 1.0, 1.0)
+    return fvx.CartesianCGrid3D.from_interior(8, 8, 4, 1.0, 1.0, 1.0)
 
 
 class TestMultilayerOutputShape:
@@ -72,7 +72,7 @@ class TestMultilayerPerLayerEquivalence:
         """Interior of every layer recovers the correct finite difference."""
         diff2d = fvx.Difference2D(grid=grid2d)
         c = 2.0
-        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.spacing("x")
         layer = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
         nl = 3
         h = jnp.stack([layer] * nl)
@@ -155,7 +155,7 @@ class TestMultilayerVsDifference3D:
 
         # Use a field that produces non-zero differences everywhere
         c = 1.0
-        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.dx
+        x = jnp.arange(grid2d.Nx, dtype=float) * grid2d.spacing("x")
         layer = jnp.broadcast_to(c * x, (grid2d.Ny, grid2d.Nx))
         h = jnp.stack([layer] * Nz)  # [Nz, Ny, Nx]
 

@@ -16,8 +16,8 @@ class TestPoissonSolver2D:
         """
         nx, ny = 64, 64
         solver = PoissonSolver2D.create(nx=nx, ny=ny, Lx=1.0, Ly=1.0, bc="dirichlet")
-        x = jnp.arange(solver.grid.Nx) * solver.grid.dx
-        y = jnp.arange(solver.grid.Ny) * solver.grid.dy
+        x = jnp.arange(solver.grid.Nx) * solver.grid.spacing("x")
+        y = jnp.arange(solver.grid.Ny) * solver.grid.spacing("y")
         X, Y = jnp.meshgrid(x, y)
         rhs = -2.0 * jnp.pi**2 * jnp.sin(jnp.pi * X) * jnp.sin(jnp.pi * Y)
         phi = solver.solve(rhs)
@@ -36,8 +36,8 @@ class TestPoissonSolver2D:
     def test_periodic_bc(self):
         """Periodic Poisson solve should be consistent."""
         solver = PoissonSolver2D.create(nx=32, ny=32, bc="periodic")
-        x = jnp.arange(solver.grid.Nx) * solver.grid.dx
-        y = jnp.arange(solver.grid.Ny) * solver.grid.dy
+        x = jnp.arange(solver.grid.Nx) * solver.grid.spacing("x")
+        y = jnp.arange(solver.grid.Ny) * solver.grid.spacing("y")
         X, Y = jnp.meshgrid(x, y)
         # Use a periodic RHS: sin(2*pi*x)*sin(2*pi*y)
         k = 2.0 * jnp.pi
@@ -69,8 +69,8 @@ class TestHelmholtzSolver2D:
         nx, ny = 32, 32
         poisson = PoissonSolver2D.create(nx=nx, ny=ny, bc="dirichlet")
         helmholtz = HelmholtzSolver2D.create(nx=nx, ny=ny, lambda_=0.0, bc="dirichlet")
-        x = jnp.arange(poisson.grid.Nx) * poisson.grid.dx
-        y = jnp.arange(poisson.grid.Ny) * poisson.grid.dy
+        x = jnp.arange(poisson.grid.Nx) * poisson.grid.spacing("x")
+        y = jnp.arange(poisson.grid.Ny) * poisson.grid.spacing("y")
         X, Y = jnp.meshgrid(x, y)
         rhs = -2.0 * jnp.pi**2 * jnp.sin(jnp.pi * X) * jnp.sin(jnp.pi * Y)
         phi_p = poisson.solve(rhs)
@@ -81,8 +81,8 @@ class TestHelmholtzSolver2D:
         """Larger lambda should reduce the solution amplitude."""
         h1 = HelmholtzSolver2D.create(nx=32, ny=32, lambda_=1.0)
         h10 = HelmholtzSolver2D.create(nx=32, ny=32, lambda_=10.0)
-        x = jnp.arange(h1.grid.Nx) * h1.grid.dx
-        y = jnp.arange(h1.grid.Ny) * h1.grid.dy
+        x = jnp.arange(h1.grid.Nx) * h1.grid.spacing("x")
+        y = jnp.arange(h1.grid.Ny) * h1.grid.spacing("y")
         X, Y = jnp.meshgrid(x, y)
         rhs = jnp.sin(jnp.pi * X) * jnp.sin(jnp.pi * Y)
         phi1 = h1.solve(rhs)

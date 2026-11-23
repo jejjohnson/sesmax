@@ -6,12 +6,18 @@ from typing import Any, ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import CartesianGrid1D, Difference1D, Mask1D
+from gridax import (
+    CartesianCGrid1D,
+    CField,
+    Difference1D,
+    Mask1D,
+)
 from jaxtyping import Array, PyTree
 
+from sesmax_core._src.fields import each, values
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
-from sesmax_core._src.testing.pde1d._ghosts import fill_ghosts
+from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
 
 
@@ -32,7 +38,7 @@ class Diffusion1DState(State):
         u: Scalar field on T-points, shape ``(Nx,)`` including ghost cells.
     """
 
-    u: Array
+    u: Array | CField
 
     # ``u`` here is a T-point scalar, not a C-grid velocity: it is the
     # transported quantity, and the velocity is a separate coefficient.
@@ -40,7 +46,6 @@ class Diffusion1DState(State):
     # scale for it in ``Scales`` and the nondimensionalisation leaves
     # it alone rather than dividing it by ``U``.
     scale_kinds: ClassVar[dict[str, str]] = {"u": "tracer"}
-    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
 
 
 class Diffusion1DDiagnostics(Diagnostics):
@@ -68,7 +73,7 @@ class Diffusion1D(Model):
     """
 
     params: Diffusion1DParams
-    grid: CartesianGrid1D = eqx.field(static=True)
+    grid: CartesianCGrid1D
     diff: Difference1D
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
@@ -77,16 +82,17 @@ class Diffusion1D(Model):
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> Diffusion1DState:
         r"""Compute tendency: du/dt = nu * d²u/dx²."""
-        du_dt = self.params.nu * self.diff.laplacian(state.u)
+        # du/dt = nu ∇²u
+        du_dt = each(lambda lap: self.params.nu * lap, self.diff.laplacian(state.u))
         return Diffusion1DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> Diffusion1DState:
         """Apply boundary conditions to the state."""
-        return Diffusion1DState(u=fill_ghosts(state.u, periodic=self.periodic))
+        return Diffusion1DState(u=fill_ends(state.u, self.grid, periodic=self.periodic))
 
     def diagnose(self, state: PyTree) -> Diffusion1DDiagnostics:
         """Compute energy diagnostic."""
-        energy = 0.5 * jnp.sum(state.u[1:-1] ** 2) * self.grid.dx
+        energy = 0.5 * jnp.sum(values(state.u)[1:-1] ** 2) * self.grid.spacing("x")
         return Diffusion1DDiagnostics(energy=energy)
 
     @staticmethod
@@ -143,7 +149,7 @@ class Diffusion1D(Model):
         Returns:
             A ``Diffusion1D`` model instance.
         """
-        grid = CartesianGrid1D.from_interior(nx, Lx)
+        grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = Diffusion1DParams(nu=as_parameter(nu))
         diff = Difference1D(grid=grid, mask=mask)
         return Diffusion1D(

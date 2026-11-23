@@ -43,7 +43,7 @@ class TestLinearShallowWater1D:
 
     def test_vector_field_finite(self):
         model = LinearShallowWater1D.create(nx=50, f0=0.0)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         h0 = _gaussian_1d(x, model.grid.Lx / 2.0, model.grid.Lx / 10.0)
         state0 = LinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
         state0 = model.apply_boundary_conditions(state0)
@@ -53,7 +53,7 @@ class TestLinearShallowWater1D:
 
     def test_integrate(self):
         model = LinearShallowWater1D.create(nx=50, f0=0.0)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         h0 = _gaussian_1d(x, model.grid.Lx / 2.0, model.grid.Lx / 10.0)
         state0 = LinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
         sol = model.integrate(state0, t0=0.0, t1=100.0, dt=1.0)
@@ -66,14 +66,14 @@ class TestLinearShallowWater1D:
         nx, Lx = 400, 2e6
         c = jnp.sqrt(g * H0)
         model = LinearShallowWater1D.create(nx=nx, Lx=Lx, g=g, f0=0.0, H0=H0)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         sigma = Lx / 20.0
         mu0 = Lx / 2.0
         h0 = _gaussian_1d(x, mu0, sigma)
         state0 = LinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
 
         t_final = 5000.0
-        dt = 0.5 * model.grid.dx / float(c)  # CFL < 1
+        dt = 0.5 * model.grid.spacing("x") / float(c)  # CFL < 1
         sol = model.integrate(
             state0, t0=0.0, t1=t_final, dt=dt, saveat=dfx.SaveAt(t1=True)
         )
@@ -115,7 +115,7 @@ class TestLinearShallowWater1D:
 
     def test_diagnose(self):
         model = LinearShallowWater1D.create(nx=50)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         h0 = _gaussian_1d(x, model.grid.Lx / 2.0, model.grid.Lx / 10.0)
         state = LinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
         diag = model.diagnose(state)
@@ -124,7 +124,7 @@ class TestLinearShallowWater1D:
 
     def test_grad_through_params(self):
         model = LinearShallowWater1D.create(nx=20, lateral_viscosity=1.0)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         h0 = _gaussian_1d(x, model.grid.Lx / 2.0, model.grid.Lx / 10.0)
         state0 = LinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
 
@@ -155,7 +155,7 @@ class TestNonlinearShallowWater1D:
 
     def test_integrate_finite(self):
         model = NonlinearShallowWater1D.create(nx=100, H0=100.0, f0=0.0)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         h0 = 100.0 + _gaussian_1d(x, model.grid.Lx / 2.0, model.grid.Lx / 10.0)
         state0 = NonlinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
         sol = model.integrate(state0, t0=0.0, t1=100.0, dt=1.0)
@@ -163,7 +163,7 @@ class TestNonlinearShallowWater1D:
 
     def test_grad_through_params(self):
         model = NonlinearShallowWater1D.create(nx=20, H0=100.0, lateral_viscosity=1.0)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         h0 = 100.0 + 0.1 * _gaussian_1d(x, model.grid.Lx / 2.0, model.grid.Lx / 10.0)
         state0 = NonlinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
 
@@ -177,7 +177,7 @@ class TestNonlinearShallowWater1D:
 
     def test_diagnose(self):
         model = NonlinearShallowWater1D.create(nx=50, H0=100.0)
-        x = jnp.arange(model.grid.Nx) * model.grid.dx
+        x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
         h0 = 100.0 + _gaussian_1d(x, model.grid.Lx / 2.0, model.grid.Lx / 10.0)
         state = NonlinearSW1DState(h=h0, u=jnp.zeros_like(h0), v=jnp.zeros_like(h0))
         diag = model.diagnose(state)

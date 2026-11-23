@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import math
+import operator
 from typing import Any, ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import CartesianGrid1D, Difference1D, Interpolation1D, Mask1D
+from gridax import (
+    CartesianCGrid1D,
+    CField,
+    Difference1D,
+    Interpolation1D,
+    Mask1D,
+)
 from jaxtyping import Array, PyTree
 
+from sesmax_core._src.fields import each, values
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
-from sesmax_core._src.testing.pde1d._ghosts import fill_ghosts
+from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
 
 
@@ -33,7 +41,7 @@ class LinearConvection1DState(State):
         u: Scalar field on T-points, shape ``(Nx,)`` including ghost cells.
     """
 
-    u: Array
+    u: Array | CField
 
     # ``u`` here is a T-point scalar, not a C-grid velocity: it is the
     # transported quantity, and the velocity is a separate coefficient.
@@ -41,7 +49,6 @@ class LinearConvection1DState(State):
     # scale for it in ``Scales`` and the nondimensionalisation leaves
     # it alone rather than dividing it by ``U``.
     scale_kinds: ClassVar[dict[str, str]] = {"u": "tracer"}
-    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
 
 
 class LinearConvection1DDiagnostics(Diagnostics):
@@ -70,7 +77,7 @@ class LinearConvection1D(Model):
     """
 
     params: LinearConvection1DParams
-    grid: CartesianGrid1D = eqx.field(static=True)
+    grid: CartesianCGrid1D
     diff: Difference1D
     interp: Interpolation1D
     mask: Mask1D | None
@@ -82,18 +89,20 @@ class LinearConvection1D(Model):
         """Compute tendency: du/dt = -c * du/dx."""
         # Flux form: -d(c * u)/dx at T-points
         # 1. Interpolate u to U-points, multiply by c
-        flux = self.params.c * self.interp.T_to_U(state.u)
+        flux = each(lambda u: self.params.c * u, self.interp.T_to_U(state.u))
         # 2. Backward difference of flux: U -> T
-        du_dt = -self.diff.diff_x_U_to_T(flux)
+        du_dt = each(operator.neg, self.diff.diff_x_U_to_T(flux))
         return LinearConvection1DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> LinearConvection1DState:
         """Apply boundary conditions to the state."""
-        return LinearConvection1DState(u=fill_ghosts(state.u, periodic=self.periodic))
+        return LinearConvection1DState(
+            u=fill_ends(state.u, self.grid, periodic=self.periodic)
+        )
 
     def diagnose(self, state: PyTree) -> LinearConvection1DDiagnostics:
         """Compute energy diagnostic."""
-        energy = 0.5 * jnp.sum(state.u[1:-1] ** 2) * self.grid.dx
+        energy = 0.5 * jnp.sum(values(state.u)[1:-1] ** 2) * self.grid.spacing("x")
         return LinearConvection1DDiagnostics(energy=energy)
 
     @staticmethod
@@ -165,7 +174,7 @@ class LinearConvection1D(Model):
         Returns:
             A ``LinearConvection1D`` model instance.
         """
-        grid = CartesianGrid1D.from_interior(nx, Lx)
+        grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = LinearConvection1DParams(c=as_parameter(c))
         diff = Difference1D(grid=grid, mask=mask)
         interp = Interpolation1D(grid=grid, mask=mask)

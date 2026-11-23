@@ -38,7 +38,7 @@ def _gaussian_1d(x, mu, sigma):
 
 def _make_x(grid):
     """Cell-centre coordinates including ghost cells."""
-    return jnp.arange(grid.Nx) * grid.dx
+    return jnp.arange(grid.Nx) * grid.spacing("x")
 
 
 # ---------------------------------------------------------------------------

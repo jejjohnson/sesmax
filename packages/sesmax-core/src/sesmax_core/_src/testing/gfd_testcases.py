@@ -44,7 +44,7 @@ def gravity_wave_1d(
         ``(model, state0)`` tuple.
     """
     model = LinearShallowWater1D.create(nx=nx, Lx=Lx, g=g, f0=0.0, H0=H0)
-    x = jnp.arange(model.grid.Nx) * model.grid.dx
+    x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
     x0 = Lx / 2.0
     h0 = jnp.exp(-0.5 * ((x - x0) / sigma) ** 2)
     u0 = jnp.zeros_like(h0)
@@ -107,7 +107,7 @@ def geostrophic_adjustment_2d(
     model = LinearShallowWater2D.create(
         nx=nx, ny=ny, Lx=Lx, Ly=Ly, f0=f0, H0=H0, bc="periodic"
     )
-    x = jnp.arange(model.grid.Nx) * model.grid.dx
+    x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
     X = jnp.broadcast_to(x[None, :], (model.grid.Ny, model.grid.Nx))
     # Smooth tanh height step: high on left, low on right
     h0 = -eta_max * jnp.tanh((X - Lx / 2.0) / (Lx / 20.0))

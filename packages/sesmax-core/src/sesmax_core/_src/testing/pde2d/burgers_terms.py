@@ -36,19 +36,24 @@ from __future__ import annotations
 import equinox as eqx
 from gridax import (
     Advection2D as FVXAdvection2D,
-    CartesianGrid2D,
+    CartesianCGrid2D,
     Difference2D,
     Interpolation2D,
     Mask2D,
-    enforce_periodic,
+    fill_ghosts,
 )
+from gridax.schemes import Scheme, Upwind
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src.model import TermModel
 from sesmax_core._src.terms import IMPLICIT, Kind, Scaled, Term, implicit
-from sesmax_core._src.testing.pde2d._advective_form import advective_tendency
+from sesmax_core._src.testing.pde2d._advective_form import PERIODIC, advective_tendency
 from sesmax_core._src.testing.pde2d.burgers import Burgers2D, Burgers2DState
 from sesmax_core._src.types import as_parameter
+
+
+#: The default scheme of the advective face values.
+UPWIND = Upwind(1)
 
 
 class Burgers2DAdvection(Term):
@@ -63,13 +68,13 @@ class Burgers2DAdvection(Term):
         advection: gridax C-grid advection operator.
         interp: gridax interpolation operator (T→U, T→V).
         diff: gridax difference operator (for the divergence).
-        method: Reconstruction method passed to the advection operator.
+        scheme: Scheme passed to the advection operator.
     """
 
     advection: FVXAdvection2D
     interp: Interpolation2D
     diff: Difference2D
-    method: str = eqx.field(static=True, default="upwind1")
+    scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
     def __call__(
         self, t: float, state: Burgers2DState, args: PyTree | None = None
@@ -80,7 +85,7 @@ class Burgers2DAdvection(Term):
             self.advection,
             self.interp,
             self.diff,
-            method=self.method,
+            scheme=self.scheme,
         )
         return Burgers2DState(u=adv_u, v=adv_v)
 
@@ -139,14 +144,12 @@ class Burgers2DTermModel(TermModel):
         grid: The Arakawa C-grid (static; used for diagnostics).
     """
 
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
 
     def apply_boundary_conditions(self, state: Burgers2DState) -> Burgers2DState:
         """Enforce periodic boundary conditions on both velocity fields."""
-        return Burgers2DState(
-            u=enforce_periodic(state.u),
-            v=enforce_periodic(state.v),
-        )
+        bcs = Burgers2DState(u=PERIODIC, v=PERIODIC)
+        return fill_ghosts(state, self.grid, bcs)
 
     @property
     def nu(self) -> Array:
@@ -179,7 +182,7 @@ class Burgers2DTermModel(TermModel):
         Lx: float = 2.0,
         Ly: float = 2.0,
         nu: float = 0.01,
-        method: str = "upwind1",
+        scheme: Scheme = UPWIND,
         mask: Mask2D | None = None,
         *,
         imex: bool = False,
@@ -200,14 +203,14 @@ class Burgers2DTermModel(TermModel):
         Returns:
             A ``Burgers2DTermModel`` instance.
         """
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         nu_arr = as_parameter(nu)
 
         advection = Burgers2DAdvection(
             advection=FVXAdvection2D(grid=grid, mask=mask),
             interp=Interpolation2D(grid=grid, mask=mask),
             diff=Difference2D(grid=grid, mask=mask),
-            method=method,
+            scheme=scheme,
         )
         diffusion = Burgers2DDiffusion(
             diff=Difference2D(grid=grid, mask=mask),
@@ -225,7 +228,7 @@ class Burgers2DTermModel(TermModel):
     def from_model(model: Burgers2D, *, imex: bool = False) -> Burgers2DTermModel:
         """Build a term model matching an existing :class:`Burgers2D`.
 
-        Reuses the source model's grid, mask, and advection method so the
+        Reuses the source model's grid, mask, and advection scheme so the
         two are numerically comparable.
 
         Args:
@@ -243,7 +246,7 @@ class Burgers2DTermModel(TermModel):
             advection=model.advection,
             interp=model.interp,
             diff=model.diff,
-            method=model.method,
+            scheme=model.scheme,
         )
         diffusion = Burgers2DDiffusion(
             diff=model.diff,

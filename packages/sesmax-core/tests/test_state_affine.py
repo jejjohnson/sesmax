@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import warnings
-from typing import ClassVar
 
 import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import Mask2D
+from gridax import CField, Mask2D
 from jaxtyping import Array, Float
 
 from sesmax_core._src.scales import Scales
@@ -21,10 +20,8 @@ from sesmax_core._src.types import State
 # The ocean state classes these tests were written against, copied from
 # somax 9cb19b3 (somax/_src/models/qg/barotropic.py and swm/nonlinear_2d.py,
 # swm/multilayer.py) so that StateAffine is tested in the core before the
-# ocean models move. Only their fields and class variables matter here: the
-# class variables (``mask_locations``) steer StateAffine. Three classes of the
+# ocean models move. Only their fields matter here. Two classes of the
 # somax suite run on toy-model states (TestFieldNamesAreOnlyAHint,
-# TestNonlinearOneDimensionalCoriolisPartner,
 # TestTransportedScalarsKeepTheirAmplitude); they import those from
 # sesmax_core.testing.
 
@@ -33,7 +30,6 @@ class BarotropicQGState(State):
     """State for the barotropic quasi-geostrophic model (as in somax)."""
 
     q: Float[Array, "Ny Nx"]
-    mask_locations: ClassVar[dict[str, str]] = {"q": "h"}
 
 
 class NonlinearSW2DState(State):
@@ -276,6 +272,10 @@ class TestFromSamples:
         assert tree_allclose(t.inverse(t.forward(single)), single, rtol=1e-6)
 
 
+#: The points of the C-grid state, for array fields.
+AT = {"u": "U", "v": "V"}
+
+
 class TestMaskedSamples:
     @pytest.fixture
     def mask(self):
@@ -287,33 +287,75 @@ class TestMaskedSamples:
     def traj(self, mask):
         rng = np.random.RandomState(4)
 
-        def field(location):
+        def field(point):
             data = rng.randn(16, NY, NX)
-            return jnp.where(getattr(mask, location), jnp.asarray(data), jnp.nan)
+            return jnp.where(mask.wet(at=point), jnp.asarray(data), jnp.nan)
 
-        return NonlinearSW2DState(h=field("h"), u=field("u"), v=field("v"))
+        return NonlinearSW2DState(h=field("T"), u=field("U"), v=field("V"))
+
+    def test_a_located_field_uses_the_mask_of_its_point(self, traj, mask):
+        dims = ("time", "y", "x")
+        located = NonlinearSW2DState(
+            h=CField(traj.h, dims, loc="T"),
+            u=CField(traj.u, dims, loc="U"),
+            v=CField(traj.v, dims, loc="V"),
+        )
+        for per_gridpoint in (False, True):
+            kw = {"per_gridpoint": per_gridpoint, "mask": mask}
+            got = StateAffine.from_samples(located, **kw)
+            want = StateAffine.from_samples(traj, at=AT, **kw)
+            assert tree_allclose(got.loc, want.loc, rtol=0.0)
+            assert tree_allclose(got.scale, want.scale, rtol=0.0)
+        one = jax.tree_util.tree_map(lambda x: x[0], located)
+        out = want.forward(one)
+        assert (out.u.loc, out.u.dims) == ("U", ("y", "x"))
+        np.testing.assert_array_equal(
+            out.u.data, want.forward(jax.tree_util.tree_map(lambda x: x[0], traj)).u
+        )
+        assert float(want.log_det(one)) == float(
+            want.log_det(jax.tree_util.tree_map(lambda x: x[0], traj))
+        )
+
+    def test_an_array_without_a_point_is_at_t(self, traj, mask):
+        t = StateAffine.from_samples(
+            NonlinearSW2DState(h=traj.h, u=traj.h, v=traj.h),
+            per_gridpoint=True,
+            mask=mask,
+        )
+        np.testing.assert_array_equal(t.scale.u, t.scale.h)
+
+    def test_at_names_array_fields(self, traj, mask):
+        with pytest.raises(ValueError, match="at names"):
+            StateAffine.from_samples(traj, mask=mask, at={"q": "X"})
+        located = NonlinearSW2DState(
+            h=traj.h, u=CField(traj.u, ("time", "y", "x"), loc="U"), v=traj.v
+        )
+        with pytest.raises(ValueError, match="at names"):
+            StateAffine.from_samples(located, mask=mask, at=AT)
 
     def test_dry_cells_get_the_identity_transform(self, traj, mask):
-        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask)
-        dry = ~np.asarray(mask.h)
+        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask, at=AT)
+        dry = ~np.asarray(mask.wet())
         assert dry.any()
         np.testing.assert_array_equal(np.asarray(t.loc.h)[dry], 0.0)
         np.testing.assert_array_equal(np.asarray(t.scale.h)[dry], 1.0)
 
     def test_land_sentinels_do_not_leak_into_wet_statistics(self, traj, mask):
-        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask)
+        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask, at=AT)
         assert np.isfinite(np.asarray(t.loc.h)).all()
         assert np.isfinite(np.asarray(t.scale.h)).all()
 
     def test_staggered_fields_use_their_own_mask(self, traj, mask):
-        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask)
-        np.testing.assert_array_equal(np.asarray(t.scale.u)[~np.asarray(mask.u)], 1.0)
+        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask, at=AT)
+        np.testing.assert_array_equal(
+            np.asarray(t.scale.u)[~np.asarray(mask.wet(at="U"))], 1.0
+        )
         # The u-mask differs from the h-mask, so the kwarg is doing work.
-        assert not np.array_equal(np.asarray(mask.u), np.asarray(mask.h))
+        assert not np.array_equal(np.asarray(mask.wet(at="U")), np.asarray(mask.wet()))
 
     def test_wet_cells_match_the_plain_moments(self, traj, mask):
-        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask)
-        wet = np.asarray(mask.h)
+        t = StateAffine.from_samples(traj, per_gridpoint=True, mask=mask, at=AT)
+        wet = np.asarray(mask.wet())
         # Average only the wet columns: the dry ones are all-NaN by
         # construction and have no plain mean to compare against.
         expected = np.asarray(traj.h)[:, wet].mean(axis=0)
@@ -659,16 +701,7 @@ class TestFieldNamesAreOnlyAHint:
         assert float(transform.scale.omega) == pytest.approx(self.scales().vorticity)
 
     def test_collocated_velocities_use_the_t_point_mask(self):
-        """Burgers keeps u and v at T-points, so mask.u would be wrong."""
-        from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
-
-        assert Burgers2DState.mask_locations == {"u": "h", "v": "h"}
-
-    def test_qg_potential_vorticity_uses_the_t_point_mask(self):
-        assert BarotropicQGState.mask_locations == {"q": "h"}
-
-    def test_the_declared_mask_is_the_one_actually_used(self):
-        """Not just declared: a dry T-cell must be excluded in practice."""
+        """Burgers keeps u and v at T-points: a dry T-cell is excluded."""
         from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
 
         wet = np.ones((6, 6), dtype=bool)
@@ -685,36 +718,11 @@ class TestFieldNamesAreOnlyAHint:
         assert float(jnp.max(transform.loc.u)) == pytest.approx(1.0, rel=1e-6)
 
     def test_metadata_does_not_become_a_state_field(self):
-        """The ClassVars are metadata, not leaves."""
+        """The ClassVar is metadata, not a leaf."""
         from sesmax_core._src.testing.pde2d.burgers import Burgers2DState
 
         transform = StateAffine.from_scales(Burgers2DState, self.scales())
-        assert not hasattr(transform.loc, "mask_locations_leaf")
         assert len(jax.tree_util.tree_leaves(transform.loc)) == 2
-
-
-class TestNonlinearOneDimensionalCoriolisPartner:
-    """``NonlinearSW1DState.v`` is a T-point field, like the linear one."""
-
-    def test_it_declares_the_t_point_mask(self):
-        from sesmax_core._src.testing.swm.nonlinear_1d import NonlinearSW1DState
-
-        assert NonlinearSW1DState.mask_locations == {"v": "h"}
-
-    def test_it_matches_the_linear_state(self):
-        from sesmax_core._src.testing.swm.linear_1d import LinearSW1DState
-        from sesmax_core._src.testing.swm.nonlinear_1d import NonlinearSW1DState
-
-        assert (
-            NonlinearSW1DState.mask_locations["v"]
-            == LinearSW1DState.mask_locations["v"]
-        )
-
-    def test_u_keeps_the_staggered_mask(self):
-        """Only ``v`` is collocated; ``u`` really is at U-points."""
-        from sesmax_core._src.testing.swm.nonlinear_1d import NonlinearSW1DState
-
-        assert "u" not in NonlinearSW1DState.mask_locations
 
 
 class TestTransportedScalarsKeepTheirAmplitude:
