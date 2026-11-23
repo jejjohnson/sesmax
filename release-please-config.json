@@ -67,7 +67,6 @@
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
-      "release-as": "0.1.0",
       "extra-files": [
         "src/sesmax_core/__init__.py",
         {
