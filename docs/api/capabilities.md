@@ -530,16 +530,10 @@ Finite-volume stencils on Arakawa C-grids: the grids, interpolation, differences
 
 | Name | Kind | What it does |
 |---|---|---|
-| `Advection1D` | class | Advection of a tracer on a 1-D Cartesian C-grid. |
-| `Advection2D` | class | Advection of a tracer on a 2-D Cartesian C-grid. |
-| `Advection3D` | class | Horizontal advection of a tracer on a 3-D Cartesian C-grid, level by level. |
 | `ArakawaCGrid1D` | class | 1-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid2D` | class | 2-D Arakawa C-grid topology (no metric). |
 | `ArakawaCGrid3D` | class | 3-D Arakawa C-grid topology (no metric). |
-| `ArakawaJacobian2D` | class | The Arakawa Jacobian on a 2-D Cartesian C-grid. |
 | `BC` | class | The boundary condition of each face of a grid. |
-| `BiharmonicDiffusion2D` | class | Biharmonic diffusion on a 2-D Cartesian C-grid. |
-| `BiharmonicDiffusion3D` | class | Horizontal biharmonic diffusion on a 3-D Cartesian C-grid, level by level. |
 | `CField` | class | An array with named dims, static labels and a stagger per axis. |
 | `CartesianAGrid1D` | class | 1-D Cartesian collocated grid. |
 | `CartesianAGrid2D` | class | 2-D Cartesian collocated grid. |
@@ -547,70 +541,42 @@ Finite-volume stencils on Arakawa C-grids: the grids, interpolation, differences
 | `CartesianCGrid1D` | class | 1-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianCGrid2D` | class | 2-D Cartesian Arakawa C-grid (uniform spacing). |
 | `CartesianCGrid3D` | class | 3-D Cartesian Arakawa C-grid (uniform spacing). |
+| `CoastGhosts` | class | The dry points one side of a coast, and where the water is from them. |
 | `CollocatedGrid1D` | class | 1-D collocated topology: ``Nx`` points, no ghost ring. |
 | `CollocatedGrid2D` | class | 2-D collocated topology: ``[Ny, Nx]`` points, no ghost ring. |
 | `CollocatedGrid3D` | class | 3-D collocated topology: ``[Nz, Ny, Nx]`` points, no ghost ring. |
-| `Coriolis2D` | class | The Coriolis tendencies on a 2-D Cartesian C-grid. |
-| `Coriolis3D` | class | The Coriolis tendencies on a 3-D Cartesian C-grid, level by level. |
 | `CurvilinearGrid1D` | class | 1-D curvilinear C-grid with a uniform metric. |
 | `CurvilinearGrid2D` | class | 2-D curvilinear C-grid with a uniform metric. |
 | `CurvilinearGrid3D` | class | 3-D curvilinear C-grid with a uniform metric. |
-| `Difference1D` | class | Finite-difference operators on a 1-D Arakawa C-grid. |
-| `Difference2D` | class | Finite-difference operators on a 2-D Arakawa C-grid. |
-| `Difference3D` | class | Finite-difference operators on a 3-D Arakawa C-grid. |
-| `Diffusion2D` | class | Harmonic diffusion on a 2-D Cartesian C-grid, in flux form. |
-| `Diffusion3D` | class | Horizontal harmonic diffusion on a 3-D Cartesian C-grid, level by level. |
 | `Dirichlet` | class | A value at the wall. |
-| `Divergence2D` | class | Divergence operator on a 2-D Arakawa C-grid. |
-| `Energetics2D` | class | Energy diagnostics at T-points on a 2-D Arakawa C-grid. |
 | `Extrapolation` | class | Extrapolate the polynomial through the first interior nodes. |
-| `Interpolation1D` | class | 1-D averaging operators on an Arakawa C-grid. |
-| `Interpolation2D` | class | 2-D averaging operators on an Arakawa C-grid. |
-| `Interpolation3D` | class | 3-D averaging operators on an Arakawa C-grid. |
+| `GridOps` | class | The canonical functions with a grid and a mask filled in. |
+| `LossyConversionWarning` | class | A conversion that averages, so the way back does not give the field again. |
 | `Mask1D` | class | Unified Arakawa C-grid mask for a 1-D Cartesian domain. |
 | `Mask2D` | class | Unified Arakawa C-grid mask for a 2-D Cartesian domain. |
 | `Mask3D` | class | Unified Arakawa C-grid mask for a 3-D Cartesian domain. |
-| `MomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D Arakawa C-grid. |
-| `MomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D Arakawa C-grid. |
 | `Neumann` | class | A gradient ``∂φ/∂n`` along the outward normal. |
 | `Outflow` | class | Zero gradient by copy: every layer holds the nearest interior node. |
 | `Periodic` | class | Wrap around: ``φ_{-k} = φ_{N+1-k}``, the node one period away. |
-| `QGPotentialVorticity2D` | class | Quasi-geostrophic potential vorticity at T-points. |
-| `Reconstruction1D` | class | 1-D face-value reconstruction. |
-| `Reconstruction2D` | class | 2-D face-value reconstruction for advective fluxes. |
-| `Reconstruction3D` | class | 3-D face-value reconstruction. |
 | `Reflective` | class | Even symmetry about the wall: ``φ_{-k} = φ_k``. |
 | `Robin` | class | A mixed condition at the wall, ``a φ + b ∂φ/∂n = c``. |
 | `Slip` | class | The tangential velocity at a solid wall, from no-slip to free-slip. |
 | `SphericalAGrid2D` | class | 2-D collocated grid on a sphere. |
-| `SphericalAdvection2D` | class | Advection of a tracer on a 2-D spherical C-grid. |
-| `SphericalAdvection3D` | class | Horizontal advection of a tracer on a 3-D spherical C-grid, level by level. |
-| `SphericalBiharmonicDiffusion2D` | class | Biharmonic diffusion on a 2-D spherical C-grid. |
-| `SphericalBiharmonicDiffusion3D` | class | Horizontal biharmonic diffusion on a 3-D spherical C-grid, level by level. |
 | `SphericalCGrid2D` | class | 2-D Arakawa C-grid on a sphere. |
 | `SphericalCGrid3D` | class | 3-D Arakawa C-grid on a sphere. |
-| `SphericalDifference2D` | class | Spherical finite-difference operators on a 2-D Arakawa C-grid. |
-| `SphericalDifference3D` | class | Spherical finite-difference operators on a 3-D Arakawa C-grid. |
-| `SphericalDiffusion2D` | class | Harmonic diffusion on a 2-D spherical C-grid, in flux form. |
-| `SphericalDiffusion3D` | class | Horizontal harmonic diffusion on a 3-D spherical C-grid, level by level. |
-| `SphericalDivergence2D` | class | Horizontal divergence on a 2-D spherical Arakawa C-grid. |
-| `SphericalDivergence3D` | class | 3-D spherical divergence (every level). |
-| `SphericalLaplacian2D` | class | Spherical Laplacian on a 2-D Arakawa C-grid. |
-| `SphericalLaplacian3D` | class | 3-D spherical Laplacian (every level). |
-| `SphericalMomentumAdvection2D` | class | Energy-conserving momentum advection on a 2-D spherical C-grid. |
-| `SphericalMomentumAdvection3D` | class | Energy-conserving momentum advection on a 3-D spherical C-grid. |
-| `SphericalVorticity2D` | class | Vorticity and PV-flux operators on a 2-D spherical Arakawa C-grid. |
-| `SphericalVorticity3D` | class | 3-D spherical vorticity (every level). |
 | `Sponge` | class | Relax the ghost layers towards a background value. |
 | `StaggerMismatchError` | class | Fields on different points of the grid met in one operation. |
 | `StencilCapability1D` | class | Directional count of contiguous wet neighbours for each 1-D grid cell. |
 | `StencilCapability2D` | class | Directional count of contiguous wet neighbours for each 2-D grid cell. |
 | `StencilCapability3D` | class | Directional count of contiguous wet neighbours for each 3-D grid cell. |
-| `Strain2D` | class | Strain diagnostics on a 2-D Arakawa C-grid. |
-| `Vorticity2D` | class | 2-D vorticity and PV-flux operators. |
-| `Vorticity3D` | class | 3-D vorticity operators (horizontal plane per z-level). |
+| `StretchedCGrid1D` | class | 1-D Cartesian C-grid with irregular axes. |
+| `StretchedCGrid2D` | class | 2-D Cartesian C-grid with irregular axes. |
+| `StretchedCGrid3D` | class | 3-D Cartesian C-grid with irregular axes. |
+| `Wall` | class | A solid wall: one condition for the normal component, one for the others. |
 | `advect` | function | The finite-volume tendency of a tracer, ``-∇·(q u)``, at T. |
+| `advect_momentum` | function | The advection of momentum in vector-invariant form, at U and V. |
 | `agrid_from` | function | The collocated grid of a georeferenced raster. |
+| `apply_mask` | function | A field with ``fill`` on the dry points of its point. |
 | `arakawa_jacobian` | function | The Arakawa (1966) Jacobian ``J(a, b) = ∂ₓa ∂ᵧb - ∂ᵧa ∂ₓb``, at T. |
 | `area_mean` | function | Area-weighted mean over the interior T cells. |
 | `area_sum` | function | Area-weighted sum over the interior T cells. |
@@ -636,8 +602,9 @@ Finite-volume stencils on Arakawa C-grids: the grids, interpolation, differences
 | `avg_y_fwd_3d` | function | Forward average in y, 3-D: T (or U) → V (or X) points. |
 | `avg_z_bwd_3d` | function | Backward average in z, 3-D: W → T points. |
 | `avg_z_fwd_3d` | function | Forward average in z, 3-D: T → W points. |
-| `bernoulli_potential` | function | Bernoulli potential at T-points on an Arakawa C-grid. |
+| `bernoulli_potential` | function | The Bernoulli potential ``K + g h``, at T. |
 | `biharmonic` | function | The biharmonic diffusion of a tracer, ``-κ₄ ∇²(∇²f)``, at T. |
+| `collocate` | function | A field of a C-grid, on its collocated grid (``grid.collocated()``). |
 | `combine` | function | Apply an element-wise function to fields on the same point. |
 | `coriolis` | function | The Coriolis tendencies ``(+f v, -f u)``, at U and V. |
 | `count_contiguous` | function | Count contiguous wet cells from each point along one axis (n-D). |
@@ -656,17 +623,17 @@ Finite-volume stencils on Arakawa C-grids: the grids, interpolation, differences
 | `diff_z_fwd_3d` | function | Forward difference in z, 3-D: T → W points. |
 | `difference` | function | The difference of a field along an axis, at ``dst``. |
 | `diffuse` | function | The harmonic diffusion of a tracer, ``∇·(κ∇f)``, at T. |
+| `diffusive_fluxes` | function | The fluxes whose divergence is :func:`diffuse`, ``κ δₓf`` and ``κ δᵧf``. |
 | `dilate_mask` | function | Binary dilation by 1 cell with an n-D *cross* structuring element. |
 | `divergence` | function | The horizontal divergence of a vector, at T. |
-| `enforce_periodic` | function | Fill the ghost-cell ring with periodic boundary conditions. |
+| `embed` | function | A field from its interior, with ``fill`` on the ghost ring. |
 | `enstrophy` | function | Enstrophy (pointwise). |
 | `fill_ghosts` | function | Fill the ghost ring of a field, or of every field of a state. |
-| `fix_boundary_corners` | function | Average corner ghost cells from their two face-adjacent ghost neighbours. |
-| `free_slip_boundaries` | function | Fill ghost ring with symmetric reflection (free-slip wall). |
+| `geostrophic_velocity` | function | The geostrophic velocity of a free surface on a sphere, at U and V. |
 | `grad_perp` | function | The rotated gradient of a streamfunction, ``(u, v) = (-∂ᵧψ, ∂ₓψ)``. |
 | `gradient` | function | The horizontal gradient of a scalar: ``(∂ₓf, ∂ᵧf)``. |
 | `h_from_pooled` | function | Inverse of :func:`pool_bool` for binary inputs. |
-| `interior` | function | Create an array shaped like ``like``, zero everywhere except the interior. |
+| `interior` | function | A field without its ghost ring. |
 | `interpolate` | function | The value at each point of ``dst``, from the points of ``src`` around it. |
 | `kinetic_energy` | function | The kinetic energy per unit mass, at T. |
 | `laplacian` | function | The horizontal Laplacian of a scalar, at its own points. |
@@ -676,46 +643,39 @@ Finite-volume stencils on Arakawa C-grids: the grids, interpolation, differences
 | `masked_std` | function | Standard deviation over ``axis``, excluding dry cells, floored at ``eps``. |
 | `mc` | function | Monotonized Central (MC) flux limiter. |
 | `minmod` | function | Minmod flux limiter. |
-| `no_flux_boundaries` | function | Fill ghost ring with zeros for normal-flux variables. |
-| `no_slip_boundaries` | function | Fill ghost ring with sign-flipped interior values (no-slip wall). |
 | `okubo_weiss` | function | Okubo-Weiss parameter (pointwise). |
-| `pad_interior` | function | Extract physical interior and re-pad to original size. |
+| `okubo_weiss_parameter` | function | The Okubo–Weiss parameter ``σₙ² + σₛ² - ζ²`` of a flow, at T. |
 | `pool_bool` | function | n-D average-pool of a binary mask with one-sided zero padding. |
 | `potential_enstrophy` | function | Potential enstrophy (pointwise). |
 | `potential_vorticity` | function | Potential vorticity (pointwise). |
-| `potential_vorticity_multilayer` | function | Multi-layer QG potential vorticity. |
-| `pv_flux_arakawa_lamb` | function | Deprecated alias of :func:`pv_flux_blend` (not Arakawa-Lamb 1981). |
-| `pv_flux_blend` | function | Blend of the energy- and enstrophy-conserving PV fluxes (grid-free). |
-| `qg_potential_vorticity` | function | QG potential vorticity at T-points (single layer). |
+| `pv_flux` | function | The flux of a vorticity by a velocity, ``(q u, q v)``, at U and V. |
+| `qg_potential_vorticity` | function | The quasi-geostrophic potential vorticity, at T. |
 | `reconstruct` | function | The advective flux ``q̂ u`` on the faces along ``axis``. |
 | `rusanov_flux` | function | Local Lax--Friedrichs (Rusanov) numerical flux at faces along ``axis``. |
+| `select` | function | One region of a field, by name, read-only. |
 | `shear_strain` | function | The shear strain ``δₓv + δᵧu``, at X. |
 | `smooth_abs` | function | Smooth approximation of ``\|x\|`` with a nonzero gradient at the origin. |
 | `smooth_clamp` | function | Smooth approximation of ``max(x, x_min)`` (a soft lower clamp). |
 | `smooth_max` | function | Smooth approximation of the elementwise ``max(x, y)``. |
 | `ssh_to_streamfn` | function | Convert sea surface height to streamfunction. |
+| `stagger` | function | A field of a collocated grid, on its C-grid (``grid.staggered()``). |
 | `strain_magnitude_squared` | function | Squared strain magnitude (pointwise). |
+| `strain_rate_squared` | function | The squared strain rate ``σₙ² + σₛ²``, at T. |
 | `streamfn_to_ssh` | function | Convert streamfunction to sea surface height. |
 | `stretching_term` | function | Cross-layer stretching term for multi-layer QG models. |
 | `superbee` | function | Superbee flux limiter. |
-| `sw_potential_vorticity` | function | Shallow-water potential vorticity at X-points on an Arakawa C-grid. |
-| `sw_potential_vorticity_multilayer` | function | Multi-layer shallow-water potential vorticity at X-points. |
+| `sw_potential_vorticity` | function | The shallow-water potential vorticity ``(ζ + f) / h``, at X. |
 | `t_point_coordinates` | function | Coordinates of every T point of a Cartesian grid, one row per point. |
 | `tensor_strain` | function | The normal (tensor) strain ``δₓu - δᵧv``, at T. |
 | `to_dimarray` | function | The data, dims and labels of a field as a ``pipekit_array.DimArray``. |
 | `to_right` | function | A field on left faces (MITgcm's U, on the west one) as one on right faces. |
 | `upwind_flux` | function | Compute upwind flux with automatic stencil fallback near boundaries. |
-| `uv_center_flux` | function | Compute raw face fluxes for a cell-centred scalar on a C-grid. |
-| `uv_node_flux` | function | Compute raw face fluxes for a node-centred tracer on a C-grid. |
 | `van_leer` | function | Van Leer flux limiter. |
-| `vertical_velocity` | function | Vertical velocity from the continuity equation. |
+| `vertical_velocity` | function | The vertical velocity of a non-divergent flow, at W. |
 | `volume_mean` | function | Volume-weighted mean over the interior T cells, ``(∑ V x) / (∑ V)``. |
 | `volume_sum` | function | Volume-weighted sum over the interior T cells. |
 | `volume_weights` | function | The T-cell volumes of a 3-D grid, area times ``dz`` (``xp`` as in :func:`area_weights`). |
 | `vorticity_flux_upwind` | function | Dissipative upwind vortex-force fluxes on a C-grid. |
-| `wall_boundaries` | function | Apply wall boundary conditions appropriate for a C-grid staggering. |
-| `zero_boundaries` | function | Fill ghost ring with zeros (homogeneous Dirichlet). |
-| `zero_gradient_boundaries` | function | Fill ghost ring by copying nearest interior value (zero gradient / Neumann). |
 
 ### `gridax.solvers`
 

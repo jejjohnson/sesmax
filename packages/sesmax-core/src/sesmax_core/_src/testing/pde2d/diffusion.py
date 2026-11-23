@@ -8,7 +8,7 @@ import jax.numpy as jnp
 from gridax import (
     CartesianCGrid2D,
     CField,
-    Difference2D,
+    GridOps,
     Mask2D,
     fill_ghosts,
 )
@@ -67,13 +67,13 @@ class Diffusion2D(Model):
     Args:
         params: Differentiable parameters (viscosity ``nu``).
         grid: 2D Arakawa C-grid.
-        diff: Difference operators.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
     """
 
     params: Diffusion2DParams
     grid: CartesianCGrid2D
-    diff: Difference2D
+    ops: GridOps
     mask: Mask2D | None
 
     def vector_field(
@@ -81,7 +81,7 @@ class Diffusion2D(Model):
     ) -> Diffusion2DState:
         r"""Compute tendency: du/dt = nu * laplacian(u)."""
         # du/dt = nu ∇²u
-        du_dt = each(lambda lap: self.params.nu * lap, self.diff.laplacian(state.u))
+        du_dt = each(lambda lap: self.params.nu * lap, self.ops.laplacian(state.u))
         return Diffusion2DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> Diffusion2DState:
@@ -164,5 +164,5 @@ class Diffusion2D(Model):
         """
         grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         params = Diffusion2DParams(nu=as_parameter(nu))
-        diff = Difference2D(grid=grid, mask=mask)
-        return Diffusion2D(params=params, grid=grid, diff=diff, mask=mask)
+        ops = GridOps(grid, mask)
+        return Diffusion2D(params=params, grid=grid, ops=ops, mask=mask)

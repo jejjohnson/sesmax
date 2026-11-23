@@ -11,8 +11,7 @@ import jax.numpy as jnp
 from gridax import (
     CartesianCGrid1D,
     CField,
-    Difference1D,
-    Interpolation1D,
+    GridOps,
     Mask1D,
 )
 from jaxtyping import Array, PyTree
@@ -70,16 +69,14 @@ class LinearConvection1D(Model):
     Args:
         params: Differentiable parameters (wave speed ``c``).
         grid: 1D Arakawa C-grid.
-        diff: Difference operators.
-        interp: Interpolation operators.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
     """
 
     params: LinearConvection1DParams
     grid: CartesianCGrid1D
-    diff: Difference1D
-    interp: Interpolation1D
+    ops: GridOps
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
 
@@ -89,9 +86,13 @@ class LinearConvection1D(Model):
         """Compute tendency: du/dt = -c * du/dx."""
         # Flux form: -d(c * u)/dx at T-points
         # 1. Interpolate u to U-points, multiply by c
-        flux = each(lambda u: self.params.c * u, self.interp.T_to_U(state.u))
+        flux = each(
+            lambda u: self.params.c * u, self.ops.interpolate(state.u, src="T", dst="U")
+        )
         # 2. Backward difference of flux: U -> T
-        du_dt = each(operator.neg, self.diff.diff_x_U_to_T(flux))
+        du_dt = each(
+            operator.neg, self.ops.difference(flux, axis="x", src="U", dst="T")
+        )
         return LinearConvection1DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> LinearConvection1DState:
@@ -176,13 +177,11 @@ class LinearConvection1D(Model):
         """
         grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = LinearConvection1DParams(c=as_parameter(c))
-        diff = Difference1D(grid=grid, mask=mask)
-        interp = Interpolation1D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return LinearConvection1D(
             params=params,
             grid=grid,
-            diff=diff,
-            interp=interp,
+            ops=ops,
             mask=mask,
             periodic=periodic,
         )

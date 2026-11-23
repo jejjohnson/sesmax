@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from gridax import (
-    Advection1D,
     CField,
-    Interpolation1D,
+    GridOps,
 )
 from gridax.schemes import Scheme
 from jaxtyping import Array, Float
@@ -16,8 +15,7 @@ from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 
 def burgers_tendency(
     u: Float[Array, " Nx"] | CField,
-    advection: Advection1D,
-    interp: Interpolation1D,
+    ops: GridOps,
     *,
     periodic: bool,
     scheme: Scheme,
@@ -37,18 +35,17 @@ def burgers_tendency(
 
     Args:
         u: Velocity at T-points, with its ghost cells filled.
-        advection: gridax advection operator.
-        interp: gridax interpolation operator.
+        ops: gridax's operations on the grid and the mask.
         periodic: Whether the domain is periodic.
         scheme: The scheme of the face values.
 
     Returns:
         The tendency at T-points.
     """
-    face_velocity = interp.T_to_U(u)
+    face_velocity = ops.interpolate(u, src="T", dst="U")
     wall = "closed"
-    if periodic and advection.mask is None:
-        face_velocity = fill_ends(face_velocity, advection.grid, periodic=True, at="U")
+    if periodic and ops.mask is None:
+        face_velocity = fill_ends(face_velocity, ops.grid, periodic=True, at="U")
         wall = "open"
-    flux_form = advection(u, face_velocity, scheme=scheme, wall=wall)
+    flux_form = ops.advect(u, face_velocity, None, scheme=scheme, wall=wall)
     return each(lambda x: 0.5 * x, flux_form)

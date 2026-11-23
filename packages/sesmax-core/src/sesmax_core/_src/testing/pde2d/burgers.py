@@ -7,11 +7,9 @@ from typing import Any
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    Advection2D as FVXAdvection2D,
     CartesianCGrid2D,
     CField,
-    Difference2D,
-    Interpolation2D,
+    GridOps,
     Mask2D,
     fill_ghosts,
 )
@@ -73,18 +71,14 @@ class Burgers2D(Model):
     Args:
         params: Differentiable parameters (viscosity ``nu``).
         grid: 2D Arakawa C-grid.
-        diff: Difference operators.
-        advection: Advection operator.
-        interp: Interpolation operators.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
         scheme: Scheme of the advective face values (default ``Upwind(1)``).
     """
 
     params: Burgers2DParams
     grid: CartesianCGrid2D
-    diff: Difference2D
-    advection: FVXAdvection2D
-    interp: Interpolation2D
+    ops: GridOps
     mask: Mask2D | None
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
@@ -96,9 +90,7 @@ class Burgers2D(Model):
         adv_u, adv_v = advective_tendency(
             state.u,
             state.v,
-            self.advection,
-            self.interp,
-            self.diff,
+            self.ops,
             scheme=self.scheme,
         )
 
@@ -107,8 +99,8 @@ class Burgers2D(Model):
             return advection + self.params.nu * lap
 
         return Burgers2DState(
-            u=each(total, adv_u, self.diff.laplacian(state.u)),
-            v=each(total, adv_v, self.diff.laplacian(state.v)),
+            u=each(total, adv_u, self.ops.laplacian(state.u)),
+            v=each(total, adv_v, self.ops.laplacian(state.v)),
         )
 
     def apply_boundary_conditions(self, state: PyTree) -> Burgers2DState:
@@ -204,15 +196,11 @@ class Burgers2D(Model):
         """
         grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         params = Burgers2DParams(nu=as_parameter(nu))
-        diff = Difference2D(grid=grid, mask=mask)
-        advection = FVXAdvection2D(grid=grid, mask=mask)
-        interp = Interpolation2D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return Burgers2D(
             params=params,
             grid=grid,
-            diff=diff,
-            advection=advection,
-            interp=interp,
+            ops=ops,
             mask=mask,
             scheme=scheme,
         )

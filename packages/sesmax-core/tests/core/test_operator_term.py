@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import Coriolis2D, Difference2D
+from gridax import GridOps
 from pipekit_jax import JaxOperator
 from pipekit_ops import Graph, Input, Lambda
 
@@ -34,26 +34,26 @@ from sesmax_core.operators import OperatorTerm
 class GravityWaveOp(JaxOperator):
     """(h, u, v) ↦ {h: -H₀ ∇·(u, v), u: -g δₓh, v: -g δᵧh}; g, H₀ learnable."""
 
-    diff: Difference2D
+    ops: GridOps
     g: jax.Array = eqx.field(converter=jnp.asarray)
     H0: jax.Array = eqx.field(converter=jnp.asarray)
 
     def _apply(self, h, u, v):
         return {
-            "h": -self.H0 * self.diff.divergence(u, v),
-            "u": -self.g * self.diff.diff_x_T_to_U(h),
-            "v": -self.g * self.diff.diff_y_T_to_V(h),
+            "h": -self.H0 * self.ops.divergence(u, v),
+            "u": -self.g * self.ops.difference(h, axis="x", src="T", dst="U"),
+            "v": -self.g * self.ops.difference(h, axis="y", src="T", dst="V"),
         }
 
 
 class CoriolisOp(JaxOperator):
     """(u, v) ↦ (+f v̄, -f ū)."""
 
-    coriolis: Coriolis2D
+    ops: GridOps
     f: jax.Array
 
     def _apply(self, u, v):
-        return self.coriolis(u, v, self.f)
+        return self.ops.coriolis(u, v, f=self.f)
 
 
 class Drag(JaxOperator):
@@ -75,24 +75,24 @@ class Neg(JaxOperator):
 
 
 class Div(JaxOperator):
-    diff: Difference2D
+    ops: GridOps
 
     def _apply(self, u, v):
-        return self.diff.divergence(u, v)
+        return self.ops.divergence(u, v)
 
 
 class GradX(JaxOperator):
-    diff: Difference2D
+    ops: GridOps
 
     def _apply(self, h):
-        return self.diff.diff_x_T_to_U(h)
+        return self.ops.difference(h, axis="x", src="T", dst="U")
 
 
 class GradY(JaxOperator):
-    diff: Difference2D
+    ops: GridOps
 
     def _apply(self, h):
-        return self.diff.diff_y_T_to_V(h)
+        return self.ops.difference(h, axis="y", src="T", dst="V")
 
 
 @pytest.fixture
@@ -145,7 +145,7 @@ def _assert_state_equal(a, b):
 def test_dict_valued_operator_matches_the_gravity_wave_kernel():
     model = _model()
     gravity, _ = _summands(model)
-    op = GravityWaveOp(diff=gravity.diff, g=gravity.g, H0=gravity.H0)
+    op = GravityWaveOp(ops=gravity.ops, g=gravity.g, H0=gravity.H0)
     term = OperatorTerm(op=op, inputs=("h", "u", "v"))
     s = _state(model)
     _assert_state_equal(term(0.0, s), gravity(0.0, s))
@@ -154,7 +154,7 @@ def test_dict_valued_operator_matches_the_gravity_wave_kernel():
 def test_tuple_valued_operator_matches_the_coriolis_kernel():
     model = _model()
     _, coriolis = _summands(model)
-    op = CoriolisOp(coriolis=coriolis.coriolis, f=coriolis.f_field)
+    op = CoriolisOp(ops=coriolis.ops, f=coriolis.f_field)
     term = OperatorTerm(op=op, inputs=("u", "v"), outputs=("u", "v"))
     s = _state(model)
     _assert_state_equal(term(0.0, s), coriolis(0.0, s))
@@ -167,9 +167,9 @@ def test_a_pipekit_graph_is_called_by_input_name():
     graph = Graph(
         inputs={"h": h, "u": u, "v": v},
         outputs={
-            "h": Neg(c=gravity.H0)(Div(diff=gravity.diff)(u, v)),
-            "u": Neg(c=gravity.g)(GradX(diff=gravity.diff)(h)),
-            "v": Neg(c=gravity.g)(GradY(diff=gravity.diff)(h)),
+            "h": Neg(c=gravity.H0)(Div(ops=gravity.ops)(u, v)),
+            "u": Neg(c=gravity.g)(GradX(ops=gravity.ops)(h)),
+            "v": Neg(c=gravity.g)(GradY(ops=gravity.ops)(h)),
         },
     )
     term = OperatorTerm(op=graph, inputs=("h", "u", "v"))
@@ -182,11 +182,11 @@ def test_swapping_physics_for_operator_terms_keeps_the_model_tendency():
     gravity, coriolis = _summands(model)
     rhs = (
         OperatorTerm(
-            op=GravityWaveOp(diff=gravity.diff, g=gravity.g, H0=gravity.H0),
+            op=GravityWaveOp(ops=gravity.ops, g=gravity.g, H0=gravity.H0),
             inputs=("h", "u", "v"),
         )
         + OperatorTerm(
-            op=CoriolisOp(coriolis=coriolis.coriolis, f=coriolis.f_field),
+            op=CoriolisOp(ops=coriolis.ops, f=coriolis.f_field),
             inputs=("u", "v"),
             outputs=("u", "v"),
         )
@@ -245,7 +245,7 @@ def test_gradient_reaches_a_leaf_inside_the_operator(x64):
         return jnp.sum(term(0.0, s).u ** 2)
 
     def term_with(g):
-        op = GravityWaveOp(diff=gravity.diff, g=g, H0=gravity.H0)
+        op = GravityWaveOp(ops=gravity.ops, g=g, H0=gravity.H0)
         return OperatorTerm(op=op, inputs=("h", "u", "v"))
 
     grad = eqx.filter_grad(loss)(term_with(9.81)).op.g
@@ -320,7 +320,7 @@ def test_a_gridax_tier_b_graph_matches_gravity_plus_coriolis():
     G = model.grid
     g, H0 = float(gravity.g), float(gravity.H0)
     h, u, v = Input("h"), Input("u"), Input("v")
-    cor = CoriolisOp(coriolis=coriolis.coriolis, f=coriolis.f_field)(u, v)
+    cor = CoriolisOp(ops=coriolis.ops, f=coriolis.f_field)(u, v)
     gx = fp.Difference(grid=G, axis="x", src="T", dst="U")(h)
     gy = fp.Difference(grid=G, axis="y", src="T", dst="V")(h)
     graph = Graph(

@@ -9,8 +9,7 @@ import jax.numpy as jnp
 from gridax import (
     CartesianCGrid2D,
     CField,
-    Difference2D,
-    Interpolation2D,
+    GridOps,
     Mask2D,
     fill_ghosts,
 )
@@ -71,15 +70,13 @@ class LinearConvection2D(Model):
     Args:
         params: Differentiable parameters (wave speeds ``cx``, ``cy``).
         grid: 2D Arakawa C-grid.
-        diff: Difference operators.
-        interp: Interpolation operators.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
     """
 
     params: LinearConvection2DParams
     grid: CartesianCGrid2D
-    diff: Difference2D
-    interp: Interpolation2D
+    ops: GridOps
     mask: Mask2D | None
 
     def vector_field(
@@ -87,13 +84,19 @@ class LinearConvection2D(Model):
     ) -> LinearConvection2DState:
         """Compute tendency: du/dt = -cx * du/dx - cy * du/dy."""
         # Flux in x: c_x * u at U-points, then divergence back to T
-        flux_x = each(lambda u: self.params.cx * u, self.interp.T_to_U(state.u))
+        flux_x = each(
+            lambda u: self.params.cx * u,
+            self.ops.interpolate(state.u, src="T", dst="U"),
+        )
         # Flux in y: c_y * u at V-points, then divergence back to T
-        flux_y = each(lambda u: self.params.cy * u, self.interp.T_to_V(state.u))
+        flux_y = each(
+            lambda u: self.params.cy * u,
+            self.ops.interpolate(state.u, src="T", dst="V"),
+        )
         du_dt = each(
             lambda fx, fy: -(fx + fy),
-            self.diff.diff_x_U_to_T(flux_x),
-            self.diff.diff_y_V_to_T(flux_y),
+            self.ops.difference(flux_x, axis="x", src="U", dst="T"),
+            self.ops.difference(flux_y, axis="y", src="V", dst="T"),
         )
         return LinearConvection2DState(u=du_dt)
 
@@ -193,11 +196,8 @@ class LinearConvection2D(Model):
         """
         grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         params = LinearConvection2DParams(cx=as_parameter(cx), cy=as_parameter(cy))
-        diff = Difference2D(grid=grid, mask=mask)
-        interp = Interpolation2D(grid=grid, mask=mask)
-        return LinearConvection2D(
-            params=params, grid=grid, diff=diff, interp=interp, mask=mask
-        )
+        ops = GridOps(grid, mask)
+        return LinearConvection2D(params=params, grid=grid, ops=ops, mask=mask)
 
 
 def _unit_direction(

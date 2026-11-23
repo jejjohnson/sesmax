@@ -28,11 +28,11 @@ import jax.numpy as jnp
 from gridax import (
     CartesianCGrid2D,
     CartesianCGrid3D,
-    Interpolation2D,
     Mask2D,
     Mask3D,
-    interior,
+    interpolate,
 )
+from gridax.stencils import interior
 from jaxtyping import Array, Float
 
 from sesmax_core._src.forcing_ops._base import AbstractForcing
@@ -80,7 +80,6 @@ class LinearDrag2D(AbstractForcing):
 
     grid: CartesianCGrid2D
     mask: Mask2D | None
-    interp: Interpolation2D
 
     def __init__(
         self,
@@ -89,7 +88,6 @@ class LinearDrag2D(AbstractForcing):
     ) -> None:
         self.grid = grid
         self.mask = mask
-        self.interp = Interpolation2D(grid=grid)
 
     def __call__(
         self,
@@ -122,9 +120,9 @@ class LinearDrag2D(AbstractForcing):
             v = mask_where(v, self.mask.wet(at="V"))
 
         # r_on_u[j, i+1/2] = 1/2 * (r[j, i] + r[j, i+1])
-        r_on_u = on_face_interior(r, self.interp.T_to_U)
+        r_on_u = on_face_interior(r, self.grid, "U")
         # r_on_v[j+1/2, i] = 1/2 * (r[j, i] + r[j+1, i])
-        r_on_v = on_face_interior(r, self.interp.T_to_V)
+        r_on_v = on_face_interior(r, self.grid, "V")
 
         # du_drag[j, i+1/2] = -r_on_u * u
         du_drag = interior(linear_drag_tendency(u[1:-1, 1:-1], r_on_u), u)
@@ -178,7 +176,6 @@ class QuadraticDrag2D(AbstractForcing):
 
     grid: CartesianCGrid2D
     mask: Mask2D | None
-    interp: Interpolation2D
 
     def __init__(
         self,
@@ -187,7 +184,6 @@ class QuadraticDrag2D(AbstractForcing):
     ) -> None:
         self.grid = grid
         self.mask = mask
-        self.interp = Interpolation2D(grid=grid)
 
     def __call__(
         self,
@@ -241,9 +237,9 @@ class QuadraticDrag2D(AbstractForcing):
         v = mask_where(v, mv)
 
         # v_on_u[j, i+1/2] = 1/4*(v[j+1/2,i] + v[j-1/2,i] + v[j+1/2,i+1] + v[j-1/2,i+1])
-        v_on_u = self.interp.V_to_U(v)[1:-1, 1:-1]
+        v_on_u = interpolate(v, self.grid, src="V", dst="U")[1:-1, 1:-1]
         # u_on_v[j+1/2, i] = 1/4*(u[j,i+1/2] + u[j+1,i+1/2] + u[j,i-1/2] + u[j+1,i-1/2])
-        u_on_v = self.interp.U_to_V(u)[1:-1, 1:-1]
+        u_on_v = interpolate(u, self.grid, src="U", dst="V")[1:-1, 1:-1]
         u_in = u[1:-1, 1:-1]
         v_in = v[1:-1, 1:-1]
 
@@ -252,11 +248,11 @@ class QuadraticDrag2D(AbstractForcing):
         # |u|_on_v[j+1/2, i] = sqrt(v^2 + u_on_v^2)
         speed_v = safe_speed(v_in, u_on_v)
 
-        cd_on_u = on_face_interior(cd, self.interp.T_to_U)
-        cd_on_v = on_face_interior(cd, self.interp.T_to_V)
+        cd_on_u = on_face_interior(cd, self.grid, "U")
+        cd_on_v = on_face_interior(cd, self.grid, "V")
         # Swap in 1 at dry faces so a zero dry-cell thickness cannot give 0/0.
-        h_on_u = safe_denominator(on_face_interior(h_bot, self.interp.T_to_U), mu)
-        h_on_v = safe_denominator(on_face_interior(h_bot, self.interp.T_to_V), mv)
+        h_on_u = safe_denominator(on_face_interior(h_bot, self.grid, "U"), mu)
+        h_on_v = safe_denominator(on_face_interior(h_bot, self.grid, "V"), mv)
 
         # du_drag[j, i+1/2] = -Cd * |u|_on_u * u / h_bot_on_u
         du_drag = interior(quadratic_drag_tendency(u_in, speed_u, cd_on_u, h_on_u), u)

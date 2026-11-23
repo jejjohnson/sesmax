@@ -26,13 +26,13 @@ from geophysix.seawater import LINEAR_EOS
 from gridax import (
     CartesianCGrid2D,
     CartesianCGrid3D,
-    Interpolation2D,
     Mask2D,
     Mask3D,
     diff_x_fwd_2d,
     diff_y_fwd_2d,
-    interior,
+    interpolate,
 )
+from gridax.stencils import interior
 from jaxtyping import Array, Float
 
 from sesmax_core._src.forcing_ops._base import AbstractForcing
@@ -90,7 +90,6 @@ class WindStress2D(AbstractForcing):
     grid: CartesianCGrid2D
     mask: Mask2D | None
     rho0: float
-    interp: Interpolation2D
 
     def __init__(
         self,
@@ -101,7 +100,6 @@ class WindStress2D(AbstractForcing):
         self.grid = grid
         self.mask = mask
         self.rho0 = rho0
-        self.interp = Interpolation2D(grid=grid)
 
     def __call__(
         self,
@@ -145,12 +143,12 @@ class WindStress2D(AbstractForcing):
         """
         # tau_x_on_u[j, i+1/2] = 1/2 * (tau_x[j, i] + tau_x[j, i+1])
         # (zeroed at dry faces so NaN land stress cannot give NaN gradients)
-        tau_x_on_u = mask_where(self.interp.T_to_U(tau_x), mu)
+        tau_x_on_u = mask_where(interpolate(tau_x, self.grid, src="T", dst="U"), mu)
         # tau_y_on_v[j+1/2, i] = 1/2 * (tau_y[j, i] + tau_y[j+1, i])
-        tau_y_on_v = mask_where(self.interp.T_to_V(tau_y), mv)
+        tau_y_on_v = mask_where(interpolate(tau_y, self.grid, src="T", dst="V"), mv)
         # Swap in 1 at dry faces so a zero dry-cell thickness cannot give 0/0.
-        dz_on_u = safe_denominator(on_face_interior(dz_top, self.interp.T_to_U), mu)
-        dz_on_v = safe_denominator(on_face_interior(dz_top, self.interp.T_to_V), mv)
+        dz_on_u = safe_denominator(on_face_interior(dz_top, self.grid, "U"), mu)
+        dz_on_v = safe_denominator(on_face_interior(dz_top, self.grid, "V"), mv)
 
         # du_wind[j, i+1/2] = tau_x_on_u / (rho0 * dz_top_on_u)
         du_wind = interior(
@@ -175,7 +173,7 @@ class WindCurl2D(AbstractForcing):
                           / (rho0 * H)
 
     i.e. the curl of the stress interpolated to the faces (the C-grid curl of
-    :class:`Difference2D` / :class:`Vorticity2D`), divided by ``rho0 * H``.
+    :func:`~gridax.curl`), divided by ``rho0 * H``.
     ``tau_x``, ``tau_y`` are given at T-points **with the ghost ring filled**
     (e.g. an analytic stress evaluated at the ghost-cell centres): the face
     averages are formed on the full arrays, so the X-points next to the

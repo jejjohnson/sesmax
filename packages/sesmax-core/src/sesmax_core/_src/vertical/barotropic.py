@@ -35,8 +35,8 @@ from gridax import (
     diff_x_fwd_2d,
     diff_y_bwd_2d,
     diff_y_fwd_2d,
-    interior,
 )
+from gridax.stencils import interior
 from jaxtyping import Array, Float
 
 

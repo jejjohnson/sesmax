@@ -9,8 +9,7 @@ import jax.numpy as jnp
 from gridax import (
     CartesianCGrid1D,
     CField,
-    Difference1D,
-    Interpolation1D,
+    GridOps,
     Mask1D,
     laplacian,
 )
@@ -93,16 +92,14 @@ class LinearShallowWater1D(Model):
         params: Differentiable parameters (viscosity, drag).
         consts: Frozen physical constants (g, f₀, H₀).
         grid: 1D Arakawa C-grid.
-        diff: Difference operators.
-        interp: Interpolation operators.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
     """
 
     params: LinearSW1DParams
     consts: LinearSW1DPhysConsts = eqx.field(static=True)
     grid: CartesianCGrid1D
-    diff: Difference1D
-    interp: Interpolation1D
+    ops: GridOps
     mask: Mask1D | None
 
     def vector_field(
@@ -117,16 +114,18 @@ class LinearShallowWater1D(Model):
         kappa = self.params.bottom_drag
 
         # Mass equation: dh/dt = -H0 * du/dx
-        dh_dt = each(lambda du: -H0 * du, self.diff.diff_x_U_to_T(u))
+        dh_dt = each(
+            lambda du: -H0 * du, self.ops.difference(u, axis="x", src="U", dst="T")
+        )
 
         # Momentum equations
         # Pressure gradient: -g * dh/dx
-        dh_dx = self.diff.diff_x_T_to_U(h)
+        dh_dx = self.ops.difference(h, axis="x", src="T", dst="U")
 
         # Coriolis: du/dt += f0*v, dv/dt -= f0*u
         # v lives on T-points, interpolate to U-points for du/dt
-        v_on_U = self.interp.T_to_U(v)
-        u_on_T = self.interp.U_to_T(u)
+        v_on_U = self.ops.interpolate(v, src="T", dst="U")
+        u_on_T = self.ops.interpolate(u, src="U", dst="T")
 
         # Pressure gradient and Coriolis, then diffusion and bottom drag
         du_dt = each(
@@ -201,13 +200,11 @@ class LinearShallowWater1D(Model):
             bottom_drag=as_parameter(bottom_drag),
         )
         consts = LinearSW1DPhysConsts(gravity=g, f0=f0, H0=H0)
-        diff = Difference1D(grid=grid, mask=mask)
-        interp = Interpolation1D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return LinearShallowWater1D(
             params=params,
             consts=consts,
             grid=grid,
-            diff=diff,
-            interp=interp,
+            ops=ops,
             mask=mask,
         )

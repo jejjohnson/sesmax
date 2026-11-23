@@ -17,7 +17,8 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import CartesianCGrid2D, CartesianCGrid3D, Mask2D, Mask3D, interior
+from gridax import CartesianCGrid2D, CartesianCGrid3D, Mask2D, Mask3D
+from gridax.stencils import interior
 from jaxtyping import Array, Float
 
 from sesmax_core._src.forcing_ops._base import AbstractForcing

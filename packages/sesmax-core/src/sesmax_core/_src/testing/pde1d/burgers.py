@@ -7,11 +7,9 @@ from typing import Any
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    Advection1D,
     CartesianCGrid1D,
     CField,
-    Difference1D,
-    Interpolation1D,
+    GridOps,
     Mask1D,
 )
 from gridax.schemes import Scheme, Upwind
@@ -70,9 +68,7 @@ class Burgers1D(Model):
     Args:
         params: Differentiable parameters (viscosity ``nu``).
         grid: 1D Arakawa C-grid.
-        diff: Difference operators (for diffusion).
-        advection: Advection operator (for nonlinear convection).
-        interp: Interpolation operator (for the face velocity).
+        ops: gridax's operations on the grid and the mask.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
         scheme: Scheme of the advective face values (default ``Upwind(1)``).
@@ -80,9 +76,7 @@ class Burgers1D(Model):
 
     params: Burgers1DParams
     grid: CartesianCGrid1D
-    diff: Difference1D
-    advection: Advection1D
-    interp: Interpolation1D
+    ops: GridOps
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
@@ -93,8 +87,7 @@ class Burgers1D(Model):
         r"""Compute tendency: du/dt = -u * du/dx + nu * d²u/dx²."""
         advection_term = burgers_tendency(
             state.u,
-            self.advection,
-            self.interp,
+            self.ops,
             periodic=self.periodic,
             scheme=self.scheme,
         )
@@ -102,7 +95,7 @@ class Burgers1D(Model):
         du_dt = each(
             lambda advection, lap: advection + self.params.nu * lap,
             advection_term,
-            self.diff.laplacian(state.u),
+            self.ops.laplacian(state.u),
         )
         return Burgers1DState(u=du_dt)
 
@@ -182,15 +175,11 @@ class Burgers1D(Model):
         """
         grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = Burgers1DParams(nu=as_parameter(nu))
-        diff = Difference1D(grid=grid, mask=mask)
-        advection = Advection1D(grid=grid, mask=mask)
-        interp = Interpolation1D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return Burgers1D(
             params=params,
             grid=grid,
-            diff=diff,
-            advection=advection,
-            interp=interp,
+            ops=ops,
             mask=mask,
             periodic=periodic,
             scheme=scheme,

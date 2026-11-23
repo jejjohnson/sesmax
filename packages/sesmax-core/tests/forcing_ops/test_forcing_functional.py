@@ -5,7 +5,7 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 import numpy as np
-from gridax import interior
+from gridax.stencils import interior
 
 from sesmax_core.forcing import (
     linear_drag_tendency,

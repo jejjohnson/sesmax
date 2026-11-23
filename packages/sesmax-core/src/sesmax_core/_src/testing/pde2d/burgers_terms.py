@@ -4,7 +4,7 @@ This is the worked example for the term-kernel decomposition (the
 pipekit-refactor "Level 3" idea). The canonical :class:`Burgers2D`
 hand-writes its right-hand side as one ``vector_field`` method::
 
-    du/dt = -advection(u, v) + nu * laplacian(u)        (and likewise v)
+    du/dt = -ops.advect(u, v) + nu * laplacian(u)        (and likewise v)
 
 Here the same physics is split into two reusable kernels —
 :class:`Burgers2DAdvection` and :class:`Burgers2DDiffusion` — that
@@ -35,10 +35,8 @@ from __future__ import annotations
 
 import equinox as eqx
 from gridax import (
-    Advection2D as FVXAdvection2D,
     CartesianCGrid2D,
-    Difference2D,
-    Interpolation2D,
+    GridOps,
     Mask2D,
     fill_ghosts,
 )
@@ -65,15 +63,11 @@ class Burgers2DAdvection(Term):
     (the default) — advection is non-stiff.
 
     Args:
-        advection: gridax C-grid advection operator.
-        interp: gridax interpolation operator (T→U, T→V).
-        diff: gridax difference operator (for the divergence).
+        ops: gridax's operations on the grid and the mask.
         scheme: Scheme passed to the advection operator.
     """
 
-    advection: FVXAdvection2D
-    interp: Interpolation2D
-    diff: Difference2D
+    ops: GridOps
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
     def __call__(
@@ -82,9 +76,7 @@ class Burgers2DAdvection(Term):
         adv_u, adv_v = advective_tendency(
             state.u,
             state.v,
-            self.advection,
-            self.interp,
-            self.diff,
+            self.ops,
             scheme=self.scheme,
         )
         return Burgers2DState(u=adv_u, v=adv_v)
@@ -100,22 +92,22 @@ class Burgers2DDiffusion(Term):
     is reusable across models.
 
     Args:
-        diff: gridax C-grid difference operator (provides
+        ops: gridax's operations on the grid and the mask.
             ``laplacian``).
         kind: IMEX integration label. Defaults to ``"explicit"``;
             :meth:`Burgers2DTermModel.create` tags it implicit when
             ``imex=True``.
     """
 
-    diff: Difference2D
+    ops: GridOps
     _kind: Kind = eqx.field(static=True, default="explicit")
 
     def __call__(
         self, t: float, state: Burgers2DState, args: PyTree | None = None
     ) -> Burgers2DState:
         return Burgers2DState(
-            u=self.diff.laplacian(state.u),
-            v=self.diff.laplacian(state.v),
+            u=self.ops.laplacian(state.u),
+            v=self.ops.laplacian(state.v),
         )
 
     @property
@@ -206,14 +198,13 @@ class Burgers2DTermModel(TermModel):
         grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         nu_arr = as_parameter(nu)
 
+        ops = GridOps(grid, mask)
         advection = Burgers2DAdvection(
-            advection=FVXAdvection2D(grid=grid, mask=mask),
-            interp=Interpolation2D(grid=grid, mask=mask),
-            diff=Difference2D(grid=grid, mask=mask),
+            ops=ops,
             scheme=scheme,
         )
         diffusion = Burgers2DDiffusion(
-            diff=Difference2D(grid=grid, mask=mask),
+            ops=ops,
             _kind=IMPLICIT if imex else "explicit",
         )
 
@@ -243,13 +234,11 @@ class Burgers2DTermModel(TermModel):
         # unwraps it at evaluation time.
         nu_arr = model.params.nu
         advection = Burgers2DAdvection(
-            advection=model.advection,
-            interp=model.interp,
-            diff=model.diff,
+            ops=model.ops,
             scheme=model.scheme,
         )
         diffusion = Burgers2DDiffusion(
-            diff=model.diff,
+            ops=model.ops,
             _kind=IMPLICIT if imex else "explicit",
         )
         scaled_diffusion = Scaled(diffusion, nu_arr)

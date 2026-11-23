@@ -7,11 +7,9 @@ from typing import Any
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    Advection2D as FVXAdvection2D,
     CartesianCGrid2D,
     CField,
-    Difference2D,
-    Interpolation2D,
+    GridOps,
     Mask2D,
     fill_ghosts,
 )
@@ -64,17 +62,13 @@ class NonlinearConvection2D(Model):
 
     Args:
         grid: 2D Arakawa C-grid.
-        advection: Advection operator.
-        interp: Interpolation operators.
-        diff: Difference operators (for the divergence).
+        ops: gridax's operations on the grid and the mask.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
         scheme: Scheme of the advective face values (default ``Upwind(1)``).
     """
 
     grid: CartesianCGrid2D
-    advection: FVXAdvection2D
-    interp: Interpolation2D
-    diff: Difference2D
+    ops: GridOps
     mask: Mask2D | None
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
@@ -85,9 +79,7 @@ class NonlinearConvection2D(Model):
         du_dt, dv_dt = advective_tendency(
             state.u,
             state.v,
-            self.advection,
-            self.interp,
-            self.diff,
+            self.ops,
             scheme=self.scheme,
         )
         return NonlinearConvection2DState(u=du_dt, v=dv_dt)
@@ -174,14 +166,10 @@ class NonlinearConvection2D(Model):
             A ``NonlinearConvection2D`` model instance.
         """
         grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
-        advection = FVXAdvection2D(grid=grid, mask=mask)
-        interp = Interpolation2D(grid=grid, mask=mask)
-        diff = Difference2D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return NonlinearConvection2D(
             grid=grid,
-            advection=advection,
-            interp=interp,
-            diff=diff,
+            ops=ops,
             mask=mask,
             scheme=scheme,
         )

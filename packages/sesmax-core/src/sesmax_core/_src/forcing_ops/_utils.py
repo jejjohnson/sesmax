@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import jax.numpy as jnp
+from gridax import CartesianCGrid2D, interpolate
 from jaxtyping import Array, Float
 
 
@@ -31,7 +30,8 @@ def interior_or_scalar(
 
 def on_face_interior(
     x: float | Float[Array, "Ny Nx"],
-    t_to_face: Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]],
+    grid: CartesianCGrid2D,
+    face: str,
 ) -> Float[Array, " ..."]:
     """Interior face values of a T-point coefficient; scalars pass through.
 
@@ -39,18 +39,21 @@ def on_face_interior(
     ----------
     x : float or Float[Array, "Ny Nx"]
         Scalar coefficient or a T-point field (ghost ring filled).
-    t_to_face : Callable
-        T -> face interpolation, e.g. ``Interpolation2D.T_to_U``.
+    grid : CartesianCGrid2D
+        The grid of the field.
+    face : {"U", "V"}
+        The faces.
 
     Returns
     -------
     Float[Array, " ..."]
-        The scalar unchanged, or ``t_to_face(x)[1:-1, 1:-1]``.
+        The scalar unchanged, or the mean of the two cells of a face,
+        ``[1:-1, 1:-1]``.
     """
     x = jnp.asarray(x)
     if x.ndim == 0:
         return x
-    return t_to_face(x)[1:-1, 1:-1]
+    return interpolate(x, grid, src="T", dst=face)[1:-1, 1:-1]
 
 
 def safe_speed(
