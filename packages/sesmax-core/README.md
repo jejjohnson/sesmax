@@ -129,7 +129,7 @@ base = LinearSWM2DTermModel.create(nx=16, ny=16, Lx=1e6, Ly=1e6, bottom_drag=1e-
 
 # the cell centres along each side, in metres
 # → (Nx,)
-axis = (jnp.arange(18) - 0.5) * base.grid.dx
+axis = (jnp.arange(18) - 0.5) * base.grid.spacing("x")
 # → (Ny, Nx) each
 y_cell, x_cell = jnp.meshgrid(axis, axis, indexing="ij")
 # s_j, the source centres in metres
