@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from gridax import (
+    BC,
     CField,
     GridOps,
 )
@@ -10,7 +11,6 @@ from gridax.schemes import Scheme
 from jaxtyping import Array, Float
 
 from sesmax_core._src.fields import each
-from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 
 
 def burgers_tendency(
@@ -28,10 +28,8 @@ def burgers_tendency(
     faces, so the flux ``u^2 / 2`` is half of ``h = u`` carried by ``v = u``
     interpolated to the faces.
 
-    A periodic domain needs ``wall="open"``, because a closed wall writes no
-    tendency on the outermost cells, and the interpolated face velocity needs
-    its ghosts filled, because the interpolation writes only the interior. A
-    masked domain keeps closed walls, which gridax requires.
+    A periodic domain is said so with ``bc=``: a closed wall would write no
+    tendency on the outermost cells. A masked domain keeps closed walls.
 
     Args:
         u: Velocity at T-points, with its ghost cells filled.
@@ -43,9 +41,6 @@ def burgers_tendency(
         The tendency at T-points.
     """
     face_velocity = ops.interpolate(u, src="T", dst="U")
-    wall = "closed"
-    if periodic and ops.mask is None:
-        face_velocity = fill_ends(face_velocity, ops.grid, periodic=True, at="U")
-        wall = "open"
-    flux_form = ops.advect(u, face_velocity, None, scheme=scheme, wall=wall)
+    bc = BC.periodic("x") if periodic and ops.mask is None else None
+    flux_form = ops.advect(u, face_velocity, None, scheme=scheme, bc=bc)
     return each(lambda x: 0.5 * x, flux_form)

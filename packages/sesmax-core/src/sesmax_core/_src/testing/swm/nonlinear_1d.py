@@ -5,6 +5,7 @@ from __future__ import annotations
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
+    BC,
     CartesianCGrid1D,
     CField,
     GridOps,
@@ -112,19 +113,17 @@ class NonlinearShallowWater1D(Model):
         kappa = self.params.bottom_drag
 
         # The domain is periodic: a closed wall would write no tendency on the
-        # outermost cells. finitevolX requires closed walls with a mask.
-        wall = "closed" if self.mask is not None else "open"
+        # outermost cells. A masked one keeps closed walls.
+        bc = BC.periodic("x") if self.mask is None else None
 
         # Mass equation: dh/dt = -d(hu)/dx (via advection operator)
-        dh_dt = self.ops.advect(h, u, None, scheme=self.scheme, wall=wall)
+        dh_dt = self.ops.advect(h, u, None, scheme=self.scheme, bc=bc)
 
         # Momentum advection: -u * du/dx, implemented in conservative
         # flux form as -d(u^2 / 2)/dx using the existing advection operator.
         # The momentum cells are the U points, so u is the cell value too.
         u_cells = placed(values(u), u, "T")
-        flux_form = values(
-            self.ops.advect(u_cells, u, None, scheme=self.scheme, wall=wall)
-        )
+        flux_form = values(self.ops.advect(u_cells, u, None, scheme=self.scheme, bc=bc))
         du_adv = placed(flux_form, u, "U")
 
         # Pressure gradient: -g * dh/dx

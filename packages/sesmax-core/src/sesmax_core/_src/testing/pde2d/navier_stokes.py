@@ -336,12 +336,18 @@ class IncompressibleNS2D(Model):
         u_T = self._wrap(self.ops.interpolate(self._wrap(u_V), src="V", dst="T"))
         v_T = self._wrap(self.ops.interpolate(self._wrap(v_U), src="U", dst="T"))
         # Interpolate to face points for transport
-        u_on_U = self._wrap(self.ops.interpolate(u_T, src="T", dst="U"))
-        v_on_V = self._wrap(self.ops.interpolate(v_T, src="T", dst="V"))
-        # 3. Advection of vorticity; the periodic box and the channel
-        # read the periodic ghost columns, so their edge faces are open.
-        wall = "closed" if self.problem == "cavity" else "open"
-        adv = self.ops.advect(omega, u_on_U, v_on_V, scheme=self.scheme, wall=wall)
+        u_on_U = self.ops.interpolate(u_T, src="T", dst="U")
+        v_on_V = self.ops.interpolate(v_T, src="T", dst="V")
+        # 3. Advection of vorticity. The channel's walls are nodes, which no
+        # condition of gridax describes, so its edge faces are open and read
+        # the ghost ring.
+        edges: dict[str, Any] = {}
+        if self.problem == "periodic":
+            edges = {"bc": BC.periodic()}
+        elif self.problem == "channel":
+            u_on_U, v_on_V = self._wrap(u_on_U), self._wrap(v_on_V)
+            edges = {"wall": "open"}
+        adv = self.ops.advect(omega, u_on_U, v_on_V, scheme=self.scheme, **edges)
         # 4. Diffusion
         diff = self.params.nu * self.ops.laplacian(omega)
         # 5. Body force
