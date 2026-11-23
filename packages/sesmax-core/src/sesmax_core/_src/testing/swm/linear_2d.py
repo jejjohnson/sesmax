@@ -11,10 +11,8 @@ from gridax import (
     BC,
     CartesianCGrid2D,
     CField,
-    Coriolis2D,
-    Difference2D,
     Dirichlet,
-    Interpolation2D,
+    GridOps,
     Mask2D,
     Neumann,
     Periodic,
@@ -115,9 +113,7 @@ class LinearShallowWater2D(Model):
         params: Differentiable parameters (viscosity, drag).
         consts: Frozen physical constants (g, f₀, β, H₀).
         grid: 2D Arakawa C-grid.
-        diff: Difference operators.
-        interp: Interpolation operators.
-        coriolis: Coriolis operator.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
         f_field: Precomputed Coriolis parameter field f(y).
         bc_type: Boundary condition type (``"periodic"`` or ``"wall"``).
@@ -126,9 +122,7 @@ class LinearShallowWater2D(Model):
     params: LinearSW2DParams
     consts: LinearSW2DPhysConsts = eqx.field(static=True)
     grid: CartesianCGrid2D
-    diff: Difference2D
-    interp: Interpolation2D
-    coriolis: Coriolis2D
+    ops: GridOps
     mask: Mask2D | None
     f_field: Float[Array, "Ny Nx"]
     bc_type: str = eqx.field(static=True, default="periodic")
@@ -144,11 +138,11 @@ class LinearShallowWater2D(Model):
         kappa = self.params.bottom_drag
 
         # Mass equation: dh/dt = -H0 * div(u, v)
-        dh_dt = each(lambda div: -H0 * div, self.diff.divergence(u, v))
+        dh_dt = each(lambda div: -H0 * div, self.ops.divergence(u, v))
 
         # Coriolis: du += f*v, dv -= f*u
         f = placed(self.f_field, u, "T")
-        du_cor, dv_cor = self.coriolis(u, v, f)
+        du_cor, dv_cor = self.ops.coriolis(u, v, f=f)
 
         # Pressure gradient and Coriolis, then diffusion and bottom drag
         def momentum(dh: Array, cor: Array, lap: Array, velocity: Array) -> Array:
@@ -156,14 +150,14 @@ class LinearShallowWater2D(Model):
 
         du_dt = each(
             momentum,
-            self.diff.diff_x_T_to_U(h),
+            self.ops.difference(h, axis="x", src="T", dst="U"),
             du_cor,
             laplacian(u, self.grid, at="U", mask=self.mask),
             u,
         )
         dv_dt = each(
             momentum,
-            self.diff.diff_y_T_to_V(h),
+            self.ops.difference(h, axis="y", src="T", dst="V"),
             dv_cor,
             laplacian(v, self.grid, at="V", mask=self.mask),
             v,
@@ -231,9 +225,7 @@ class LinearShallowWater2D(Model):
             bottom_drag=as_parameter(bottom_drag),
         )
         consts = LinearSW2DPhysConsts(gravity=g, f0=f0, beta=beta, H0=H0)
-        diff = Difference2D(grid=grid, mask=mask)
-        interp = Interpolation2D(grid=grid, mask=mask)
-        coriolis = Coriolis2D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
 
         # Build f(y) = f0 + beta * (y - y0) on full grid
         y = jnp.arange(grid.Ny) * grid.spacing("y")
@@ -245,9 +237,7 @@ class LinearShallowWater2D(Model):
             params=params,
             consts=consts,
             grid=grid,
-            diff=diff,
-            interp=interp,
-            coriolis=coriolis,
+            ops=ops,
             mask=mask,
             f_field=f_field,
             bc_type=bc,

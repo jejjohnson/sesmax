@@ -39,8 +39,7 @@ import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
     CartesianCGrid2D,
-    Coriolis2D,
-    Difference2D,
+    GridOps,
     fill_ghosts,
     laplacian,
 )
@@ -78,12 +77,12 @@ class LinearSWMGravityWave(Term):
     not retrace a jitted step.
 
     Args:
-        diff: gridax C-grid difference operator.
+        ops: gridax's operations on the grid and the mask.
         g: Gravitational acceleration (differentiable leaf).
         H0: Mean layer depth (differentiable leaf).
     """
 
-    diff: Difference2D
+    ops: GridOps
     g: Array = eqx.field(converter=jnp.asarray)
     H0: Array = eqx.field(converter=jnp.asarray)
 
@@ -91,9 +90,15 @@ class LinearSWMGravityWave(Term):
         self, t: float, state: LinearSW2DState, args: PyTree | None = None
     ) -> LinearSW2DState:
         return LinearSW2DState(
-            h=each(lambda div: -self.H0 * div, self.diff.divergence(state.u, state.v)),
-            u=each(lambda dh: -self.g * dh, self.diff.diff_x_T_to_U(state.h)),
-            v=each(lambda dh: -self.g * dh, self.diff.diff_y_T_to_V(state.h)),
+            h=each(lambda div: -self.H0 * div, self.ops.divergence(state.u, state.v)),
+            u=each(
+                lambda dh: -self.g * dh,
+                self.ops.difference(state.h, axis="x", src="T", dst="U"),
+            ),
+            v=each(
+                lambda dh: -self.g * dh,
+                self.ops.difference(state.h, axis="y", src="T", dst="V"),
+            ),
         )
 
 
@@ -101,18 +106,18 @@ class LinearSWMCoriolis(Term):
     r"""Coriolis kernel: ``du/dt += f*v``, ``dv/dt -= f*u`` (no height term).
 
     Args:
-        coriolis: gridax C-grid Coriolis operator.
+        ops: gridax's operations on the grid and the mask.
         f_field: Precomputed Coriolis parameter field ``f(y)``.
     """
 
-    coriolis: Coriolis2D
+    ops: GridOps
     f_field: Array
 
     def __call__(
         self, t: float, state: LinearSW2DState, args: PyTree | None = None
     ) -> LinearSW2DState:
         f = placed(self.f_field, state.u, "T")
-        du_cor, dv_cor = self.coriolis(state.u, state.v, f)
+        du_cor, dv_cor = self.ops.coriolis(state.u, state.v, f=f)
         return LinearSW2DState(h=each(jnp.zeros_like, state.h), u=du_cor, v=dv_cor)
 
 
@@ -124,11 +129,11 @@ class LinearSWMDiffusion(Term):
     leaf). Stiff — tag implicit for IMEX integration.
 
     Args:
-        diff: gridax C-grid difference operator.
+        ops: gridax's operations on the grid and the mask.
         kind: IMEX integration label (``"explicit"`` by default).
     """
 
-    diff: Difference2D
+    ops: GridOps
     _kind: Kind = eqx.field(static=True, default="explicit")
 
     def __call__(
@@ -136,8 +141,8 @@ class LinearSWMDiffusion(Term):
     ) -> LinearSW2DState:
         return LinearSW2DState(
             h=each(jnp.zeros_like, state.h),
-            u=laplacian(state.u, self.diff.grid, at="U", mask=self.diff.mask),
-            v=laplacian(state.v, self.diff.grid, at="V", mask=self.diff.mask),
+            u=laplacian(state.u, self.ops.grid, at="U", mask=self.ops.mask),
+            v=laplacian(state.v, self.ops.grid, at="V", mask=self.ops.mask),
         )
 
     @property
@@ -160,8 +165,7 @@ class LinearSWMDrag(Term):
 
 def _assemble(
     *,
-    diff: Difference2D,
-    coriolis: Coriolis2D,
+    ops: GridOps,
     f_field: Array,
     g: float,
     H0: float,
@@ -170,9 +174,9 @@ def _assemble(
     imex: bool,
 ) -> Term:
     """Build the ``gravity + coriolis + nu*diffusion - kappa*drag`` tree."""
-    gravity = LinearSWMGravityWave(diff=diff, g=g, H0=H0)
-    coriolis_term = LinearSWMCoriolis(coriolis=coriolis, f_field=f_field)
-    diffusion = LinearSWMDiffusion(diff=diff, _kind=IMPLICIT if imex else "explicit")
+    gravity = LinearSWMGravityWave(ops=ops, g=g, H0=H0)
+    coriolis_term = LinearSWMCoriolis(ops=ops, f_field=f_field)
+    diffusion = LinearSWMDiffusion(ops=ops, _kind=IMPLICIT if imex else "explicit")
     scaled_diffusion: Term = Scaled(diffusion, nu)
     if imex:
         scaled_diffusion = implicit(scaled_diffusion)
@@ -248,8 +252,7 @@ class LinearSWM2DTermModel(TermModel):
             A ``LinearSWM2DTermModel`` mirroring ``model``.
         """
         rhs = _assemble(
-            diff=model.diff,
-            coriolis=model.coriolis,
+            ops=model.ops,
             f_field=model.f_field,
             g=model.consts.gravity,
             H0=model.consts.H0,

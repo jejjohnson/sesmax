@@ -7,13 +7,12 @@ from typing import Any, ClassVar
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    Advection2D as FVXAdvection2D,
+    BC,
     CartesianCGrid2D,
     CField,
-    Difference2D,
-    Interpolation2D,
+    GridOps,
     Mask2D,
-    enforce_periodic,
+    fill_ghosts,
 )
 from gridax.schemes import Scheme, Upwind
 from jaxtyping import Array, Float, PyTree
@@ -212,9 +211,7 @@ class IncompressibleNS2D(Model):
     Args:
         params: Differentiable parameters (viscosity ``nu``).
         grid: 2D Arakawa C-grid.
-        diff: Difference operators.
-        interp: Interpolation operators.
-        advection: Advection operator.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
         problem: ``"cavity"``, ``"periodic"`` or ``"channel"``.
         poisson_bc: Spectral solver BC type for Poisson inversion
@@ -229,9 +226,7 @@ class IncompressibleNS2D(Model):
 
     params: NSParams
     grid: CartesianCGrid2D
-    diff: Difference2D
-    interp: Interpolation2D
-    advection: FVXAdvection2D
+    ops: GridOps
     mask: Mask2D | None
     problem: str = eqx.field(static=True, default="cavity")
     poisson_bc: str = eqx.field(static=True, default="dst")
@@ -253,7 +248,7 @@ class IncompressibleNS2D(Model):
             psi = streamfunction_from_vorticity(
                 -omega, self.grid.spacing("x"), self.grid.spacing("y"), bc="fft"
             )
-            return enforce_periodic(psi)
+            return fill_ghosts(psi, self.grid, BC.periodic())
         if self.problem == "channel":
             return self._solve_channel_psi(omega, flux)
         return streamfunction_from_vorticity(
@@ -297,7 +292,7 @@ class IncompressibleNS2D(Model):
         serves all three.
         """
         if self.problem == "periodic":
-            return enforce_periodic(field)
+            return fill_ghosts(field, self.grid, BC.periodic())
         if self.problem == "channel":
             field = field.at[:, 0].set(field[:, -2])
             return field.at[:, -1].set(field[:, 1])
@@ -320,8 +315,12 @@ class IncompressibleNS2D(Model):
         self, psi: Float[Array, "Ny Nx"]
     ) -> tuple[Float[Array, "Ny Nx"], Float[Array, "Ny Nx"]]:
         """Compute velocity from streamfunction."""
-        u = self.diff.diff_y_T_to_V(psi)  # u = dpsi/dy at V-points
-        v = -self.diff.diff_x_T_to_U(psi)  # v = -dpsi/dx at U-points
+        u = self.ops.difference(
+            psi, axis="y", src="T", dst="V"
+        )  # u = dpsi/dy at V-points
+        v = -self.ops.difference(
+            psi, axis="x", src="T", dst="U"
+        )  # v = -dpsi/dx at U-points
         return u, v
 
     def vector_field(
@@ -334,17 +333,17 @@ class IncompressibleNS2D(Model):
         # 2. Velocity from streamfunction
         u_V, v_U = self._velocity_from_psi(psi)
         # Interpolate to T-points for scalar advection
-        u_T = self._wrap(self.interp.V_to_T(self._wrap(u_V)))
-        v_T = self._wrap(self.interp.U_to_T(self._wrap(v_U)))
+        u_T = self._wrap(self.ops.interpolate(self._wrap(u_V), src="V", dst="T"))
+        v_T = self._wrap(self.ops.interpolate(self._wrap(v_U), src="U", dst="T"))
         # Interpolate to face points for transport
-        u_on_U = self._wrap(self.interp.T_to_U(u_T))
-        v_on_V = self._wrap(self.interp.T_to_V(v_T))
+        u_on_U = self._wrap(self.ops.interpolate(u_T, src="T", dst="U"))
+        v_on_V = self._wrap(self.ops.interpolate(v_T, src="T", dst="V"))
         # 3. Advection of vorticity; the periodic box and the channel
         # read the periodic ghost columns, so their edge faces are open.
         wall = "closed" if self.problem == "cavity" else "open"
-        adv = self.advection(omega, u_on_U, v_on_V, scheme=self.scheme, wall=wall)
+        adv = self.ops.advect(omega, u_on_U, v_on_V, scheme=self.scheme, wall=wall)
         # 4. Diffusion
-        diff = self.params.nu * self.diff.laplacian(omega)
+        diff = self.params.nu * self.ops.laplacian(omega)
         # 5. Body force
         domega_dt = adv + diff + self.body_force
         return NSVorticityState(
@@ -361,7 +360,7 @@ class IncompressibleNS2D(Model):
         """
         omega = values(state.omega)
         if self.problem == "periodic":
-            omega = enforce_periodic(omega)
+            omega = fill_ghosts(omega, self.grid, BC.periodic())
         elif self.problem == "channel":
             # Periodic columns first, so the solve sees a periodic source.
             omega = omega.at[:, 0].set(omega[:, -2])
@@ -397,8 +396,8 @@ class IncompressibleNS2D(Model):
         """Compute velocity, streamfunction, KE, and enstrophy."""
         psi = self._solve_psi(values(state.omega), state.flux)
         u_V, v_U = self._velocity_from_psi(psi)
-        u_T = self._wrap(self.interp.V_to_T(self._wrap(u_V)))
-        v_T = self._wrap(self.interp.U_to_T(self._wrap(v_U)))
+        u_T = self._wrap(self.ops.interpolate(self._wrap(u_V), src="V", dst="T"))
+        v_T = self._wrap(self.ops.interpolate(self._wrap(v_U), src="U", dst="T"))
         interior_u = u_T[1:-1, 1:-1]
         interior_v = v_T[1:-1, 1:-1]
         interior_w = values(state.omega)[1:-1, 1:-1]
@@ -512,16 +511,12 @@ class IncompressibleNS2D(Model):
             raise ValueError(f"problem={problem!r} does not take a mask")
         grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         params = NSParams(nu=as_parameter(nu))
-        diff = Difference2D(grid=grid, mask=mask)
-        interp = Interpolation2D(grid=grid, mask=mask)
-        advection = FVXAdvection2D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         poisson_bc = _POISSON_BC[problem]
         return IncompressibleNS2D(
             params=params,
             grid=grid,
-            diff=diff,
-            interp=interp,
-            advection=advection,
+            ops=ops,
             mask=mask,
             problem=problem,
             poisson_bc=poisson_bc,

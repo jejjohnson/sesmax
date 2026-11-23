@@ -8,7 +8,7 @@ field **already at the correct stagger** and is responsible for any
 ghost-ring padding and land/ocean masking afterwards.  The output has the
 shape of the inputs: to get a full ``[Ny, Nx]`` field with a zero ghost
 ring, slice every array input to the interior ``[1:-1, 1:-1]`` first and
-pad the result back with :func:`~gridax.interior` (as in the example
+pad the result back with :func:`~gridax.stencils.interior` (as in the example
 below); full-grid inputs give a full-grid output, which ``interior`` does
 not accept.
 
@@ -28,7 +28,7 @@ All functions are compatible with ``jax.jit``, ``jax.vmap``, and
 Example
 -------
 >>> import jax.numpy as jnp
->>> from gridax import interior
+>>> from gridax.stencils import interior
 >>> from sesmax_core.forcing import wind_stress_tendency
 >>> u = jnp.zeros((6, 6))
 >>> tau_x_on_u = 0.1 * jnp.ones((6, 6))  # already interpolated to U-points

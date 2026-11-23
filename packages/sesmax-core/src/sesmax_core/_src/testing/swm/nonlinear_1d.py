@@ -5,11 +5,9 @@ from __future__ import annotations
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    Advection1D,
     CartesianCGrid1D,
     CField,
-    Difference1D,
-    Interpolation1D,
+    GridOps,
     Mask1D,
     laplacian,
 )
@@ -91,9 +89,7 @@ class NonlinearShallowWater1D(Model):
         params: Differentiable parameters (viscosity, drag).
         consts: Frozen physical constants (g, f₀, H₀).
         grid: 1D Arakawa C-grid.
-        diff: Difference operators.
-        interp: Interpolation operators.
-        advection: Advection operator.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         scheme: Scheme of the advective face values.
     """
@@ -101,9 +97,7 @@ class NonlinearShallowWater1D(Model):
     params: NonlinearSW1DParams
     consts: NonlinearSW1DPhysConsts = eqx.field(static=True)
     grid: CartesianCGrid1D
-    diff: Difference1D
-    interp: Interpolation1D
-    advection: Advection1D
+    ops: GridOps
     mask: Mask1D | None
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
@@ -122,21 +116,23 @@ class NonlinearShallowWater1D(Model):
         wall = "closed" if self.mask is not None else "open"
 
         # Mass equation: dh/dt = -d(hu)/dx (via advection operator)
-        dh_dt = self.advection(h, u, scheme=self.scheme, wall=wall)
+        dh_dt = self.ops.advect(h, u, None, scheme=self.scheme, wall=wall)
 
         # Momentum advection: -u * du/dx, implemented in conservative
         # flux form as -d(u^2 / 2)/dx using the existing advection operator.
         # The momentum cells are the U points, so u is the cell value too.
         u_cells = placed(values(u), u, "T")
-        flux_form = values(self.advection(u_cells, u, scheme=self.scheme, wall=wall))
+        flux_form = values(
+            self.ops.advect(u_cells, u, None, scheme=self.scheme, wall=wall)
+        )
         du_adv = placed(flux_form, u, "U")
 
         # Pressure gradient: -g * dh/dx
-        dh_dx = self.diff.diff_x_T_to_U(h)
+        dh_dx = self.ops.difference(h, axis="x", src="T", dst="U")
 
         # Coriolis
-        v_on_U = self.interp.T_to_U(v)
-        u_on_T = self.interp.U_to_T(u)
+        v_on_U = self.ops.interpolate(v, src="T", dst="U")
+        u_on_T = self.ops.interpolate(u, src="U", dst="T")
 
         # Advection, pressure gradient and Coriolis, then diffusion and drag
         du_dt = each(
@@ -217,16 +213,12 @@ class NonlinearShallowWater1D(Model):
             bottom_drag=as_parameter(bottom_drag),
         )
         consts = NonlinearSW1DPhysConsts(gravity=g, f0=f0, H0=H0)
-        diff = Difference1D(grid=grid, mask=mask)
-        interp = Interpolation1D(grid=grid, mask=mask)
-        advection = Advection1D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return NonlinearShallowWater1D(
             params=params,
             consts=consts,
             grid=grid,
-            diff=diff,
-            interp=interp,
-            advection=advection,
+            ops=ops,
             mask=mask,
             scheme=scheme,
         )

@@ -9,7 +9,7 @@ import jax.numpy as jnp
 from gridax import (
     CartesianCGrid1D,
     CField,
-    Difference1D,
+    GridOps,
     Mask1D,
 )
 from jaxtyping import Array, PyTree
@@ -67,14 +67,14 @@ class Diffusion1D(Model):
     Args:
         params: Differentiable parameters (viscosity ``nu``).
         grid: 1D Arakawa C-grid.
-        diff: Difference operators.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
     """
 
     params: Diffusion1DParams
     grid: CartesianCGrid1D
-    diff: Difference1D
+    ops: GridOps
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
 
@@ -83,7 +83,7 @@ class Diffusion1D(Model):
     ) -> Diffusion1DState:
         r"""Compute tendency: du/dt = nu * d²u/dx²."""
         # du/dt = nu ∇²u
-        du_dt = each(lambda lap: self.params.nu * lap, self.diff.laplacian(state.u))
+        du_dt = each(lambda lap: self.params.nu * lap, self.ops.laplacian(state.u))
         return Diffusion1DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> Diffusion1DState:
@@ -151,11 +151,11 @@ class Diffusion1D(Model):
         """
         grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = Diffusion1DParams(nu=as_parameter(nu))
-        diff = Difference1D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return Diffusion1D(
             params=params,
             grid=grid,
-            diff=diff,
+            ops=ops,
             mask=mask,
             periodic=periodic,
         )

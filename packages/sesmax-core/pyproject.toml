@@ -39,9 +39,9 @@ dependencies = [
     # The grids, masks and C-grid operators every grid-based model is written
     # on, with gridax.solvers (the ``jax`` extra: masked operators, multigrid,
     # capacitance) and gridax.pipekit (the ``pipekit`` extra: the diagnostic
-    # graphs). Pinned to gridax main at 494d73d (gridax#536, the canonical
-    # functions on located fields), which no release holds yet.
-    "gridax[jax,pipekit] @ git+https://github.com/jejjohnson/gridax.git@494d73d7b11b2607942d43b24dfb05f9a29f9437#subdirectory=packages/gridax",
+    # graphs). Pinned to gridax main at 42fe52d (gridax#549: the functions and
+    # ``GridOps`` in place of the operator classes), which no release holds yet.
+    "gridax[jax,pipekit] @ git+https://github.com/jejjohnson/gridax.git@42fe52d9633f4bd08ec076cf014c4ee64fa5ca71#subdirectory=packages/gridax",
     # Every pipekit package at the one tag pipekit-ops-v0.2.1: per-package
     # tags make uv report conflicting URLs for pipekit-ops.
     "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-ops",
@@ -101,4 +101,4 @@ packages = ["src/sesmax_core"]
 # reference above (which pip users still get).
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.2" }
 geophysix = { git = "https://github.com/jejjohnson/geophysix.git", tag = "v0.0.3" }
-gridax = { git = "https://github.com/jejjohnson/gridax.git", rev = "494d73d7b11b2607942d43b24dfb05f9a29f9437", subdirectory = "packages/gridax" }
+gridax = { git = "https://github.com/jejjohnson/gridax.git", rev = "42fe52d9633f4bd08ec076cf014c4ee64fa5ca71", subdirectory = "packages/gridax" }

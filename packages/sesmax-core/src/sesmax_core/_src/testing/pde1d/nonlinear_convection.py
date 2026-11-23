@@ -7,10 +7,9 @@ from typing import Any
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    Advection1D,
     CartesianCGrid1D,
     CField,
-    Interpolation1D,
+    GridOps,
     Mask1D,
 )
 from gridax.schemes import Scheme, Upwind
@@ -55,16 +54,14 @@ class NonlinearConvection1D(Model):
 
     Args:
         grid: 1D Arakawa C-grid.
-        advection: Advection operator.
-        interp: Interpolation operator.
+        ops: gridax's operations on the grid and the mask.
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
         scheme: Scheme of the advective face values (default ``Upwind(1)``).
     """
 
     grid: CartesianCGrid1D
-    advection: Advection1D
-    interp: Interpolation1D
+    ops: GridOps
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
@@ -75,8 +72,7 @@ class NonlinearConvection1D(Model):
         """Compute tendency: du/dt = -d(u^2 / 2)/dx via upwind flux."""
         du_dt = burgers_tendency(
             state.u,
-            self.advection,
-            self.interp,
+            self.ops,
             periodic=self.periodic,
             scheme=self.scheme,
         )
@@ -148,12 +144,10 @@ class NonlinearConvection1D(Model):
             A ``NonlinearConvection1D`` model instance.
         """
         grid = CartesianCGrid1D.from_interior(nx, Lx)
-        advection = Advection1D(grid=grid, mask=mask)
-        interp = Interpolation1D(grid=grid, mask=mask)
+        ops = GridOps(grid, mask)
         return NonlinearConvection1D(
             grid=grid,
-            advection=advection,
-            interp=interp,
+            ops=ops,
             mask=mask,
             periodic=periodic,
             scheme=scheme,

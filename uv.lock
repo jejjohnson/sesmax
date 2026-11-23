@@ -823,7 +823,7 @@ wheels = [
 [[package]]
 name = "gridax"
 version = "0.2.0"
-source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&rev=494d73d7b11b2607942d43b24dfb05f9a29f9437#494d73d7b11b2607942d43b24dfb05f9a29f9437" }
+source = { git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&rev=42fe52d9633f4bd08ec076cf014c4ee64fa5ca71#42fe52d9633f4bd08ec076cf014c4ee64fa5ca71" }
 dependencies = [
     { name = "geophysix" },
     { name = "jaxtyping" },
@@ -2845,7 +2845,7 @@ requires-dist = [
     { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.13" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
     { name = "geophysix", git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.3" },
-    { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&rev=494d73d7b11b2607942d43b24dfb05f9a29f9437" },
+    { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax.git?subdirectory=packages%2Fgridax&rev=42fe52d9633f4bd08ec076cf014c4ee64fa5ca71" },
     { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.10" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxlib", specifier = ">=0.11.1" },
