@@ -7,6 +7,8 @@ import abc
 import diffrax as dfx
 import equinox as eqx
 import jax.numpy as jnp
+from functax.interp import LocalScheme, Policies, SeriesScheme
+from integrix.march import SampledPath
 from jaxtyping import Array
 
 
@@ -62,13 +64,33 @@ class SeasonalWindForcing(ForcingProtocol):
 
 
 class InterpolatedForcing(ForcingProtocol):
-    """Data-driven forcing via diffrax path interpolation.
+    """Forcing from samples (t_k, u_k), read between them as a diffrax path.
 
-    Wraps a ``diffrax.AbstractPath`` (e.g. ``LinearInterpolation``,
-    ``CubicInterpolation``) to provide forcing from tabulated data.
+    The path is a ``diffrax.LinearInterpolation``, a
+    ``diffrax.CubicInterpolation``, or an integrix ``SampledPath`` over any
+    functax 1-D scheme, such as a C² spline or a PCHIP that stays between
+    neighbouring samples.
+
+    The reconstruction has a kink at each t_k, and a step that straddles one
+    loses order. Pass ``step_ts`` to the step control, or take fixed steps
+    that divide the sample spacing.
 
     Args:
-        path: A diffrax interpolation path built from data.
+        path: A diffrax path built from data.
+
+    Examples:
+        River discharge through PCHIP, which cannot go negative:
+
+        >>> import jax.numpy as jnp
+        >>> from functax.interp import Pchip
+        >>> from sesmax_core.forcing import InterpolatedForcing
+        >>> ts = jnp.array([0.0, 1.0, 2.0, 3.0])
+        >>> discharge = jnp.array([0.0, 0.0, 4.0, 0.0])
+        >>> river = InterpolatedForcing.from_data(ts, discharge, method=Pchip())
+        >>> bool(river(0.5, None) >= 0.0)
+        True
+        >>> river.step_ts.tolist()
+        [0.0, 1.0, 2.0, 3.0]
     """
 
     path: dfx.AbstractPath
@@ -77,23 +99,52 @@ class InterpolatedForcing(ForcingProtocol):
         """Evaluate interpolated forcing at time ``t``."""
         return self.path.evaluate(t)
 
+    @property
+    def step_ts(self) -> Array:
+        """The sample times t_k; pass them to a step controller's ``step_ts``.
+
+        Every path that `from_data` builds carries them; a path of another
+        type needs a ``ts`` of its own.
+        """
+        return self.path.ts
+
     @staticmethod
     def from_data(
         ts: Array,
         values: Array,
-        method: str = "linear",
+        method: str | LocalScheme | SeriesScheme = "linear",
+        *,
+        outside: str = "extrapolate",
     ) -> InterpolatedForcing:
         """Build an ``InterpolatedForcing`` from tabulated data.
 
         Args:
             ts: Time coordinates with shape ``(T,)``.
             values: Forcing values with shape ``(T, ...)``.
-            method: Interpolation method, ``"linear"`` (default) or
-                ``"cubic"``.
+            method: ``"linear"`` (default) or ``"cubic"`` for diffrax's paths,
+                whose cubic takes its slopes from the backward secants, or a
+                functax 1-D scheme (``functax.interp.Linear()``,
+                ``CubicSpline()``, ``Pchip()``, ...).
+            outside: What a scheme does past the samples: ``"extrapolate"``
+                (default, as diffrax's paths do), ``"clamp"`` to hold the end
+                values, or ``"nan"``. A cubic scheme's end piece can leave the
+                data's range. Diffrax's two methods always extrapolate.
 
         Returns:
             An ``InterpolatedForcing`` instance.
+
+        Raises:
+            ValueError: If ``method`` is an unknown string, if ``outside`` is
+                set for a diffrax method, or if ``method`` is neither a string
+                nor a functax scheme.
         """
+        if not isinstance(method, str):
+            policies = Policies(outside=outside)
+            path = SampledPath.fit(method, ts, values, policies=policies)
+            return InterpolatedForcing(path=path)
+        if outside != "extrapolate":
+            msg = f"method={method!r} always extrapolates, got outside={outside!r}"
+            raise ValueError(msg)
         if method == "linear":
             path = dfx.LinearInterpolation(ts=ts, ys=values)
         elif method == "cubic":

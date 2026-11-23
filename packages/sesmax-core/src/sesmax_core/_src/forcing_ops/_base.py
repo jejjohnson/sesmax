@@ -177,8 +177,9 @@ class TimeVaryingForcing(AbstractForcing):
     Any further ``*args`` / ``**kwargs`` follow the evaluated fields.
 
     ``field_fn`` may be an analytic formula or a data-driven interpolant such
-    as ``diffrax.LinearInterpolation(ts, ys).evaluate`` (ERA5, JRA-55, ...),
-    both of which are compatible with ``jax.jit`` / ``jax.grad``.
+    as ``diffrax.LinearInterpolation(ts, ys).evaluate`` or the ``path.evaluate``
+    of an ``InterpolatedForcing`` (ERA5, JRA-55, ...), all of which are
+    compatible with ``jax.jit`` / ``jax.grad``.
 
     Parameters
     ----------

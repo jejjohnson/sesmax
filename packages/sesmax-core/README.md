@@ -82,7 +82,7 @@ Write $`f(\mathbf{x}, t; \boldsymbol{\theta})`$ for the whole sum above. Everyth
 
 ## 📥 Install
 
-sesmax-core is not on PyPI; it is installed from this repository with [uv](https://docs.astral.sh/uv/). It needs Python 3.12 or newer and brings in JAX, Equinox, diffrax, lineax, optimistix, einops, paramax, gridax, spectraldiffx, geonnax, geophysix, integrix and pipekit.
+sesmax-core is not on PyPI; it is installed from this repository with [uv](https://docs.astral.sh/uv/). It needs Python 3.12 or newer and brings in JAX, Equinox, diffrax, lineax, optimistix, einops, paramax, gridax, spectraldiffx, geonnax, geophysix, functax, integrix and pipekit.
 
 The libraries of the stack pin each other at different git tags, so a plain `pip install` or `uv pip install` of the git URL stops at a conflict (on gaussx today). In your project, name the source and copy the `override-dependencies` list of the [workspace `pyproject.toml`](../../pyproject.toml), which holds one tag for each:
 
@@ -254,7 +254,8 @@ sesmax-core is tier 0 of the [sesmax workspace](https://github.com/jejjohnson/se
 |---|---|
 | Modules and filtered transforms | [`equinox`](https://github.com/patrick-kidger/equinox) |
 | Time integration | [`diffrax`](https://github.com/patrick-kidger/diffrax) |
-| IMEX solver, step control and the step bound | [`integrix`](https://github.com/jejjohnson/integrix) |
+| IMEX solver, step control, the step bound and the path of a sampled forcing | [`integrix`](https://github.com/jejjohnson/integrix) |
+| Interpolation schemes of a sampled forcing | [`functax`](https://github.com/jejjohnson/functax) |
 | Grids, masks, C-grid operators and the elliptic operators | [`gridax`](https://github.com/jejjohnson/gridax) |
 | Conjugate-gradient solves of the inversions (installed through gridax) | [`gaussx`](https://github.com/jejjohnson/gaussx) |
 | Spectral solves | [`spectraldiffx`](https://github.com/jejjohnson/spectraldiffx) |

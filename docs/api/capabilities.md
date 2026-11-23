@@ -42,7 +42,7 @@ Every public name in `sesmax_core` (202 of them), each listed once at its public
 |---|---|---|
 | `ConstantForcing` | class | Time-independent forcing field. |
 | `ForcingProtocol` | class | Base class for forcing terms. |
-| `InterpolatedForcing` | class | Data-driven forcing via diffrax path interpolation. |
+| `InterpolatedForcing` | class | Forcing from samples (t_k, u_k), read between them as a diffrax path. |
 | `NoForcing` | class | Zero forcing (free evolution). |
 | `SeasonalWindForcing` | class | Sinusoidal wind forcing with learnable amplitude. |
 
