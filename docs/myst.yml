@@ -74,6 +74,7 @@ project:
         - file: design/workspace_and_core.md
         - file: design/shared_core.md
         - file: design/run_loop.md
+        - file: design/workspace_packages.md
         - file: design/ocean.md
         - file: design/numerics_wishlist.md
     - title: Project

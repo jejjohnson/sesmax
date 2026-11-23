@@ -2,7 +2,7 @@
 title: "sesmax-ocean: moving the ocean models from somax"
 subtitle: "Design · phase C2, on gridax instead of finitevolX"
 short_title: Ocean package
-description: "Plans the move of somax's ocean models into sesmax-ocean: what moves, a gate by numbers in place of 'only import changes', a trial port of two models, two defects it found, the order of the pull requests and the open questions."
+description: "Plans the move of somax's ocean models into sesmax-ocean: what moves, a gate by numbers in place of 'only import changes', a trial port of two models, two defects it found, the order of the pull requests and the open questions. Builds on the workspace packages page."
 date: 2026-11-23
 keywords:
   - sesmax
@@ -21,8 +21,9 @@ numbering:
 
 ## Decision
 
-Proposed: move somax's ocean models from commit `9cb19b3` into a new package `sesmax-ocean`, models first and the runner later, and accept each model when it reproduces somax's numbers to round-off in float64.
-The gate of phase C2 ("every remaining somax test passes with only import changes") cannot be kept, because the core moved from finitevolX to gridax in the meantime.
+Proposed: move somax's ocean models from commit `9cb19b3` into a new package `sesmax-ocean`, and accept each model when it reproduces somax's numbers to round-off in float64.
+The package is a component in the sense of [the workspace packages](workspace_packages.md): it holds models and scenarios, its checks come from `sesmax-testing`, and its runs go to `sesmax-experiment`.
+The gate of phase C2 in the workspace design ("every remaining somax test passes with only import changes") cannot be kept, because the core moved from finitevolX to gridax in the meantime.
 Alternative: keep the models on finitevolX until the move is over, which keeps that gate but gives one workspace two C-grid libraries, so an ocean state could not be read by the core's own terms.
 Status: proposed, for review. A trial port of two models is done in a scratch folder; nothing is in the repository.
 
@@ -32,7 +33,7 @@ Status: proposed, for review. A trial port of two models is done in a scratch fo
 | --- | --- |
 | Can we start now? | Yes: somax's `main` is still the pinned commit, and two ported models agree with it |
 | What replaces the gate? | Equality with somax in float64: tendencies, 20 steps, diagnostics |
-| What moves first? | The models, with no runner |
+| What moves first? | The models, after `sesmax-testing` exists |
 | What about defects? | Copied, then fixed in their own pull requests |
 | What stays out? | The spectral models and the other open somax features |
 
@@ -49,7 +50,7 @@ The other eight have a home elsewhere, listed in the table below.
 Since sesmax#138 a state holds arrays or `gridax.CField`s, `mask_locations` and `method="weno5"` are gone, and ghosts come from `gridax.fill_ghosts`.
 
 **The runner.**
-[The run-loop design](run_loop.md) puts the loop in `sesmax_core.sim`. It is still a proposal and nothing of it is implemented.
+[The run-loop design](run_loop.md) put the loop in `sesmax_core.sim`, and nothing of it is implemented. It becomes the simulation part of `sesmax-experiment`.
 
 | finitevolX name | Replacement |
 | --- | --- |
@@ -94,33 +95,34 @@ Today (bug): the mass and PV fluxes are averaged across the box's edge from ghos
 
 The line counts are `wc -l` at `9cb19b3`.
 
-| Group | Lines | Goes to | Phase |
+| Group | Lines | Goes to | Step |
 | --- | --- | --- | --- |
-| `models/qg/`, `swm/nonlinear_2d.py`, `swm/multilayer.py`, `spherical/` | 3,714 | `sesmax_ocean` (models) | C2a |
-| `core/resolution.py` | 401 | `sesmax_ocean.resolution` | C2a |
-| `eval/` | 390 | `sesmax_ocean.eval` | C2a |
-| ocean presets of `core/forcing_bank.py` | 172 | `sesmax_ocean.forcing` | C2a |
-| runner, run specs, units, progress, checks | 3,214 | `sesmax_core.sim`, and the ocean's checks in `sesmax_ocean.sim` | C2b |
-| model registry, scenarios, dispatch | 2,030 | `sesmax_ocean.sim` | C2c |
-| basin data, configs, DVC | 1,083 | `sesmax_ocean.sim` and `configs/` | C2c |
+| `models/qg/`, `swm/nonlinear_2d.py`, `swm/multilayer.py`, `spherical/` | 3,714 | `sesmax_ocean` (models) | W2 |
+| `core/resolution.py` | 401 | `sesmax_ocean.resolution` | W2 |
+| `eval/` | 390 | `sesmax_ocean.eval` | W2 |
+| ocean presets of `core/forcing_bank.py` | 172 | `sesmax_ocean.forcing` | W2 |
+| runner, run specs, units, progress, checks | 3,214 | `sesmax_experiment`; the ocean's own checks in `sesmax_ocean` | W3 |
+| model registry, scenarios, dispatch | 2,030 | `sesmax_ocean.scenarios` | W4 |
+| basin data, configs, DVC | 1,083 | `sesmax_ocean.scenarios` and `configs/` | W4 |
 
-The core keeps private some helpers that the ocean models need: the positivity checks (`require_positive`, `reject_derived_kwargs`), the Burger-number helpers, the diagnostics bridge (`fvx_ops`, `masked`) and the element-wise helpers of located fields (`each`, `values`, `placed`).
-`require_non_negative`, which the ocean factories call, is not in the core.
-A second package must not import `_src`, so the core makes them public first.
+The core keeps private some helpers that the ocean models call (the positivity checks, the Burger-number helpers, the diagnostics bridge and the element-wise helpers of located fields), and `require_non_negative`, which the ocean factories call, is not in it.
+Step W1 makes them public.
 
-## Phases and gates
+## Steps and gates
 
-Each item is one pull request, stacked in this order.
+The steps are those of [the workspace packages](workspace_packages.md); W1 (`sesmax-testing`) comes before them. Each item is one pull request, stacked in this order.
 
-| Phase | Pull requests | Gate |
+| Step | Pull requests | Gate |
 | --- | --- | --- |
-| C2a Models | scaffold; public helpers in the core; barotropic QG; layered and reparameterised QG; shallow water; sphere; resolution, eval and presets; the two fixes; notebooks | equality with somax, and its ocean tests with their assertions unchanged |
-| C2b Run loop | `sesmax_core.sim` (its own design's SIM-1, then SIM-2) | the run-loop design's checks, and an exact restart for each stepper |
-| C2c Runs | registry, scenarios, configs and data in `sesmax_ocean.sim` | somax's eight configs build and give somax's `t = 0` state and first chunk |
-| C2d Benchmark | the DUACS sea-surface-height baseline | the QG model's score is reported against DUACS |
+| W2 Models | scaffold; barotropic QG; layered and reparameterised QG; shallow water; sphere; resolution, eval and presets; the two fixes; notebooks | equality with somax, and its ocean tests with their assertions unchanged |
+| W3 Run loop | in `sesmax-experiment` | the run-loop design's checks, and an exact restart for each stepper |
+| W4 Scenarios | registry, scenarios, configs and data | somax's eight configs build and give somax's `t = 0` state and first chunk |
+
+The DUACS sea-surface-height baseline leaves this plan: it is a benchmark, so it goes to geobench, which reports the QG model's score.
 
 **The equality gate.**
-A script runs somax at `9cb19b3` and writes the initial states, tendencies, 20-step end states and diagnostics of each model to one `.npz` file, which the tests read.
+A script runs somax at `9cb19b3` and writes the initial states, tendencies, 20-step end states and diagnostics of each model to one `.npz` file, which the reference check of `sesmax-testing` reads.
+The two fixes are each checked by the conservation and translation checks, which fail before them.
 The trial port's file for six cases is 309 kB.
 A case passes when the relative difference is below 1e-13 for tendencies and diagnostics and below 1e-12 after 20 steps; the spherical QG model is compared at its CG tolerance.
 
@@ -133,7 +135,7 @@ A workspace member with a `[tool.uv.sources]` entry, a `dev` group entry and a r
 
 ## somax after the move
 
-somax is archived after C2c and not before, because its runner and configs are the only way to make a reference run until then.
+somax is archived after W4 and not before, because its runner and configs are the only way to make a reference run until then.
 Its open features (the spectral model zoo somax#232, hybrid terms somax#213, the SSH-QG and internal-tide models somax#141, the registry adapters somax#209, self-describing output somax#206) are not part of the move.
 Each gets a new issue in sesmax, or is closed, when somax is archived.
 
@@ -144,11 +146,10 @@ Each gets a new issue in sesmax, or is closed, when somax is archived.
 | OC-1 | The C2 gate | equality by numbers | stay on finitevolX and keep the old gate |
 | OC-2 | Located fields in the ocean states | from the first port: arrays and `CField`s, as in the core | arrays now, `CField`s later |
 | OC-3 | The two defects | copy, then fix in the same stack with the numbers before and after | fix while porting |
-| OC-4 | Runner | after the models (C2b, C2c) | together, as the plan had it |
-| OC-5 | DUACS benchmark | its own phase, as it needs data and compute that CI does not have | inside C2a |
+| OC-4 | Runner | after the models (W3, W4) | together, as the plan had it |
 
 ## Relationships
 
 - Parent: jejjohnson/somax#233.
-- Follows: [the workspace and core design](workspace_and_core.md), whose C2 row this page replaces, and [the run-loop design](run_loop.md), which C2b implements.
+- Follows: [the workspace and core design](workspace_and_core.md), whose C2 row this page replaces, [the workspace packages](workspace_packages.md), and [the run-loop design](run_loop.md), which W3 implements.
 - Related: sesmax#90 (periodic helpers), sesmax#104 and sesmax#109 (the ocean's energy budget and Jacobian record), sesmax#115 (real basins), jejjohnson/somax#141, #206, #209, #213, #232.
