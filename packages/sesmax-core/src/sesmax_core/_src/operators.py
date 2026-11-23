@@ -7,7 +7,7 @@ is always available: it exposes sesmax models as first-class
 :class:`pipekit_ops.Operator` s.
 
 Why a companion Operator instead of making the model itself an Operator?
-A sesmax model is an ``eqx.Module`` whose fields are grids, finitevolx
+A sesmax model is an ``eqx.Module`` whose fields are grids, gridax
 operators, and assembled term trees — none of them JSON primitives, so
 the model can't round-trip through ``pipekit_ops.serial``. Two forms bridge
 the gap:
@@ -58,7 +58,7 @@ class ModelOp(Operator):
     ``state_signature``).
 
     Serialization: the wrapped model is an ``eqx.Module`` (grids,
-    finitevolx operators, term trees — not JSON primitives), so this
+    gridax operators, term trees — not JSON primitives), so this
     general form is **not** faithfully round-trippable through
     ``pipekit_ops.serial`` — it sets ``forbid_in_yaml = True`` and an empty
     auto-config. Subclasses whose construction is a *flat primitive

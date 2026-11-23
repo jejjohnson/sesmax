@@ -10,7 +10,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from finitevolx import Mask2D
+from gridax import Mask2D
 from jaxtyping import Array, Float
 
 from sesmax_core._src.scales import Scales

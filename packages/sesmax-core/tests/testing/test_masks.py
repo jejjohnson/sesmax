@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import jax.numpy as jnp
 import numpy as np
-from finitevolx import Mask1D, Mask2D
+from gridax import Mask1D, Mask2D
 
 from sesmax_core.testing import (
     Burgers1D,

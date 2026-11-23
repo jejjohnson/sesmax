@@ -6,13 +6,7 @@ from typing import ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import (
-    Advection1D,
-    CartesianGrid1D,
-    Difference1D,
-    Interpolation1D,
-    Mask1D,
-)
+from gridax import Advection1D, CartesianGrid1D, Difference1D, Interpolation1D, Mask1D
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src.model import Model

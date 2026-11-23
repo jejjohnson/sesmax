@@ -6,7 +6,7 @@ and of tests/test_capacitance_residual.py (the two tests that call
 ``streamfunction_from_vorticity``, renamed ``test_capacitance_*``).
 
 What changed: the three functions come from ``sesmax_core.gfd``, everything else from
-the public ``gridax`` and ``gridax_jax`` names (calls were already keyword-only past
+the public ``gridax`` and ``gridax.solvers`` names (calls were already keyword-only past
 ``dy``), the two direct CG solves call gaussx's ``linear_solve_with_info`` in place
 of gridax-jax's deprecated ``solve_cg`` (``_cg`` below, its tolerances), and the
 private ``_resolve_mask_arr`` comes from ``sesmax_core._src.gfd.inversion``.
@@ -26,7 +26,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from gridax import BoundaryConditionSet, CartesianGrid2D, Dirichlet1D, Mask2D
-from gridax_jax import (
+from gridax.solvers import (
     build_capacitance_solver,
     dst1_eigenvalues,
     make_spectral_preconditioner,

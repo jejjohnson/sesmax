@@ -12,7 +12,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from gridax import diff_x_fwd_2d, divergence_2d, interior
-from gridax_jax import build_multigrid_solver
+from gridax.solvers import build_multigrid_solver
 
 from sesmax_core.vertical import barotropic_filter
 

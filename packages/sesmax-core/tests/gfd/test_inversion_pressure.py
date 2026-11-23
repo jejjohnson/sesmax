@@ -6,12 +6,11 @@ Moved from gridax tests/test_pressure_cg.py at gridax 01d8320 (sesmax#126).
 ``pv_inversion`` accepts a traced scalar ``lambda_`` under ``jit`` and ``vmap``.
 
 What changed: the imports (the functions from ``sesmax_core.gfd``, the grid and mask
-from ``gridax``, the T-point Neumann operator from ``gridax_jax``'s private iterative
-module). Dropped: ``TestNeumannOperator``, which tests gridax's private T-point
-operators and stays there, and ``test_pressure_rejects_known_values``, which only
-checked that ``pressure_from_divergence`` rejects ``known_values=`` and
-``known_mask=``, parameters it no longer has.
-``test_streamfunction_known_values_reject_neumann`` is kept.
+from ``gridax``, the T-point Neumann operator from ``gridax.solvers``). Dropped:
+``TestNeumannOperator``, which tests gridax's T-point operators and stays there, and
+``test_pressure_rejects_known_values``, which only checked that
+``pressure_from_divergence`` rejects ``known_values=`` and ``known_mask=``, parameters
+it no longer has. ``test_streamfunction_known_values_reject_neumann`` is kept.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from gridax import CartesianGrid2D, Mask2D
-from gridax_jax._src.solvers.iterative import _masked_neumann_laplacian
+from gridax.solvers import masked_neumann_laplacian
 
 from sesmax_core.gfd import (
     pressure_from_divergence,
@@ -86,7 +85,7 @@ class TestPressureCG:
         p = pressure_from_divergence(b, dx, dy, method="cg", mask=mask)
         assert abs(np.asarray(p)[wet].mean()) < 1e-14
         np.testing.assert_array_equal(np.asarray(p)[~wet], 0.0)
-        lap = _masked_neumann_laplacian(p, mask.h.astype(b.dtype), dx, dy)
+        lap = masked_neumann_laplacian(p, mask.h.astype(b.dtype), dx, dy)
         # residual of the CG solve: rtol 1e-6 of |b| ~ 3
         np.testing.assert_allclose(np.asarray(lap)[wet], _demeaned(b, wet), atol=1e-5)
 

@@ -7,7 +7,7 @@ from typing import Any, ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import (
+from gridax import (
     CartesianGrid2D,
     Difference2D,
     Interpolation2D,

@@ -5,7 +5,7 @@ description: Add a physics term or a term model to sesmax — a Term subclass re
 
 # Add a term
 
-Read "Terms" and "Models" under "The contracts" in `AGENTS.md` first, and search `docs/api/capabilities.md`: finitevolX already owns most stencils, so a term usually calls one rather than writing it.
+Read "Terms" and "Models" under "The contracts" in `AGENTS.md` first, and search `docs/api/capabilities.md`: gridax already owns most stencils, so a term usually calls one rather than writing it.
 
 ## 1. Where it goes
 

@@ -34,7 +34,7 @@ which is the evidence that the decomposition is faithful.
 from __future__ import annotations
 
 import equinox as eqx
-from finitevolx import (
+from gridax import (
     Advection2D as FVXAdvection2D,
     CartesianGrid2D,
     Difference2D,
@@ -60,9 +60,9 @@ class Burgers2DAdvection(Term):
     (the default) — advection is non-stiff.
 
     Args:
-        advection: finitevolx C-grid advection operator.
-        interp: finitevolx interpolation operator (T→U, T→V).
-        diff: finitevolx difference operator (for the divergence).
+        advection: gridax C-grid advection operator.
+        interp: gridax interpolation operator (T→U, T→V).
+        diff: gridax difference operator (for the divergence).
         method: Reconstruction method passed to the advection operator.
     """
 
@@ -95,7 +95,7 @@ class Burgers2DDiffusion(Term):
     is reusable across models.
 
     Args:
-        diff: finitevolx C-grid difference operator (provides
+        diff: gridax C-grid difference operator (provides
             ``laplacian``).
         kind: IMEX integration label. Defaults to ``"explicit"``;
             :meth:`Burgers2DTermModel.create` tags it implicit when

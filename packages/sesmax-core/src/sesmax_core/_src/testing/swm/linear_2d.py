@@ -6,13 +6,13 @@ from typing import ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from finitevolx import (
+from geophysix.rotation import beta_plane
+from gridax import (
     CartesianGrid2D,
     Coriolis2D,
     Difference2D,
     Interpolation2D,
     Mask2D,
-    coriolis_fn,
     enforce_periodic,
     wall_boundaries,
 )
@@ -221,7 +221,7 @@ class LinearShallowWater2D(Model):
         y = jnp.arange(grid.Ny) * grid.dy
         y0 = Ly / 2.0
         Y = jnp.broadcast_to(y[:, None], (grid.Ny, grid.Nx))
-        f_field = coriolis_fn(Y, f0=f0, beta=beta, y0=y0)
+        f_field = beta_plane(Y, f0=f0, beta=beta, y0=y0)
 
         return LinearShallowWater2D(
             params=params,

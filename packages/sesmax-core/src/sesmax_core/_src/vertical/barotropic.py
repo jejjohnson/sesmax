@@ -69,11 +69,11 @@ def barotropic_filter(
     adds back to every layer's momentum tendency, e.g. ``dt_u += filt_u``.
 
     ``helm_solve`` is invoked as a plain callable (``helm_solve(rhs)``); pass
-    the :class:`~gridax_jax.MultigridSolver` object itself (it is callable via
+    the :class:`~gridax.solvers.MultigridSolver` object itself (it is callable via
     ``__call__``).
 
     .. note::
-        :func:`~gridax_jax.build_multigrid_solver` **freezes** the coefficient
+        :func:`~gridax.solvers.build_multigrid_solver` **freezes** the coefficient
         (interpolated to the cell faces) into the level hierarchy at
         construction time.  A prebuilt ``helm_solve`` therefore
         solves with a *fixed* coefficient; it is correct only when the
@@ -100,7 +100,7 @@ def barotropic_filter(
     helm_solve : Callable[[Array], Array]
         Solver for the variable-coefficient Helmholtz problem
         ``div(h grad w) = rhs`` at T-points, e.g. a
-        :class:`~gridax_jax.MultigridSolver` built with ``coeff=h`` and
+        :class:`~gridax.solvers.MultigridSolver` built with ``coeff=h`` and
         ``bc="neumann"`` (zero transport through the coast; the multigrid
         default is the Dirichlet wall of the streamfunction solves).  The
         solver object is itself callable.
