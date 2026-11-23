@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.0](https://github.com/jejjohnson/sesmax/compare/sesmax-core-v0.1.0...sesmax-core-v0.2.0) (2026-11-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** states of located fields, on gridax's canonical functions ([#138](https://github.com/jejjohnson/sesmax/issues/138))
+* **deps:** sesmax-core moves to gridax with the jax and pipekit extras, at 5de277f ([#135](https://github.com/jejjohnson/sesmax/issues/135))
+
+### Features
+
+* **core:** forcing, vertical modes, relaxation and the barotropic filter, moved from gridax-jax ([#122](https://github.com/jejjohnson/sesmax/issues/122)) ([e40d702](https://github.com/jejjohnson/sesmax/commit/e40d702f8758b3a69f28008cc5503ec695cb6560))
+* **core:** sampled forcing takes any functax 1-D scheme, and reports its step times ([#141](https://github.com/jejjohnson/sesmax/issues/141)) ([3c64811](https://github.com/jejjohnson/sesmax/commit/3c64811ed8d7bdb4d4300f3101de9eecd48fd608)), closes [#130](https://github.com/jejjohnson/sesmax/issues/130)
+* **core:** solve_pde integrates a right-hand-side function with state and tendency corrections at every stage ([#128](https://github.com/jejjohnson/sesmax/issues/128)) ([a13567e](https://github.com/jejjohnson/sesmax/commit/a13567ecf46248e2dd0b8ba98b9d23af8f20e2e1)), closes [#127](https://github.com/jejjohnson/sesmax/issues/127)
+* **core:** states of located fields, on gridax's canonical functions ([#138](https://github.com/jejjohnson/sesmax/issues/138)) ([65fda09](https://github.com/jejjohnson/sesmax/commit/65fda09f998003f87023f27ee9cd52660789da9f))
+* **core:** the streamfunction, pressure and QG PV inversions move to sesmax_core.gfd, with their tests and notebooks ([#129](https://github.com/jejjohnson/sesmax/issues/129)) ([995adc8](https://github.com/jejjohnson/sesmax/commit/995adc8c92fb85f479ae8d68cfefdf79676d7328))
+
+
+### Miscellaneous
+
+* **deps:** sesmax-core moves to gridax with the jax and pipekit extras, at 5de277f ([#135](https://github.com/jejjohnson/sesmax/issues/135)) ([071d73a](https://github.com/jejjohnson/sesmax/commit/071d73a530027975b6a36370949bc798c53f2248))
+
 ## 0.1.0 (2026-11-10)
 
 
