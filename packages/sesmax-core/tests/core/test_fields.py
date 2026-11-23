@@ -7,6 +7,7 @@ sum of tendencies on different points raises.
 from __future__ import annotations
 
 import dataclasses
+import re
 
 import diffrax as dfx
 import jax
@@ -182,12 +183,19 @@ def test_trajectories_are_identical(model, state_cls, points):
         return jax.tree.map(lambda a, b: a + 1e-3 * b, filled, rate)
 
     run = jax.jit(step)
+    # one program, up to the names of its results
+    programs = [
+        re.sub(r'"result[^"]*"', '"result"', run.lower(y).as_text())
+        for y in (plain, located)
+    ]
+    assert programs[0] == programs[1]
+    # XLA may round two runs of one program on the CPU differently
     for _ in range(5):
         plain, located = run(plain), run(located)
     for field, point in zip(dataclasses.fields(state_cls), points, strict=False):
         a, b = getattr(plain, field.name), getattr(located, field.name)
         assert b.loc == point
-        np.testing.assert_array_equal(b.data, a)
+        np.testing.assert_allclose(b.data, a, rtol=1e-5, atol=1e-6)
 
 
 def test_integrate_and_flatten_a_located_state():
