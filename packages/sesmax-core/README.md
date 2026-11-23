@@ -50,7 +50,7 @@ model = LinearSWM2DTermModel(terms=terms, grid=base.grid)
 trajectory = rollout(model, rest, dt=600.0, n_steps=36)
 ```
 
-Most of the numerics belongs to other libraries, and this package only composes them. A model is an [`equinox`](https://github.com/patrick-kidger/equinox) module and time stepping is [`diffrax`](https://github.com/patrick-kidger/diffrax), so any diffrax solver goes into `Model.integrate`. The C-grid stencils and the elliptic solves are [`gridax`](https://github.com/jejjohnson/gridax), the spatial bases of a forcing are [`geonnax`](https://github.com/jejjohnson/geonnax), constrained parameters are [`paramax`](https://github.com/danielward27/paramax) wrappers, a rollout is a [`pipekit`](https://github.com/jejjohnson/pipekit) scan, and the adapters hand a model to [`filterax`](https://github.com/jejjohnson/filterax) and [`vardax`](https://github.com/jejjohnson/vardax).
+Most of the numerics belongs to other libraries, and this package only composes them. A model is an [`equinox`](https://github.com/patrick-kidger/equinox) module and time stepping is [`diffrax`](https://github.com/patrick-kidger/diffrax), so `Model.integrate` takes a diffrax solver (an IMEX one when the terms are split). The C-grid stencils are [`gridax`](https://github.com/jejjohnson/gridax), the elliptic inversions put gridax's operators into [`gaussx`](https://github.com/jejjohnson/gaussx) and [`spectraldiffx`](https://github.com/jejjohnson/spectraldiffx) solves, the spatial bases of a forcing are [`geonnax`](https://github.com/jejjohnson/geonnax), constrained parameters are [`paramax`](https://github.com/danielward27/paramax) wrappers, a rollout is a [`pipekit`](https://github.com/jejjohnson/pipekit) scan, and the adapters hand a model to [`filterax`](https://github.com/jejjohnson/filterax) and [`vardax`](https://github.com/jejjohnson/vardax).
 
 ## 🌟 Highlights
 
@@ -255,8 +255,9 @@ sesmax-core is tier 0 of the [sesmax workspace](https://github.com/jejjohnson/se
 | Modules and filtered transforms | [`equinox`](https://github.com/patrick-kidger/equinox) |
 | Time integration | [`diffrax`](https://github.com/patrick-kidger/diffrax) |
 | IMEX solver, step control and the step bound | [`integrix`](https://github.com/jejjohnson/integrix) |
-| Grids, masks, C-grid operators and elliptic solves | [`gridax`](https://github.com/jejjohnson/gridax) |
-| Spectral solves (the Navier–Stokes test problem) | [`spectraldiffx`](https://github.com/jejjohnson/spectraldiffx) |
+| Grids, masks, C-grid operators and the elliptic operators | [`gridax`](https://github.com/jejjohnson/gridax) |
+| Conjugate-gradient solves of the inversions (installed through gridax) | [`gaussx`](https://github.com/jejjohnson/gaussx) |
+| Spectral solves | [`spectraldiffx`](https://github.com/jejjohnson/spectraldiffx) |
 | Spatial bases of a forcing | [`geonnax`](https://github.com/jejjohnson/geonnax) |
 | Constrained parameters | [`paramax`](https://github.com/danielward27/paramax) |
 | Physical constants | [`geophysix`](https://github.com/jejjohnson/geophysix) |
