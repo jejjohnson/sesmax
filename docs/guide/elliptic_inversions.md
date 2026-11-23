@@ -18,15 +18,15 @@ Every function takes the full `[Ny, Nx]` array, ghost ring included, and returns
 import jax
 import jax.numpy as jnp
 import numpy as np
-from gridax import CartesianGrid2D, Mask2D
+from gridax import CartesianCGrid2D, Mask2D
 import gridax.solvers
 import sesmax_core.gfd as gfd
 
 jax.config.update("jax_enable_x64", True)
 
 # A 64 x 64-cell basin, 100 km on a side: arrays are [Ny, Nx] = [66, 66]
-grid = CartesianGrid2D.from_interior(64, 64, 1e5, 1e5)
-dx, dy, Ny, Nx = grid.dx, grid.dy, grid.Ny, grid.Nx
+grid = CartesianCGrid2D.from_interior(64, 64, 1e5, 1e5)
+dx, dy, Ny, Nx = grid.spacing("x"), grid.spacing("y"), grid.Ny, grid.Nx
 
 # vorticity at the X points, where psi lives (X node i sits at x = i dx)
 x = jnp.arange(Nx)[None, :] * dx
@@ -46,7 +46,7 @@ ocean = np.zeros((Ny, Nx), dtype=bool)
 ocean[1:-1, 1:-1] = True
 ocean &= (ii - Nx / 2) ** 2 + (jj - Ny / 2) ** 2 < (0.45 * Nx) ** 2
 ocean &= (ii - 0.62 * Nx) ** 2 + (jj - 0.55 * Ny) ** 2 > (0.1 * Nx) ** 2
-mask = Mask2D.from_mask(ocean)  # psi uses mask.xy_corner_strict, p uses mask.h
+mask = Mask2D.from_mask(ocean)  # psi uses mask.wet(at="X", kind="strict"), p uses mask.wet()
 
 lambda_ = 1 / 2e4**2  # λ = 1 / R_d²
 ```
@@ -81,7 +81,7 @@ The capacitance and multigrid set-ups depend only on the geometry and $\lambda$,
 :::{tab-item} CG
 
 ```python
-# psi = 0 on the coast nodes of mask.xy_corner_strict
+# psi = 0 on the coast nodes of mask.wet(at="X", kind="strict")
 psi = gfd.streamfunction_from_vorticity(
     zeta, dx, dy, lambda_=lambda_, method="cg", mask=mask
 )
@@ -110,7 +110,7 @@ psi = gfd.streamfunction_from_vorticity(
 :::
 ::::
 
-`method="cg"` and `method="multigrid"` stop when the residual satisfies $\lVert \mathbf{b} - \mathbf{A}\mathbf{x} \rVert_\infty \le 10^{-6} + 10^{-6} \lVert \mathbf{b} \rVert_\infty$ in float64, and below float64 at $\sqrt{\varepsilon}$ relative to the right-hand side. They raise if CG has not converged in 500 steps, also under `jit`. The multigrid hierarchy must be built for the solve's mask, $\lambda$ and wall: Dirichlet (the default) for $\psi$, and `bc="neumann"` on `mask.h` for the pressure with `bc="dct"`.
+`method="cg"` and `method="multigrid"` stop when the residual satisfies $\lVert \mathbf{b} - \mathbf{A}\mathbf{x} \rVert_\infty \le 10^{-6} + 10^{-6} \lVert \mathbf{b} \rVert_\infty$ in float64, and below float64 at $\sqrt{\varepsilon}$ relative to the right-hand side. They raise if CG has not converged in 500 steps, also under `jit`. The multigrid hierarchy must be built for the solve's mask, $\lambda$ and wall: Dirichlet (the default) for $\psi$, and `bc="neumann"` on `mask.wet()` for the pressure with `bc="dct"`.
 
 ## The pressure
 
@@ -178,7 +178,7 @@ $$
 
 so the solve runs on $E$ with a corrected right-hand side (gaussx's `lift_known_values`), and the known values are added back. The spectral method takes known values on the rectangle's wall nodes with `bc="dst"` and no mask. The capacitance method takes them with a solver built on the same wet mask, and no `known_mask`. `pv_inversion` broadcasts `known_values` against its input, and each layer's correction uses its own $\lambda_k$.
 
-`bc` also accepts a `gridax.BoundaryConditionSet`. Its face types choose the transform (all `Dirichlet1D` gives `"dst"`, all zero `Neumann1D` gives `"dct"`, all `Periodic1D` gives `"fft"`), its `mask` feeds the masked methods, and non-zero `Dirichlet1D` values become known values on each face's wall nodes. That needs a basin whose outer coast lies on the four walls, a rectangle with islands allowed. For any other coastline, pass `known_values` on `gridax.solvers.coast_ring(mask)`.
+`bc` also accepts a `gridax.BC`. Its face types choose the transform (all `Dirichlet` gives `"dst"`, all zero `Neumann` gives `"dct"`, all `Periodic` gives `"fft"`), and non-zero `Dirichlet` values become known values on each face's wall nodes. That needs a basin whose outer coast lies on the four walls, a rectangle with islands allowed. For any other coastline, pass `known_values` on `gridax.solvers.coast_ring(mask)`.
 
 ## Examples
 

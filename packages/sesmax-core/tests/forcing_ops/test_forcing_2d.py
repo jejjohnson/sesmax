@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import CartesianGrid2D, Difference2D, Mask2D
+from gridax import CartesianCGrid2D, Difference2D, Mask2D
 from gridax_inputs import (
     make_grid_2d,
     make_h_field_2d,
@@ -31,7 +31,7 @@ from sesmax_core.vertical import multilayer
 
 @pytest.fixture
 def grid():
-    return CartesianGrid2D.from_interior(8, 6, 1.0, 1.0)
+    return CartesianCGrid2D.from_interior(8, 6, 1.0, 1.0)
 
 
 def _ones(grid, value=1.0):
@@ -189,15 +189,24 @@ class TestMasks:
         u, v, h = make_u_field_2d(), make_v_field_2d(), make_h_field_2d()
         tx = jnp.ones_like(h)
         outputs = [
-            (WindStress2D(grid, mask=mask)(tx, tx, 10.0), (mask.u, mask.v)),
-            (LinearDrag2D(grid, mask=mask)(u, v, 0.1), (mask.u, mask.v)),
-            (QuadraticDrag2D(grid, mask=mask)(u, v, 1e-3, 1.0), (mask.u, mask.v)),
+            (
+                WindStress2D(grid, mask=mask)(tx, tx, 10.0),
+                (mask.wet(at="U"), mask.wet(at="V")),
+            ),
+            (
+                LinearDrag2D(grid, mask=mask)(u, v, 0.1),
+                (mask.wet(at="U"), mask.wet(at="V")),
+            ),
+            (
+                QuadraticDrag2D(grid, mask=mask)(u, v, 1e-3, 1.0),
+                (mask.wet(at="U"), mask.wet(at="V")),
+            ),
         ]
         for (du, dv), (mu, mv) in outputs:
             np.testing.assert_array_equal(np.asarray(du)[~np.asarray(mu)], 0.0)
             np.testing.assert_array_equal(np.asarray(dv)[~np.asarray(mv)], 0.0)
         dq = RayleighDamping2D(grid, mask=mask)(h, 0.1)
-        np.testing.assert_array_equal(np.asarray(dq)[~np.asarray(mask.h)], 0.0)
+        np.testing.assert_array_equal(np.asarray(dq)[~np.asarray(mask.wet())], 0.0)
 
     def test_all_ocean_mask_matches_unmasked(self):
         grid, mask = make_grid_2d(), make_mask_2d_all_ocean()
@@ -249,7 +258,7 @@ class TestMaskNaNSafety:
     @staticmethod
     def _land_fields():
         grid, mask = make_grid_2d(), make_mask_2d()
-        wet = np.asarray(mask.h)
+        wet = np.asarray(mask.wet())
         # Thickness is zero over land (typical layer-thickness field).
         dz = jnp.where(wet, 50.0, 0.0)
         return grid, mask, wet, dz
@@ -263,30 +272,38 @@ class TestMaskNaNSafety:
             QuadraticDrag2D(grid, mask=mask)(u, v, cd=1e-3, h_bot=dz),
         ]:
             assert bool(jnp.isfinite(du).all()) and bool(jnp.isfinite(dv).all())
-            np.testing.assert_array_equal(np.asarray(du)[~np.asarray(mask.u)], 0.0)
-            np.testing.assert_array_equal(np.asarray(dv)[~np.asarray(mask.v)], 0.0)
+            np.testing.assert_array_equal(
+                np.asarray(du)[~np.asarray(mask.wet(at="U"))], 0.0
+            )
+            np.testing.assert_array_equal(
+                np.asarray(dv)[~np.asarray(mask.wet(at="V"))], 0.0
+            )
 
     def test_wet_faces_unchanged_by_sanitising(self):
         grid, mask, _, dz = self._land_fields()
         tau = jnp.ones((grid.Ny, grid.Nx))
         du, _ = WindStress2D(grid, mask=mask)(tau, tau, dz_top=dz)
         du_ref, _ = WindStress2D(grid)(tau, tau, dz_top=jnp.where(dz > 0, dz, 1.0))
-        mu = np.asarray(mask.u)
+        mu = np.asarray(mask.wet(at="U"))
         np.testing.assert_allclose(np.asarray(du)[mu], np.asarray(du_ref)[mu])
 
     def test_nan_over_land_is_zeroed(self):
         grid, mask, wet, _ = self._land_fields()
         nan_land = jnp.where(wet, 1.0, jnp.nan)
-        u = jnp.where(np.asarray(mask.u), make_u_field_2d(), jnp.nan)
-        v = jnp.where(np.asarray(mask.v), make_v_field_2d(), jnp.nan)
+        u = jnp.where(np.asarray(mask.wet(at="U")), make_u_field_2d(), jnp.nan)
+        v = jnp.where(np.asarray(mask.wet(at="V")), make_v_field_2d(), jnp.nan)
         dq = RayleighDamping2D(grid, mask=mask)(nan_land, r=0.1)
         np.testing.assert_array_equal(np.asarray(dq)[~wet], 0.0)
         for du, dv in [
             LinearDrag2D(grid, mask=mask)(u, v, r=0.1),
             QuadraticDrag2D(grid, mask=mask)(u, v, cd=1e-3, h_bot=10.0),
         ]:
-            np.testing.assert_array_equal(np.asarray(du)[~np.asarray(mask.u)], 0.0)
-            np.testing.assert_array_equal(np.asarray(dv)[~np.asarray(mask.v)], 0.0)
+            np.testing.assert_array_equal(
+                np.asarray(du)[~np.asarray(mask.wet(at="U"))], 0.0
+            )
+            np.testing.assert_array_equal(
+                np.asarray(dv)[~np.asarray(mask.wet(at="V"))], 0.0
+            )
 
     def test_grad_finite_with_zero_land_thickness(self):
         grid, mask, _, dz = self._land_fields()
@@ -306,7 +323,9 @@ class TestNaNLandGradients:
     @staticmethod
     def _nan_land():
         grid, mask = make_grid_2d(), make_mask_2d()
-        mu, mv, mh = (np.asarray(m) for m in (mask.u, mask.v, mask.h))
+        mu, mv, mh = (
+            np.asarray(m) for m in (mask.wet(at="U"), mask.wet(at="V"), mask.wet())
+        )
         u = jnp.where(mu, make_u_field_2d(), jnp.nan)
         v = jnp.where(mv, make_v_field_2d(), jnp.nan)
         q = jnp.where(mh, make_h_field_2d(), jnp.nan)
@@ -314,7 +333,7 @@ class TestNaNLandGradients:
 
     def test_grad_wrt_coefficients_finite(self):
         grid, mask, u, v, q = self._nan_land()
-        tau = jnp.where(np.asarray(mask.h), 0.1, jnp.nan)
+        tau = jnp.where(np.asarray(mask.wet()), 0.1, jnp.nan)
         lin = LinearDrag2D(grid, mask=mask)
         quad = QuadraticDrag2D(grid, mask=mask)
         damp = RayleighDamping2D(grid, mask=mask)
@@ -323,7 +342,7 @@ class TestNaNLandGradients:
             lambda c: sum(jnp.sum(t) for t in lin(u, v, c)),
             lambda c: sum(jnp.sum(t) for t in quad(u, v, c, 10.0)),
             lambda c: jnp.sum(
-                damp(q, c, q_ref=jnp.where(np.asarray(mask.h), 1.0, jnp.nan))
+                damp(q, c, q_ref=jnp.where(np.asarray(mask.wet()), 1.0, jnp.nan))
             ),
             lambda c: sum(jnp.sum(t) for t in wind(tau, tau, dz_top=c)),
         ]
@@ -340,7 +359,7 @@ class TestNaNLandGradients:
         )
         np.testing.assert_allclose(du, du_ref)
         np.testing.assert_allclose(dv, dv_ref)
-        mu = np.asarray(mask.u)
+        mu = np.asarray(mask.wet(at="U"))
         wet_moving = mu & (np.abs(np.nan_to_num(np.asarray(u))) > 0)
         assert bool((np.asarray(du)[wet_moving] != 0).all())
 
@@ -350,16 +369,17 @@ class TestWindCurl2D:
 
     @staticmethod
     def _gaussian(n):
-        g = CartesianGrid2D.from_interior(n, n, 2.0, 2.0)
+        g = CartesianCGrid2D.from_interior(n, n, 2.0, 2.0)
         # T-point coordinates, ghost ring included: x_T[i] = (i - 1/2) dx
-        x = (jnp.arange(g.Nx) - 0.5) * g.dx - 1.0
-        y = (jnp.arange(g.Ny) - 0.5) * g.dy - 1.0
+        x = (jnp.arange(g.Nx) - 0.5) * g.spacing("x") - 1.0
+        y = (jnp.arange(g.Ny) - 0.5) * g.spacing("y") - 1.0
         X, Y = jnp.meshgrid(x, y)  # [Ny, Nx]
         e = jnp.exp(-(X**2 + 2.0 * Y**2) / 0.3)
         tau_x, tau_y = 0.2 * e * (1.0 + Y), -0.1 * e
         # X-point coordinates: x_X[i] = i dx, y_X[j] = j dy
         Xc, Yc = jnp.meshgrid(
-            jnp.arange(g.Nx) * g.dx - 1.0, jnp.arange(g.Ny) * g.dy - 1.0
+            jnp.arange(g.Nx) * g.spacing("x") - 1.0,
+            jnp.arange(g.Ny) * g.spacing("y") - 1.0,
         )
         ec = jnp.exp(-(Xc**2 + 2.0 * Yc**2) / 0.3)
         # curl = d(tau_y)/dx - d(tau_x)/dy
@@ -386,11 +406,11 @@ class TestWindCurl2D:
 
         F = -tau0 (2 pi / L) sin(2 pi y / L) / (rho0 H).
         """
-        g = CartesianGrid2D.from_interior(32, 32, 5.12e6, 5.12e6)
-        y_t = (jnp.arange(g.Ny) - 0.5) * g.dy
+        g = CartesianCGrid2D.from_interior(32, 32, 5.12e6, 5.12e6)
+        y_t = (jnp.arange(g.Ny) - 0.5) * g.spacing("y")
         tau_x = -0.1 * jnp.cos(2 * jnp.pi * y_t / g.Ly)[:, None] * jnp.ones(g.Nx)
         out = WindCurl2D(grid=g)(tau_x, jnp.zeros_like(tau_x), 500.0)
-        y_x = jnp.arange(g.Ny) * g.dy
+        y_x = jnp.arange(g.Ny) * g.spacing("y")
         k = 2 * jnp.pi / g.Ly
         exact = -0.1 * k * jnp.sin(k * y_x)[:, None] * jnp.ones(g.Nx) / (1025.0 * 500.0)
         # centred difference of cos: exact up to sin(k dy/2) / (k dy/2) = 1 - 1e-3
@@ -420,7 +440,7 @@ class TestWindCurl2D:
         out = eqx.filter_jit(op)(tx_nan, ty, 2.0)
         assert bool(jnp.all(jnp.isfinite(out)))
         np.testing.assert_array_equal(
-            np.asarray(out)[~np.asarray(mask.xy_corner_strict)], 0.0
+            np.asarray(out)[~np.asarray(mask.wet(at="X", kind="strict"))], 0.0
         )
         grad = jax.jit(jax.grad(lambda a: op(a, ty, 2.0).sum()))(tx_nan)
         assert bool(jnp.all(jnp.isfinite(grad)))

@@ -29,6 +29,10 @@ from typing import TYPE_CHECKING, Any
 
 import jax.numpy as jnp
 import numpy as np
+from gridax import CField
+from jaxtyping import Array
+
+from sesmax_core._src.fields import is_field, values
 
 
 if TYPE_CHECKING:
@@ -108,14 +112,15 @@ def state_to_dataset(
     """
     xr = _xarray()
 
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {}
+    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray, dict[str, str]]] = {}
     for field in dataclasses.fields(state):
-        leaf = np.asarray(getattr(state, field.name))
+        value = getattr(state, field.name)
+        leaf = np.asarray(values(value))
         rank = leaf.ndim
         dims = _infer_dims(rank, time_axis=time is not None)
         if time is not None:
             leaf = leaf[None]
-        data_vars[field.name] = (dims, leaf)
+        data_vars[field.name] = (dims, leaf, _field_attrs(value))
 
     coords: dict[str, tuple[tuple[str, ...], np.ndarray]] = {}
     if time is not None:
@@ -126,6 +131,26 @@ def state_to_dataset(
     if attrs:
         ds.attrs.update(attrs)
     return ds
+
+
+def _field_attrs(field: Any) -> dict[str, str]:
+    """What rebuilds a `gridax.CField`: its dims and its point. None for an array.
+
+    A snapshot stacked by ``vmap`` or ``diffrax`` has a first dim the state
+    has not; only the grid dims and those before them are recorded.
+    """
+    if not is_field(field):
+        return {}
+    dims = [dim for dim in field.dims if not dim.startswith("batch")]
+    return {"cfield_dims": " ".join(dims), "cfield_loc": str(field.loc)}
+
+
+def _with_attrs(array: Array, attrs: Any) -> Any:
+    """The array, or the `gridax.CField` that :func:`_field_attrs` recorded."""
+    if "cfield_loc" not in attrs:
+        return array
+    dims = attrs["cfield_dims"].split()
+    return CField(array, dims[len(dims) - array.ndim :], loc=attrs["cfield_loc"])
 
 
 def snapshots_to_dataset(
@@ -164,9 +189,10 @@ def snapshots_to_dataset(
     if ts_np.ndim != 1:
         raise ValueError(f"ts must be 1-D, got shape {ts_np.shape}")
 
-    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray]] = {}
+    data_vars: dict[str, tuple[tuple[str, ...], np.ndarray, dict[str, str]]] = {}
     for field in dataclasses.fields(state_class):
-        leaf = np.asarray(getattr(snapshots, field.name))
+        value = getattr(snapshots, field.name)
+        leaf = np.asarray(values(value))
         if leaf.shape[0] != ts_np.shape[0]:
             raise ValueError(
                 f"snapshot leaf {field.name!r} has leading dim {leaf.shape[0]} "
@@ -174,7 +200,7 @@ def snapshots_to_dataset(
             )
         rank = leaf.ndim - 1  # subtract the time axis
         dims = _infer_dims(rank, time_axis=True)
-        data_vars[field.name] = (dims, leaf)
+        data_vars[field.name] = (dims, leaf, _field_attrs(value))
 
     ds = xr.Dataset(data_vars, coords={"time": (("time",), ts_np)})
     ds.attrs.update(_state_attrs(state_class))
@@ -246,7 +272,7 @@ def dataset_to_state(
         var = ds[field.name]
         if "time" in var.dims:
             var = var.isel(time=time_index)
-        kwargs[field.name] = jnp.asarray(var.values)
+        kwargs[field.name] = _with_attrs(jnp.asarray(var.values), var.attrs)
 
     return state_class(**kwargs)
 
@@ -394,7 +420,7 @@ def transform_attrs(transform: Any) -> dict[str, dict[str, Any]]:
     """
     out: dict[str, dict[str, Any]] = {}
     # ``dataclasses.fields`` excludes the ``ClassVar`` metadata a state
-    # may declare (``scale_kinds``, ``mask_locations``); those are dicts
+    # may declare (``scale_kinds``); that is a dict
     # describing the state, not leaves of it.
     fields = (
         dataclasses.fields(type(transform.loc))

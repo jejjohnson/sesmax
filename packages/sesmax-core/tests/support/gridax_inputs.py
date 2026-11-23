@@ -28,14 +28,14 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 from gridax import (
-    CartesianGrid1D,
-    CartesianGrid2D,
-    CartesianGrid3D,
+    CartesianCGrid1D,
+    CartesianCGrid2D,
+    CartesianCGrid3D,
     Mask1D,
     Mask2D,
     Mask3D,
-    SphericalGrid2D,
-    SphericalGrid3D,
+    SphericalCGrid2D,
+    SphericalCGrid3D,
 )
 from jaxtyping import Array, Bool, Float
 
@@ -62,19 +62,19 @@ LZ = 1.0
 # ----------------------------------------------------------------------
 
 
-def make_grid_1d() -> CartesianGrid1D:
+def make_grid_1d() -> CartesianCGrid1D:
     """Canonical 18 (16 interior) 1-D Cartesian Arakawa C-grid."""
-    return CartesianGrid1D.from_interior(NX_INTERIOR, LX)
+    return CartesianCGrid1D.from_interior(NX_INTERIOR, LX)
 
 
-def make_grid_2d() -> CartesianGrid2D:
+def make_grid_2d() -> CartesianCGrid2D:
     """Canonical 18x18 (16x16 interior) 2-D Cartesian Arakawa C-grid."""
-    return CartesianGrid2D.from_interior(NX_INTERIOR, NY_INTERIOR, LX, LY)
+    return CartesianCGrid2D.from_interior(NX_INTERIOR, NY_INTERIOR, LX, LY)
 
 
-def make_grid_3d() -> CartesianGrid3D:
+def make_grid_3d() -> CartesianCGrid3D:
     """Canonical 6x18x18 (4x16x16 interior) 3-D Cartesian Arakawa C-grid."""
-    return CartesianGrid3D.from_interior(
+    return CartesianCGrid3D.from_interior(
         NX_INTERIOR, NY_INTERIOR, NZ_INTERIOR, LX, LY, LZ
     )
 
@@ -87,9 +87,9 @@ _SPHERICAL_LON_RANGE = (-0.1, 0.1)  # radians (~11.5 degrees)
 _SPHERICAL_LAT_RANGE = (-0.1, 0.1)
 
 
-def make_spherical_grid_2d() -> SphericalGrid2D:
+def make_spherical_grid_2d() -> SphericalCGrid2D:
     """Canonical 18x18 2-D spherical Arakawa C-grid (near-equator)."""
-    return SphericalGrid2D.from_interior(
+    return SphericalCGrid2D.from_interior(
         nx_interior=NX_INTERIOR,
         ny_interior=NY_INTERIOR,
         lon_range=_SPHERICAL_LON_RANGE,
@@ -97,9 +97,9 @@ def make_spherical_grid_2d() -> SphericalGrid2D:
     )
 
 
-def make_spherical_grid_3d() -> SphericalGrid3D:
+def make_spherical_grid_3d() -> SphericalCGrid3D:
     """Canonical 6x18x18 3-D spherical Arakawa C-grid (near-equator)."""
-    return SphericalGrid3D.from_interior(
+    return SphericalCGrid3D.from_interior(
         nx_interior=NX_INTERIOR,
         ny_interior=NY_INTERIOR,
         nz_interior=NZ_INTERIOR,
@@ -166,8 +166,8 @@ def make_h_mask_2d() -> Bool[np.ndarray, "Ny Nx"]:
         L L L L L L L L L L L L L L L L L L
 
     The interior island is non-rectangular (cross-shaped) so the derived
-    ``mask.xy_corner_strict`` (strict 4-of-4 corner mask) actually differs
-    from ``mask.h`` near the corners — this exercises the staggered-mask
+    ``mask.wet(at="X", kind="strict")`` (strict 4-of-4 corner mask) actually differs
+    from ``mask.wet()`` near the corners — this exercises the staggered-mask
     propagation.
     """
     h = np.zeros((NY, NX), dtype=bool)

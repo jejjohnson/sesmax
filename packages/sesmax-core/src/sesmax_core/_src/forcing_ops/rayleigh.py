@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import CartesianGrid2D, CartesianGrid3D, Mask2D, Mask3D, interior
+from gridax import CartesianCGrid2D, CartesianCGrid3D, Mask2D, Mask3D, interior
 from jaxtyping import Array, Float
 
 from sesmax_core._src.forcing_ops._base import AbstractForcing
@@ -35,7 +35,7 @@ class RayleighDamping2D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid2D
+    grid : CartesianCGrid2D
         The underlying 2-D grid.
     mask : Mask2D or None, optional
         Optional land/ocean mask.  When provided, ``dq`` is zeroed at dry
@@ -45,15 +45,15 @@ class RayleighDamping2D(AbstractForcing):
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid2D
+    >>> from gridax import CartesianCGrid2D
     >>> from sesmax_core.forcing import RayleighDamping2D
-    >>> grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> grid = CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> damp = RayleighDamping2D(grid=grid)
     >>> h = jnp.ones((grid.Ny, grid.Nx))
     >>> dh = damp(h, r=1e-5, q_ref=0.5 * h)
     """
 
-    grid: CartesianGrid2D
+    grid: CartesianCGrid2D
     mask: Mask2D | None = None
 
     def __call__(
@@ -83,9 +83,9 @@ class RayleighDamping2D(AbstractForcing):
         if self.mask is not None:
             # Zero dry cells first: NaN-filled land would otherwise give NaN
             # gradients through -r * (q - q_ref) even where dq is masked.
-            q = mask_where(q, self.mask.h)
+            q = mask_where(q, self.mask.wet())
             if q_ref is not None and jnp.ndim(q_ref) == 2:
-                q_ref = mask_where(jnp.asarray(q_ref), self.mask.h)
+                q_ref = mask_where(jnp.asarray(q_ref), self.mask.wet())
 
         q_ref_in = None if q_ref is None else interior_or_scalar(q_ref)
         # dq[j, i] = -r[j, i] * (q[j, i] - q_ref[j, i])
@@ -95,7 +95,7 @@ class RayleighDamping2D(AbstractForcing):
 
         if self.mask is None:
             return dq
-        return mask_where(dq, self.mask.h)
+        return mask_where(dq, self.mask.wet())
 
 
 def _level_axis(x: Array) -> int | None:
@@ -117,32 +117,32 @@ class RayleighDamping3D(AbstractForcing):
 
     Parameters
     ----------
-    grid : CartesianGrid3D
+    grid : CartesianCGrid3D
         The underlying 3-D grid.
     mask : Mask3D or None, optional
         Optional land/ocean mask.  The inner :class:`RayleighDamping2D` is
-        mask-free; dry cells of the 3-D result are zeroed with ``mask.h``
+        mask-free; dry cells of the 3-D result are zeroed with ``mask.wet()``
         via ``jnp.where``, so NaN-filled land never leaks into the output.
 
     Examples
     --------
     >>> import jax.numpy as jnp
-    >>> from gridax import CartesianGrid3D
+    >>> from gridax import CartesianCGrid3D
     >>> from sesmax_core.forcing import RayleighDamping3D
-    >>> grid = CartesianGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
+    >>> grid = CartesianCGrid3D.from_interior(6, 6, 4, 1.0, 1.0, 1.0)
     >>> damp = RayleighDamping3D(grid=grid)
     >>> q = jnp.ones((grid.Nz, grid.Ny, grid.Nx))
     >>> r = jnp.linspace(0.0, 1e-5, grid.Nz)  # per-level damping rate
     >>> dq = damp(q, r)
     """
 
-    grid: CartesianGrid3D
+    grid: CartesianCGrid3D
     mask: Mask3D | None
     _damp2d: RayleighDamping2D
 
     def __init__(
         self,
-        grid: CartesianGrid3D,
+        grid: CartesianCGrid3D,
         mask: Mask3D | None = None,
     ) -> None:
         self.grid = grid
@@ -185,9 +185,9 @@ class RayleighDamping3D(AbstractForcing):
         if self.mask is not None:
             # Zero dry cells first: NaN-filled land would otherwise give NaN
             # gradients through -r * (q - q_ref) even where dq is masked.
-            q = mask_where(q, self.mask.h)
+            q = mask_where(q, self.mask.wet())
             if q_ref is not None and jnp.ndim(q_ref) == 3:
-                q_ref = mask_where(jnp.asarray(q_ref), self.mask.h)
+                q_ref = mask_where(jnp.asarray(q_ref), self.mask.wet())
 
         r_arr = jnp.asarray(r)
         if q_ref is None:
@@ -207,4 +207,4 @@ class RayleighDamping3D(AbstractForcing):
 
         if self.mask is None:
             return dq
-        return mask_where(dq, self.mask.h)
+        return mask_where(dq, self.mask.wet())

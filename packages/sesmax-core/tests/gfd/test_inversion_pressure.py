@@ -19,7 +19,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import CartesianGrid2D, Mask2D
+from gridax import CartesianCGrid2D, Mask2D
 from gridax.solvers import masked_neumann_laplacian
 
 from sesmax_core.gfd import (
@@ -33,8 +33,8 @@ N = 34
 
 
 def _grid():
-    g = CartesianGrid2D.from_interior(N - 2, N - 2, Lx=1.0, Ly=1.3)
-    return g.dx, g.dy
+    g = CartesianCGrid2D.from_interior(N - 2, N - 2, Lx=1.0, Ly=1.3)
+    return g.spacing("x"), g.spacing("y")
 
 
 def _rect_mask():
@@ -66,7 +66,7 @@ class TestPressureCG:
     def test_agrees_with_spectral_dct_on_rectangle(self):
         dx, dy = _grid()
         mask = _rect_mask()
-        wet = np.asarray(mask.h) > 0.5
+        wet = np.asarray(mask.wet()) > 0.5
         b = _rhs()
         p_sp = pressure_from_divergence(b, dx, dy, bc="dct")
         p_cg = pressure_from_divergence(b, dx, dy, method="cg", mask=mask)
@@ -80,12 +80,12 @@ class TestPressureCG:
         Neumann operator with the (projected) rhs and has zero wet-mean."""
         dx, dy = _grid()
         mask = _island_basin()
-        wet = np.asarray(mask.h) > 0.5
+        wet = np.asarray(mask.wet()) > 0.5
         b = _rhs(1)
         p = pressure_from_divergence(b, dx, dy, method="cg", mask=mask)
         assert abs(np.asarray(p)[wet].mean()) < 1e-14
         np.testing.assert_array_equal(np.asarray(p)[~wet], 0.0)
-        lap = masked_neumann_laplacian(p, mask.h.astype(b.dtype), dx, dy)
+        lap = masked_neumann_laplacian(p, mask.wet().astype(b.dtype), dx, dy)
         # residual of the CG solve: rtol 1e-6 of |b| ~ 3
         np.testing.assert_allclose(np.asarray(lap)[wet], _demeaned(b, wet), atol=1e-5)
 
@@ -96,7 +96,7 @@ class TestPressureCG:
         m[1:-1, 1:-1] = True
         m[:, N // 2] = False  # a dry wall splits the basin in two
         mask = Mask2D.from_mask(m)
-        wet = np.asarray(mask.h) > 0.5
+        wet = np.asarray(mask.wet()) > 0.5
         p = pressure_from_divergence(_rhs(11), dx, dy, method="cg", mask=mask)
         left, right = np.asarray(p)[:, : N // 2], np.asarray(p)[:, N // 2 + 1 :]
         assert abs(left[wet[:, : N // 2]].mean()) < 1e-14
@@ -116,16 +116,16 @@ class TestPressureCG:
         """Manufactured p = sin(pi x) sin(pi y), zero on the faces x, y in {0, 1}."""
         errs = []
         for n in (16, 32):
-            g = CartesianGrid2D.from_interior(n, n, Lx=1.0, Ly=1.0)
-            x = (np.arange(n + 2) - 0.5) * g.dx  # T centres; faces at 0 and 1
+            g = CartesianCGrid2D.from_interior(n, n, Lx=1.0, Ly=1.0)
+            x = (np.arange(n + 2) - 0.5) * g.spacing("x")  # T centres; faces at 0 and 1
             xx, yy = np.meshgrid(x, x)
             exact = np.sin(np.pi * xx) * np.sin(np.pi * yy)
             m = np.zeros((n + 2, n + 2), dtype=bool)
             m[1:-1, 1:-1] = True
             p = pressure_from_divergence(
                 jnp.asarray(-2 * np.pi**2 * exact),
-                g.dx,
-                g.dx,
+                g.spacing("x"),
+                g.spacing("x"),
                 bc="dst",
                 method="cg",
                 mask=Mask2D.from_mask(m),

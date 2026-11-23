@@ -24,11 +24,6 @@ def fvx_ops() -> ModuleType:
     return fp
 
 
-def grid_spec(grid: Any) -> tuple[int, int, float, float]:
-    """``(nx_interior, ny_interior, Lx, Ly)`` of a ``CartesianGrid2D``."""
-    return fvx_ops().as_grid_spec(grid)
-
-
 def masked(mask: Any, stagger: str, x: Array) -> Array:
     """Zero ``x`` on the dry points of ``stagger`` (no-op without a mask).
 

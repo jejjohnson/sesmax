@@ -7,6 +7,7 @@ import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from gridax.schemes import Upwind
 
 from sesmax_core import Diagnostics, Model, Params, State
 from sesmax_core._src.testing.pde2d.navier_stokes import (
@@ -136,7 +137,7 @@ class TestIncompressibleNS2D:
         model = IncompressibleNS2D.create(nx=16, ny=16, nu=0.1, u_lid=1.0)
         omega0 = jnp.zeros((model.grid.Ny, model.grid.Nx))
         state = model.apply_boundary_conditions(NSVorticityState(omega=omega0))
-        lid = -2.0 * model.u_lid / model.grid.dy
+        lid = -2.0 * model.u_lid / model.grid.spacing("y")
         assert jnp.allclose(state.omega[-2, 1:-2], lid)
         assert jnp.allclose(state.omega[-1, :], 0.0)
         assert jnp.allclose(state.omega[1:-2, -1], 0.0)
@@ -201,7 +202,7 @@ class TestIncompressibleNS2D:
         state = model.apply_boundary_conditions(
             NSVorticityState(omega=jnp.zeros((10, 10)), flux=jnp.asarray(0.5))
         )
-        dy = model.grid.dy
+        dy = model.grid.spacing("y")
         # psi[1] = Q dy / Ly and psi[-3] = Q (Ly - dy) / Ly at zero interior omega
         assert jnp.allclose(state.omega[0, 1:-1], -2.0 * 0.5 * dy / dy**2, rtol=1e-5)
         assert jnp.allclose(state.omega[-2, 1:-1], 2.0 * 0.5 * dy / dy**2, rtol=1e-5)
@@ -228,9 +229,9 @@ class TestIncompressibleNS2D:
         )
 
     def test_channel_and_box_take_no_mask(self):
-        from gridax import CartesianGrid2D, Mask2D
+        from gridax import CartesianCGrid2D, Mask2D
 
-        grid = CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+        grid = CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
         mask = Mask2D.from_dimensions(grid.Ny, grid.Nx)
         with pytest.raises(ValueError, match="does not take a mask"):
             IncompressibleNS2D.create(nx=8, ny=8, problem="periodic", mask=mask)
@@ -244,10 +245,10 @@ class TestIncompressibleNS2D:
         """
         n, nu, t1 = 32, 0.01, 0.5
         model = IncompressibleNS2D.create(
-            nx=n, ny=n, nu=nu, problem="periodic", method="upwind3"
+            nx=n, ny=n, nu=nu, problem="periodic", scheme=Upwind(3)
         )
         k = 2.0 * jnp.pi
-        x = jnp.arange(n + 2) * model.grid.dx
+        x = jnp.arange(n + 2) * model.grid.spacing("x")
         grid_x, grid_y = jnp.meshgrid(x, x)
         omega0 = 2.0 * k * jnp.sin(k * grid_x) * jnp.sin(k * grid_y)
         sol = model.integrate(
@@ -287,9 +288,9 @@ class TestIncompressibleNS2D:
         psi = model.diagnose(model.apply_boundary_conditions(final)).psi
         exact_flux = G * Ly**3 / (12.0 * nu)
         assert abs(float(final.flux) - exact_flux) / exact_flux < 0.01
-        y = jnp.arange(1, n) * model.grid.dy
+        y = jnp.arange(1, n) * model.grid.spacing("y")
         u_centred = (psi[2 : n + 1, 1:-1] - psi[0 : n - 1, 1:-1]) / (
-            2.0 * model.grid.dy
+            2.0 * model.grid.spacing("y")
         )
         u_exact = (G / (2.0 * nu)) * y * (Ly - y)
         rms = jnp.sqrt(jnp.mean((u_centred - u_exact[:, None]) ** 2))

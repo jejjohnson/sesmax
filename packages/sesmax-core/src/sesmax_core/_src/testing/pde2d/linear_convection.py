@@ -5,20 +5,22 @@ from __future__ import annotations
 import math
 from typing import Any, ClassVar
 
-import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    CartesianGrid2D,
+    CartesianCGrid2D,
+    CField,
     Difference2D,
     Interpolation2D,
     Mask2D,
-    enforce_periodic,
+    fill_ghosts,
 )
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src._validation import require_positive
+from sesmax_core._src.fields import each, values
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
+from sesmax_core._src.testing.pde2d._advective_form import PERIODIC
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
 
 
@@ -41,7 +43,7 @@ class LinearConvection2DState(State):
         u: Scalar field on T-points, shape ``(Ny, Nx)`` including ghost cells.
     """
 
-    u: Array
+    u: Array | CField
 
     # ``u`` here is a T-point scalar, not a C-grid velocity: it is the
     # transported quantity, and the velocity is a separate coefficient.
@@ -49,7 +51,6 @@ class LinearConvection2DState(State):
     # scale for it in ``Scales`` and the nondimensionalisation leaves
     # it alone rather than dividing it by ``U``.
     scale_kinds: ClassVar[dict[str, str]] = {"u": "tracer"}
-    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
 
 
 class LinearConvection2DDiagnostics(Diagnostics):
@@ -76,7 +77,7 @@ class LinearConvection2D(Model):
     """
 
     params: LinearConvection2DParams
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     diff: Difference2D
     interp: Interpolation2D
     mask: Mask2D | None
@@ -86,20 +87,26 @@ class LinearConvection2D(Model):
     ) -> LinearConvection2DState:
         """Compute tendency: du/dt = -cx * du/dx - cy * du/dy."""
         # Flux in x: c_x * u at U-points, then divergence back to T
-        flux_x = self.params.cx * self.interp.T_to_U(state.u)
+        flux_x = each(lambda u: self.params.cx * u, self.interp.T_to_U(state.u))
         # Flux in y: c_y * u at V-points, then divergence back to T
-        flux_y = self.params.cy * self.interp.T_to_V(state.u)
-        du_dt = -(self.diff.diff_x_U_to_T(flux_x) + self.diff.diff_y_V_to_T(flux_y))
+        flux_y = each(lambda u: self.params.cy * u, self.interp.T_to_V(state.u))
+        du_dt = each(
+            lambda fx, fy: -(fx + fy),
+            self.diff.diff_x_U_to_T(flux_x),
+            self.diff.diff_y_V_to_T(flux_y),
+        )
         return LinearConvection2DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> LinearConvection2DState:
         """Apply periodic boundary conditions."""
-        return LinearConvection2DState(u=enforce_periodic(state.u))
+        return fill_ghosts(state, self.grid, LinearConvection2DState(u=PERIODIC))
 
     def diagnose(self, state: PyTree) -> LinearConvection2DDiagnostics:
         """Compute energy diagnostic."""
-        interior = state.u[1:-1, 1:-1]
-        energy = 0.5 * jnp.sum(interior**2) * self.grid.dx * self.grid.dy
+        interior = values(state.u)[1:-1, 1:-1]
+        energy = (
+            0.5 * jnp.sum(interior**2) * self.grid.spacing("x") * self.grid.spacing("y")
+        )
         return LinearConvection2DDiagnostics(energy=energy)
 
     @staticmethod
@@ -184,7 +191,7 @@ class LinearConvection2D(Model):
         Returns:
             A ``LinearConvection2D`` model instance.
         """
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         params = LinearConvection2DParams(cx=as_parameter(cx), cy=as_parameter(cy))
         diff = Difference2D(grid=grid, mask=mask)
         interp = Interpolation2D(grid=grid, mask=mask)

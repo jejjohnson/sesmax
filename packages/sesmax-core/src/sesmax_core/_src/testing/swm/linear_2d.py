@@ -8,17 +8,23 @@ import equinox as eqx
 import jax.numpy as jnp
 from geophysix.rotation import beta_plane
 from gridax import (
-    CartesianGrid2D,
+    BC,
+    CartesianCGrid2D,
+    CField,
     Coriolis2D,
     Difference2D,
+    Dirichlet,
     Interpolation2D,
     Mask2D,
-    enforce_periodic,
-    wall_boundaries,
+    Neumann,
+    Periodic,
+    fill_ghosts,
+    laplacian,
 )
 from jaxtyping import Array, Float, PyTree
 
-from sesmax_core._src._diagnostic_ops import fvx_ops, grid_spec, masked
+from sesmax_core._src._diagnostic_ops import fvx_ops, masked
+from sesmax_core._src.fields import each, placed, values
 from sesmax_core._src.model import Model
 from sesmax_core._src.types import Diagnostics, Params, PhysConsts, State, as_parameter
 
@@ -32,12 +38,26 @@ class LinearSW2DState(State):
         v: y-velocity on V-points, shape ``(Ny, Nx)``.
     """
 
-    h: Float[Array, "Ny Nx"]
-    u: Float[Array, "Ny Nx"]
-    v: Float[Array, "Ny Nx"]
+    h: Float[Array, "Ny Nx"] | CField
+    u: Float[Array, "Ny Nx"] | CField
+    v: Float[Array, "Ny Nx"] | CField
 
     # ``h`` is the perturbation, so it is already centred on zero.
     scale_kinds: ClassVar[dict[str, str]] = {"h": "height_anomaly"}
+
+
+#: The point of each field.
+POINTS = LinearSW2DState(h="T", u="U", v="V")
+_BOX = BC(x=Periodic(), y=Periodic())
+_FLAT, _WALL = Neumann(), Dirichlet(0.0)
+#: The boundary conditions of each ``bc_type``: the doubly periodic box, and
+#: closed walls with no normal flow and free slip.
+BCS = {
+    "periodic": LinearSW2DState(h=_BOX, u=_BOX, v=_BOX),
+    "wall": LinearSW2DState(
+        h=BC(x=_FLAT, y=_FLAT), u=BC(x=_WALL, y=_FLAT), v=BC(x=_FLAT, y=_WALL)
+    ),
+}
 
 
 class LinearSW2DParams(Params):
@@ -105,7 +125,7 @@ class LinearShallowWater2D(Model):
 
     params: LinearSW2DParams
     consts: LinearSW2DPhysConsts = eqx.field(static=True)
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     diff: Difference2D
     interp: Interpolation2D
     coriolis: Coriolis2D
@@ -124,38 +144,36 @@ class LinearShallowWater2D(Model):
         kappa = self.params.bottom_drag
 
         # Mass equation: dh/dt = -H0 * div(u, v)
-        dh_dt = -H0 * self.diff.divergence(u, v)
-
-        # Pressure gradient
-        du_dt = -g * self.diff.diff_x_T_to_U(h)
-        dv_dt = -g * self.diff.diff_y_T_to_V(h)
+        dh_dt = each(lambda div: -H0 * div, self.diff.divergence(u, v))
 
         # Coriolis: du += f*v, dv -= f*u
-        du_cor, dv_cor = self.coriolis(u, v, self.f_field)
-        du_dt = du_dt + du_cor
-        dv_dt = dv_dt + dv_cor
+        f = placed(self.f_field, u, "T")
+        du_cor, dv_cor = self.coriolis(u, v, f)
 
-        # Diffusion
-        du_dt = du_dt + nu * self.diff.laplacian(u)
-        dv_dt = dv_dt + nu * self.diff.laplacian(v)
+        # Pressure gradient and Coriolis, then diffusion and bottom drag
+        def momentum(dh: Array, cor: Array, lap: Array, velocity: Array) -> Array:
+            return -g * dh + cor + nu * lap - kappa * velocity
 
-        # Bottom drag
-        du_dt = du_dt - kappa * u
-        dv_dt = dv_dt - kappa * v
+        du_dt = each(
+            momentum,
+            self.diff.diff_x_T_to_U(h),
+            du_cor,
+            laplacian(u, self.grid, at="U", mask=self.mask),
+            u,
+        )
+        dv_dt = each(
+            momentum,
+            self.diff.diff_y_T_to_V(h),
+            dv_cor,
+            laplacian(v, self.grid, at="V", mask=self.mask),
+            v,
+        )
 
         return LinearSW2DState(h=dh_dt, u=du_dt, v=dv_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> LinearSW2DState:
         """Apply boundary conditions (periodic or free-slip wall)."""
-        if self.bc_type == "periodic":
-            h = enforce_periodic(state.h)
-            u = enforce_periodic(state.u)
-            v = enforce_periodic(state.v)
-        else:
-            h = wall_boundaries(state.h, "h")
-            u = wall_boundaries(state.u, "u")
-            v = wall_boundaries(state.v, "v")
-        return LinearSW2DState(h=h, u=u, v=v)
+        return fill_ghosts(state, self.grid, BCS[self.bc_type], stagger=POINTS)
 
     def diagnose(self, state: PyTree) -> LinearSW2DDiagnostics:
         """Compute energy and relative vorticity (finitevolX Tier-B ops).
@@ -165,8 +183,8 @@ class LinearShallowWater2D(Model):
         boundary condition (periodic or wall).
         """
         fp = fvx_ops()
-        G = grid_spec(self.grid)
-        h, u, v = state.h, state.u, state.v
+        G = self.grid
+        h, u, v = values(state.h), values(state.u), values(state.v)
         ke = fp.KineticEnergy(grid=G)(u, v)  # T
         ape = fp.AvailablePE(grid=G, g_prime=self.consts.gravity)(h)  # T
         energy = fp.TotalEnergy(grid=G)(self.consts.H0 * ke, ape)
@@ -207,7 +225,7 @@ class LinearShallowWater2D(Model):
         Returns:
             A ``LinearShallowWater2D`` model instance.
         """
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         params = LinearSW2DParams(
             lateral_viscosity=as_parameter(lateral_viscosity),
             bottom_drag=as_parameter(bottom_drag),
@@ -218,7 +236,7 @@ class LinearShallowWater2D(Model):
         coriolis = Coriolis2D(grid=grid, mask=mask)
 
         # Build f(y) = f0 + beta * (y - y0) on full grid
-        y = jnp.arange(grid.Ny) * grid.dy
+        y = jnp.arange(grid.Ny) * grid.spacing("y")
         y0 = Ly / 2.0
         Y = jnp.broadcast_to(y[:, None], (grid.Ny, grid.Nx))
         f_field = beta_plane(Y, f0=f0, beta=beta, y0=y0)

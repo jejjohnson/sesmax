@@ -30,14 +30,14 @@ from __future__ import annotations
 
 import numbers
 from collections.abc import Callable
-from typing import Literal
+from typing import Any, Literal
 
 import equinox as eqx
 import gaussx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from gridax import BoundaryConditionSet, Dirichlet1D, Mask2D, Neumann1D, Periodic1D
+from gridax import BC, Dirichlet, Mask2D, Neumann, Periodic
 from gridax.solvers import (
     CapacitanceSolver,
     MultigridSolver,
@@ -68,7 +68,7 @@ __all__ = [
 
 _MaskLike = Float[Array, "Ny Nx"] | Mask2D
 _PrecondLike = Callable[[Float[Array, "Ny Nx"]], Float[Array, "Ny Nx"]]
-_BCLike = str | BoundaryConditionSet
+_BCLike = str | BC
 _Method = Literal["spectral", "cg", "capacitance", "multigrid"]
 _METHODS = ("spectral", "cg", "capacitance", "multigrid")
 _METHOD_ERROR = "method must be 'spectral', 'cg', 'capacitance' or 'multigrid'"
@@ -156,7 +156,7 @@ def _resolve_mask_arr(
     if mask is None:
         return None
     if isinstance(mask, Mask2D):
-        stag_mask = mask.xy_corner_strict if staggering == "X" else mask.h
+        stag_mask = mask.wet(at="X", kind="strict") if staggering == "X" else mask.wet()
         return jnp.asarray(stag_mask, dtype=dtype)
     return jnp.asarray(mask, dtype=dtype)
 
@@ -325,7 +325,7 @@ def _v_cycle_preconditioner(
 
     The hierarchy must be built on the solve's mask, ``lambda_`` and wall:
     ``build_multigrid_solver(mask, dx, dy, lambda_)`` (Dirichlet) for ψ, or
-    ``bc="neumann"`` on ``mask.h`` for the pressure with ``bc="dct"``. A
+    ``bc="neumann"`` on ``mask.wet()`` for the pressure with ``bc="dct"``. A
     T-point ``bc="dst"`` puts its wall on the faces, which the hierarchy's
     Dirichlet wall (on the dry centres) is not, so it raises.
     """
@@ -433,6 +433,13 @@ def _is_zero(value: object) -> bool:
     return arr.dtype.kind in "iuf" and not arr.any()
 
 
+def _faces(bc: BC) -> tuple[Any, ...]:
+    """The conditions on the south, north, west and east faces (``None`` if not set)."""
+    south, north = bc.faces.get("y", (None, None))
+    west, east = bc.faces.get("x", (None, None))
+    return south, north, west, east
+
+
 def _resolve_bc(
     bc: _BCLike,
     method: str,
@@ -444,48 +451,34 @@ def _resolve_bc(
 ) -> tuple[str, _MaskLike | None, Array | None]:
     """Translate ``bc`` into ``(bc_str, mask, known_values)``.
 
-    A string passes through unchanged. A `gridax.BoundaryConditionSet`
-    selects the spectral transform from its face types (all Dirichlet →
-    ``"dst"``, all zero Neumann → ``"dct"``, all periodic → ``"fft"``),
-    supplies ``bc.mask`` to the mask-based methods (``method="spectral"``
-    with a ``bc.mask`` raises), and turns non-zero Dirichlet face values into
-    known values on each face's wall (coast) nodes unless ``known_values``
-    is given (which then wins).
+    A string passes through unchanged. A `gridax.BC` selects the spectral
+    transform from its face types (all Dirichlet → ``"dst"``, all zero
+    Neumann → ``"dct"``, all periodic → ``"fft"``), and non-zero Dirichlet
+    face values become known values on each face's wall (coast) nodes unless
+    ``known_values`` is given (which then wins).
     """
-    if not isinstance(bc, BoundaryConditionSet):
+    if not isinstance(bc, BC):
         return bc, mask, known_values
 
-    faces = (bc.south, bc.north, bc.west, bc.east)
-    if all(isinstance(f, Dirichlet1D) for f in faces):
+    faces = _faces(bc)
+    if all(isinstance(f, Dirichlet) for f in faces):
         bc_str = "dst"
-    elif all(isinstance(f, Neumann1D) for f in faces):
-        if not all(_is_zero(f.value) for f in faces):
+    elif all(isinstance(f, Neumann) for f in faces):
+        if not all(_is_zero(f.gradient) for f in faces):
             raise ValueError(
                 "Inhomogeneous Neumann faces are not supported by the elliptic "
-                "solvers; use Neumann1D faces with value=0."
+                "solvers; use Neumann faces with gradient=0."
             )
         bc_str = "dct"
-    elif all(isinstance(f, Periodic1D) for f in faces):
+    elif all(isinstance(f, Periodic) for f in faces):
         bc_str = "fft"
     else:
         names = [type(f).__name__ for f in faces]
         raise ValueError(
-            "An elliptic solve needs all four faces of the BoundaryConditionSet "
-            "to be Dirichlet1D, Neumann1D or Periodic1D (no mixing); got "
+            "An elliptic solve needs all four faces of the BC to be Dirichlet, "
+            "Neumann or Periodic (no mixing); got "
             f"south/north/west/east = {names}"
         )
-
-    # The spectral path is rectangular: a bc.mask cannot be honoured there.
-    if bc.mask is not None:
-        if method == "spectral":
-            raise ValueError(
-                "method='spectral' solves the rectangle and cannot honour "
-                "bc.mask; use method='cg' or 'capacitance' for a masked domain, "
-                "or drop the mask from the BoundaryConditionSet."
-            )
-        if mask is not None:
-            raise ValueError("Pass the mask either as bc.mask or as mask=, not both.")
-        mask = bc.mask
 
     if (
         bc_str == "dst"
@@ -493,13 +486,13 @@ def _resolve_bc(
         and not all(_is_zero(f.value) for f in faces)
     ):
         if staggering == "T":
-            # Dirichlet1D prescribes the value on the wall *face* (ghost =
+            # Dirichlet prescribes the value on the wall *face* (ghost =
             # 2 v - interior), but the lifting prescribes values at cell
             # centres: on T points that is the ghost-cell centre, half a cell
             # outside the face (a silent first-order wall error).  Refuse
             # rather than move the wall.
             raise ValueError(
-                "Non-zero Dirichlet1D faces are not supported for the T-point "
+                "Non-zero Dirichlet faces are not supported for the T-point "
                 "pressure solve: the value belongs on the cell face, but known "
                 "values can only be pinned at cell centres (the ghost cells, "
                 "half a cell outside the face)."
@@ -526,7 +519,7 @@ def _x_basin(shape: tuple[int, ...]) -> Array:
 def _check_faces_cover_outer_coast(wet: Array) -> None:
     """Raise if the outer coast of ``wet`` is not on the four walls.
 
-    A `gridax.BoundaryConditionSet` gives one value per face, which is only
+    A `gridax.BC` gives one value per face, which is only
     well defined when every coast node of the outer land (the dry region
     connected to the array edge) lies on one of the four wall lines around
     the wet bounding box: a rectangular basin, islands allowed (their coasts
@@ -558,7 +551,7 @@ def _check_faces_cover_outer_coast(wet: Array) -> None:
     n_off = int(np.sum(outer_coast & ~on_walls))
     if n_off:
         raise ValueError(
-            "Non-zero Dirichlet1D face values need a basin whose outer coast "
+            "Non-zero Dirichlet face values need a basin whose outer coast "
             "lies on the four walls (a rectangle; islands are allowed and stay "
             f"at zero), but {n_off} outer coast nodes are on no face.  For a "
             "general coastline pass known_values on gridax.solvers.coast_ring(mask)."
@@ -566,7 +559,7 @@ def _check_faces_cover_outer_coast(wet: Array) -> None:
 
 
 def _dirichlet_face_values(
-    bc: BoundaryConditionSet, wet: Array, dtype: jnp.dtype
+    bc: BC, wet: Array, dtype: jnp.dtype
 ) -> Float[Array, "Ny Nx"]:
     """Known-value field holding each Dirichlet face value on that face's wall nodes.
 
@@ -574,7 +567,7 @@ def _dirichlet_face_values(
     just south / north of the wet bounding box and the column just west /
     east of it. For ψ on a ``from_interior`` rectangle these are X rows 0
     (south) and N-2 (north) and X columns 0 (west) and N-2 (east), the
-    C-grid wall nodes. Faces are written in the BoundaryConditionSet order
+    C-grid wall nodes. Faces are written in the order
     (south, north, west, east), so west / east win where a wall node is on
     two faces. Island coasts, which are not on a face, stay at zero.
     """
@@ -591,11 +584,12 @@ def _dirichlet_face_values(
     i_west = jnp.argmax(wet_cols) - 1
     i_east = nx - jnp.argmax(wet_cols[::-1])
 
+    south, north, west, east = _faces(bc)
     values = jnp.zeros((ny, nx), dtype=dtype)
-    values = jnp.where(j == j_south, jnp.asarray(bc.south.value, dtype), values)
-    values = jnp.where(j == j_north, jnp.asarray(bc.north.value, dtype), values)
-    values = jnp.where(i == i_west, jnp.asarray(bc.west.value, dtype), values)
-    values = jnp.where(i == i_east, jnp.asarray(bc.east.value, dtype), values)
+    values = jnp.where(j == j_south, jnp.asarray(south.value, dtype), values)
+    values = jnp.where(j == j_north, jnp.asarray(north.value, dtype), values)
+    values = jnp.where(i == i_west, jnp.asarray(west.value, dtype), values)
+    values = jnp.where(i == i_east, jnp.asarray(east.value, dtype), values)
     # Only the coast cells carry boundary values.
     return jnp.where(coast_ring(wet), values, jnp.zeros((), dtype))
 
@@ -826,18 +820,17 @@ def streamfunction_from_vorticity(
             ignore them). With ``"dct"`` (∂ψ/∂n = 0 on the walls) the wall
             nodes are unknowns, so ``zeta`` is read there too (X rows /
             columns 0 and N-2): fill the wall values of ``zeta`` first. A
-            `gridax.BoundaryConditionSet` is also accepted: its face types
-            select the transform (all ``Dirichlet1D`` → ``"dst"``, all
-            zero-valued ``Neumann1D`` → ``"dct"``, all ``Periodic1D`` →
-            ``"fft"``; mixing raises), its ``mask`` is used by the
-            mask-based methods, and non-zero ``Dirichlet1D`` values become
+            `gridax.BC` is also accepted: its face types
+            select the transform (all ``Dirichlet`` → ``"dst"``, all
+            zero-valued ``Neumann`` → ``"dct"``, all ``Periodic`` →
+            ``"fft"``; mixing raises), and non-zero ``Dirichlet`` values become
             ``known_values`` on each face's wall nodes (explicit
             ``known_values`` take precedence).
         lambda_: The Helmholtz parameter λ ≥ 0.
         method: ``"spectral"``, ``"cg"``, ``"capacitance"`` or
             ``"multigrid"``.
         mask: Domain mask, needed by ``"cg"`` and ``"multigrid"``. A
-            `gridax.Mask2D` gives its ψ mask ``xy_corner_strict``.
+            `gridax.Mask2D` gives its strict X mask.
         capacitance_solver: The pre-built capacitance solver of
             ``method="capacitance"``.
         multigrid_solver: The pre-built multigrid hierarchy of
@@ -869,15 +862,15 @@ def streamfunction_from_vorticity(
         ψ = sin(πx) sin(πy) on the unit square has ∇²ψ = -2π² ψ:
 
         >>> import jax.numpy as jnp
-        >>> from gridax import CartesianGrid2D
+        >>> from gridax import CartesianCGrid2D
         >>> from sesmax_core.gfd import streamfunction_from_vorticity
-        >>> grid = CartesianGrid2D.from_interior(32, 32, 1.0, 1.0)
+        >>> grid = CartesianCGrid2D.from_interior(32, 32, 1.0, 1.0)
         >>> # X node (j, i) at (j dy, i dx): the walls are the nodes 0 and N-2
-        >>> x = jnp.arange(grid.Nx) * grid.dx
-        >>> y = jnp.arange(grid.Ny) * grid.dy
+        >>> x = jnp.arange(grid.Nx) * grid.spacing("x")
+        >>> y = jnp.arange(grid.Ny) * grid.spacing("y")
         >>> exact = jnp.sin(jnp.pi * y)[:, None] * jnp.sin(jnp.pi * x)[None, :]
         >>> psi = streamfunction_from_vorticity(
-        ...     -2 * jnp.pi**2 * exact, grid.dx, grid.dy
+        ...     -2 * jnp.pi**2 * exact, grid.spacing("x"), grid.spacing("y")
         ... )
         >>> error = jnp.max(jnp.abs(psi - exact)[1:-2, 1:-2])
         >>> bool(error < 2e-3)
@@ -952,16 +945,16 @@ def pressure_from_divergence(
             region (the problem fixes p only up to a constant per region).
             ``"dst"`` is p = 0 on the faces, for ``"spectral"`` and ``"cg"``.
             ``"fft"`` (periodic) is ``method="spectral"`` only. A
-            `gridax.BoundaryConditionSet` is accepted as in
+            `gridax.BC` is accepted as in
             `streamfunction_from_vorticity`, except that non-zero
-            ``Dirichlet1D`` faces raise.
+            ``Dirichlet`` faces raise.
         method: ``"spectral"``, ``"cg"`` or ``"multigrid"``.
             ``"capacitance"`` raises: its solver holds the unknown at zero
             on the dry cell centres (the ψ wall), not on the faces.
         mask: Domain mask, needed by ``"cg"`` and ``"multigrid"``. A
             `gridax.Mask2D` gives its T-point mask ``h``.
         multigrid_solver: The pre-built hierarchy of ``method="multigrid"``,
-            ``build_multigrid_solver(mask.h, dx, dy, bc="neumann")`` for
+            ``build_multigrid_solver(mask.wet(), dx, dy, bc="neumann")`` for
             ``bc="dct"``.
         preconditioner: A custom preconditioner for ``method="cg"``.
 
@@ -977,14 +970,16 @@ def pressure_from_divergence(
         ∇²p = -2π² p:
 
         >>> import jax.numpy as jnp
-        >>> from gridax import CartesianGrid2D
+        >>> from gridax import CartesianCGrid2D
         >>> from sesmax_core.gfd import pressure_from_divergence
-        >>> grid = CartesianGrid2D.from_interior(32, 32, 1.0, 1.0)
+        >>> grid = CartesianCGrid2D.from_interior(32, 32, 1.0, 1.0)
         >>> # T cell (j, i) at ((j - 1/2) dy, (i - 1/2) dx)
-        >>> x = (jnp.arange(grid.Nx) - 0.5) * grid.dx
-        >>> y = (jnp.arange(grid.Ny) - 0.5) * grid.dy
+        >>> x = (jnp.arange(grid.Nx) - 0.5) * grid.spacing("x")
+        >>> y = (jnp.arange(grid.Ny) - 0.5) * grid.spacing("y")
         >>> exact = jnp.cos(jnp.pi * y)[:, None] * jnp.cos(jnp.pi * x)[None, :]
-        >>> p = pressure_from_divergence(-2 * jnp.pi**2 * exact, grid.dx, grid.dy)
+        >>> p = pressure_from_divergence(
+        ...     -2 * jnp.pi**2 * exact, grid.spacing("x"), grid.spacing("y")
+        ... )
         >>> error = jnp.max(jnp.abs(p - exact)[1:-1, 1:-1])
         >>> bool(error < 2e-3)
         True
@@ -1048,7 +1043,7 @@ def pv_inversion(
         lambda_: λ, a scalar for every layer or one per layer, ``(nl,)``.
         bc: Boundary condition on the wall / coast, as in
             `streamfunction_from_vorticity` (``"dst"`` for the mask-based
-            methods); a `gridax.BoundaryConditionSet` is accepted as there.
+            methods); a `gridax.BC` is accepted as there.
         method: ``"spectral"``, ``"cg"``, ``"capacitance"`` or
             ``"multigrid"``.
         mask: Domain mask, needed by ``"cg"`` and ``"multigrid"``.
@@ -1074,17 +1069,17 @@ def pv_inversion(
         Two layers with their own deformation parameter, one mode each:
 
         >>> import jax.numpy as jnp
-        >>> from gridax import CartesianGrid2D
+        >>> from gridax import CartesianCGrid2D
         >>> from sesmax_core.gfd import pv_inversion
-        >>> grid = CartesianGrid2D.from_interior(32, 32, 1.0, 1.0)
+        >>> grid = CartesianCGrid2D.from_interior(32, 32, 1.0, 1.0)
         >>> # X node (j, i) at (j dy, i dx)
-        >>> x = jnp.arange(grid.Nx) * grid.dx
-        >>> y = jnp.arange(grid.Ny) * grid.dy
+        >>> x = jnp.arange(grid.Nx) * grid.spacing("x")
+        >>> y = jnp.arange(grid.Ny) * grid.spacing("y")
         >>> mode = jnp.sin(jnp.pi * y)[:, None] * jnp.sin(jnp.pi * x)[None, :]
         >>> lam = jnp.array([0.0, 50.0])
         >>> # q_k = (∇² - λ_k) ψ_k ≈ -(2π² + λ_k) ψ_k for ψ_k = mode
         >>> q = -(2 * jnp.pi**2 + lam)[:, None, None] * mode
-        >>> psi = pv_inversion(q, grid.dx, grid.dy, lam)
+        >>> psi = pv_inversion(q, grid.spacing("x"), grid.spacing("y"), lam)
         >>> psi.shape
         (2, 34, 34)
         >>> bool(jnp.max(jnp.abs(psi - mode)[:, 1:-2, 1:-2]) < 2e-3)

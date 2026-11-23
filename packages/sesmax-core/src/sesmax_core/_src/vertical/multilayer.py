@@ -18,7 +18,7 @@ Use :func:`multilayer` to lift any 2D callable (e.g., a bound method of
     >>> import jax.numpy as jnp
     >>> import gridax
     >>> from sesmax_core.vertical import multilayer
-    >>> grid = gridax.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> grid = gridax.CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> diff2d = gridax.Difference2D(grid=grid)
     >>> h = jnp.ones((4, grid.Ny, grid.Nx))  # 4 layers
     >>> dh_dx = multilayer(diff2d.diff_x_T_to_U)(h)  # shape [4, Ny, Nx]
@@ -81,7 +81,7 @@ def multilayer(fn: Callable[..., Any]) -> Callable[..., Any]:
     >>> import jax.numpy as jnp
     >>> import gridax
     >>> from sesmax_core.vertical import multilayer
-    >>> grid = gridax.CartesianGrid2D.from_interior(8, 8, 1.0, 1.0)
+    >>> grid = gridax.CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
     >>> diff2d = gridax.Difference2D(grid=grid)
     >>> h = jnp.ones((3, grid.Ny, grid.Nx))  # 3 layers
     >>> dh = multilayer(diff2d.diff_x_T_to_U)(h)

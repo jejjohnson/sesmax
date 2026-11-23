@@ -83,7 +83,7 @@ MODELS_2D = [
 @pytest.mark.parametrize(("make_model", "state_type"), MODELS_1D)
 def test_1d_matches_characteristics(make_model, state_type):
     model = make_model()
-    x = jnp.arange(model.grid.Nx) * model.grid.dx
+    x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
     state = model.apply_boundary_conditions(state_type(u=_wave(x)))
     solution = model.integrate(
         state, t0=0.0, t1=END_TIME_1D, dt=2.5e-4, saveat=dfx.SaveAt(t1=True)
@@ -97,7 +97,7 @@ def test_1d_matches_characteristics(make_model, state_type):
 @pytest.mark.parametrize(("make_model", "state_type"), MODELS_2D)
 def test_2d_uniform_in_y_matches_characteristics(make_model, state_type):
     model = make_model()
-    x = jnp.arange(model.grid.Nx) * model.grid.dx
+    x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
     x_grid = jnp.tile(x, (model.grid.Ny, 1))
     state = model.apply_boundary_conditions(
         state_type(u=_wave(x_grid), v=jnp.zeros_like(x_grid))
@@ -117,8 +117,8 @@ def test_2d_uniform_in_y_matches_characteristics(make_model, state_type):
 def test_2d_diagonal_flow_matches_characteristics(make_model, state_type):
     """With u = v = f(x + y) the flow has divergence, which the form must handle."""
     model = make_model()
-    x = jnp.arange(model.grid.Nx) * model.grid.dx
-    y = jnp.arange(model.grid.Ny) * model.grid.dy
+    x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
+    y = jnp.arange(model.grid.Ny) * model.grid.spacing("y")
     x_grid, y_grid = jnp.meshgrid(x, y)
     phase = x_grid + y_grid
     state = model.apply_boundary_conditions(state_type(u=_wave(phase), v=_wave(phase)))
@@ -134,12 +134,14 @@ def test_2d_diagonal_flow_matches_characteristics(make_model, state_type):
 @pytest.mark.parametrize(("make_model", "state_type"), MODELS_1D)
 def test_1d_flux_form_conserves_across_the_periodic_edge(make_model, state_type):
     model = make_model()
-    x = jnp.arange(model.grid.Nx) * model.grid.dx
+    x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
     state = model.apply_boundary_conditions(state_type(u=_wave(x)))
     solution = model.integrate(
         state, t0=0.0, t1=END_TIME_1D, dt=2.5e-4, saveat=dfx.SaveAt(t1=True)
     )
-    total_change = jnp.sum(solution.ys.u[0, 1:-1] - state.u[1:-1]) * model.grid.dx
+    total_change = jnp.sum(solution.ys.u[0, 1:-1] - state.u[1:-1]) * model.grid.spacing(
+        "x"
+    )
     # Single-precision round-off over the run.
     assert jnp.abs(total_change) < 1e-5
 
@@ -150,7 +152,7 @@ def test_shallow_water_conserves_mass_across_the_periodic_edge():
     model = sxt.NonlinearShallowWater1D.create(
         nx=500, Lx=1e6, g=9.81, f0=0.0, H0=100.0, lateral_viscosity=50.0
     )
-    x = jnp.arange(model.grid.Nx) * model.grid.dx
+    x = jnp.arange(model.grid.Nx) * model.grid.spacing("x")
     height = 100.0 + 2.0 * jnp.exp(-0.5 * ((x - 5e5) / (1e6 / 15.0)) ** 2)
     state = sxt.NonlinearSW1DState(
         h=height, u=jnp.zeros_like(height), v=jnp.zeros_like(height)
@@ -159,7 +161,7 @@ def test_shallow_water_conserves_mass_across_the_periodic_edge():
         state,
         t0=0.0,
         t1=4e4,
-        dt=0.3 * model.grid.dx / 31.3,
+        dt=0.3 * model.grid.spacing("x") / 31.3,
         saveat=dfx.SaveAt(ts=jnp.array([2e4, 4e4])),
     )
     bump_mass = jnp.sum(height[1:-1] - 100.0)

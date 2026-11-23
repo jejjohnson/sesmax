@@ -2,19 +2,32 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import Advection1D, CartesianGrid1D, Difference1D, Interpolation1D, Mask1D
+from gridax import (
+    Advection1D,
+    CartesianCGrid1D,
+    CField,
+    Difference1D,
+    Interpolation1D,
+    Mask1D,
+)
+from gridax.schemes import Scheme, Upwind
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src._validation import require_positive
+from sesmax_core._src.fields import each, values
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
 from sesmax_core._src.testing.pde1d._burgers_flux import burgers_tendency
-from sesmax_core._src.testing.pde1d._ghosts import fill_ghosts
+from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 from sesmax_core._src.types import Diagnostics, Params, State, as_parameter
+
+
+#: The default scheme of the advective face values.
+UPWIND = Upwind(1)
 
 
 class Burgers1DParams(Params):
@@ -34,10 +47,7 @@ class Burgers1DState(State):
         u: Scalar field on T-points, shape ``(Nx,)`` including ghost cells.
     """
 
-    u: Array
-
-    # ``u`` here is a T-point scalar, not a C-grid velocity.
-    mask_locations: ClassVar[dict[str, str]] = {"u": "h"}
+    u: Array | CField
 
 
 class Burgers1DDiagnostics(Diagnostics):
@@ -65,17 +75,17 @@ class Burgers1D(Model):
         interp: Interpolation operator (for the face velocity).
         mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
         periodic: Whether to use periodic boundary conditions.
-        method: Reconstruction method for advection (default ``"upwind1"``).
+        scheme: Scheme of the advective face values (default ``Upwind(1)``).
     """
 
     params: Burgers1DParams
-    grid: CartesianGrid1D = eqx.field(static=True)
+    grid: CartesianCGrid1D
     diff: Difference1D
     advection: Advection1D
     interp: Interpolation1D
     mask: Mask1D | None
     periodic: bool = eqx.field(static=True, default=True)
-    method: str = eqx.field(static=True, default="upwind1")
+    scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
@@ -86,18 +96,23 @@ class Burgers1D(Model):
             self.advection,
             self.interp,
             periodic=self.periodic,
-            method=self.method,
+            scheme=self.scheme,
         )
-        diffusion_term = self.params.nu * self.diff.laplacian(state.u)
-        return Burgers1DState(u=advection_term + diffusion_term)
+        # du/dt = -d(u²/2)/dx + nu ∇²u
+        du_dt = each(
+            lambda advection, lap: advection + self.params.nu * lap,
+            advection_term,
+            self.diff.laplacian(state.u),
+        )
+        return Burgers1DState(u=du_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> Burgers1DState:
         """Apply boundary conditions to the state."""
-        return Burgers1DState(u=fill_ghosts(state.u, periodic=self.periodic))
+        return Burgers1DState(u=fill_ends(state.u, self.grid, periodic=self.periodic))
 
     def diagnose(self, state: PyTree) -> Burgers1DDiagnostics:
         """Compute energy diagnostic."""
-        energy = 0.5 * jnp.sum(state.u[1:-1] ** 2) * self.grid.dx
+        energy = 0.5 * jnp.sum(values(state.u)[1:-1] ** 2) * self.grid.spacing("x")
         return Burgers1DDiagnostics(energy=energy)
 
     @staticmethod
@@ -122,7 +137,7 @@ class Burgers1D(Model):
             reynolds: Reynolds number ``Re = U L / nu``; sets
                 ``nu = 1/Re``.
             **create_kw: Forwarded to :meth:`create` (``periodic``,
-                ``method``, ``mask``).
+                ``scheme``, ``mask``).
 
         Returns:
             ``(model, scales)``. ``scales.dt_from_cfl(C, nx)`` gives a
@@ -149,7 +164,7 @@ class Burgers1D(Model):
         Lx: float = 2.0,
         nu: float = 0.01,
         periodic: bool = True,
-        method: str = "upwind1",
+        scheme: Scheme = UPWIND,
         mask: Mask1D | None = None,
     ) -> Burgers1D:
         """Convenience factory.
@@ -159,13 +174,13 @@ class Burgers1D(Model):
             Lx: Domain length.
             nu: Kinematic viscosity.
             periodic: Use periodic BCs if True, Dirichlet if False.
-            method: Advection reconstruction method.
+            scheme: Scheme of the advective face values.
             mask: Optional 1-D Arakawa C-grid mask (``None`` = all-ocean).
 
         Returns:
             A ``Burgers1D`` model instance.
         """
-        grid = CartesianGrid1D.from_interior(nx, Lx)
+        grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = Burgers1DParams(nu=as_parameter(nu))
         diff = Difference1D(grid=grid, mask=mask)
         advection = Advection1D(grid=grid, mask=mask)
@@ -178,5 +193,5 @@ class Burgers1D(Model):
             interp=interp,
             mask=mask,
             periodic=periodic,
-            method=method,
+            scheme=scheme,
         )

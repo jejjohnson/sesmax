@@ -2,25 +2,32 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
     Advection2D as FVXAdvection2D,
-    CartesianGrid2D,
+    CartesianCGrid2D,
+    CField,
     Difference2D,
     Interpolation2D,
     Mask2D,
-    enforce_periodic,
+    fill_ghosts,
 )
+from gridax.schemes import Scheme, Upwind
 from jaxtyping import Array, PyTree
 
 from sesmax_core._src._validation import require_positive
+from sesmax_core._src.fields import values
 from sesmax_core._src.model import Model
 from sesmax_core._src.scales import Scales
-from sesmax_core._src.testing.pde2d._advective_form import advective_tendency
+from sesmax_core._src.testing.pde2d._advective_form import PERIODIC, advective_tendency
 from sesmax_core._src.types import Diagnostics, State
+
+
+#: The default scheme of the advective face values.
+UPWIND = Upwind(1)
 
 
 class NonlinearConvection2DState(State):
@@ -31,11 +38,8 @@ class NonlinearConvection2DState(State):
         v: y-velocity on T-points, shape ``(Ny, Nx)``.
     """
 
-    u: Array
-    v: Array
-
-    # Both components are collocated at T-points, not staggered.
-    mask_locations: ClassVar[dict[str, str]] = {"u": "h", "v": "h"}
+    u: Array | CField
+    v: Array | CField
 
 
 class NonlinearConvection2DDiagnostics(Diagnostics):
@@ -64,15 +68,15 @@ class NonlinearConvection2D(Model):
         interp: Interpolation operators.
         diff: Difference operators (for the divergence).
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
-        method: Reconstruction method (default ``"upwind1"``).
+        scheme: Scheme of the advective face values (default ``Upwind(1)``).
     """
 
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     advection: FVXAdvection2D
     interp: Interpolation2D
     diff: Difference2D
     mask: Mask2D | None
-    method: str = eqx.field(static=True, default="upwind1")
+    scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
@@ -84,21 +88,24 @@ class NonlinearConvection2D(Model):
             self.advection,
             self.interp,
             self.diff,
-            method=self.method,
+            scheme=self.scheme,
         )
         return NonlinearConvection2DState(u=du_dt, v=dv_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> NonlinearConvection2DState:
         """Apply periodic boundary conditions."""
-        return NonlinearConvection2DState(
-            u=enforce_periodic(state.u),
-            v=enforce_periodic(state.v),
-        )
+        bcs = NonlinearConvection2DState(u=PERIODIC, v=PERIODIC)
+        return fill_ghosts(state, self.grid, bcs)
 
     def diagnose(self, state: PyTree) -> NonlinearConvection2DDiagnostics:
         """Compute kinetic energy diagnostic."""
-        ui, vi = state.u[1:-1, 1:-1], state.v[1:-1, 1:-1]
-        ke = 0.5 * jnp.sum(ui**2 + vi**2) * self.grid.dx * self.grid.dy
+        ui, vi = values(state.u)[1:-1, 1:-1], values(state.v)[1:-1, 1:-1]
+        ke = (
+            0.5
+            * jnp.sum(ui**2 + vi**2)
+            * self.grid.spacing("x")
+            * self.grid.spacing("y")
+        )
         return NonlinearConvection2DDiagnostics(kinetic_energy=ke)
 
     @staticmethod
@@ -125,7 +132,7 @@ class NonlinearConvection2D(Model):
             nx: Interior cells in x.
             ny: Interior cells in y.
             aspect: ``Ly / Lx``; the domain is ``Lx = 1``.
-            **create_kw: Forwarded to :meth:`create` (``method``, ``mask``).
+            **create_kw: Forwarded to :meth:`create` (``scheme``, ``mask``).
 
         Returns:
             ``(model, scales)``. ``scales.dt_from_cfl(C, (nx, ny),
@@ -150,7 +157,7 @@ class NonlinearConvection2D(Model):
         ny: int = 64,
         Lx: float = 2.0,
         Ly: float = 2.0,
-        method: str = "upwind1",
+        scheme: Scheme = UPWIND,
         mask: Mask2D | None = None,
     ) -> NonlinearConvection2D:
         """Convenience factory.
@@ -160,13 +167,13 @@ class NonlinearConvection2D(Model):
             ny: Number of interior cells in y.
             Lx: Domain length in x.
             Ly: Domain length in y.
-            method: Advection reconstruction method.
+            scheme: Scheme of the advective face values.
             mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
 
         Returns:
             A ``NonlinearConvection2D`` model instance.
         """
-        grid = CartesianGrid2D.from_interior(nx, ny, Lx, Ly)
+        grid = CartesianCGrid2D.from_interior(nx, ny, Lx, Ly)
         advection = FVXAdvection2D(grid=grid, mask=mask)
         interp = Interpolation2D(grid=grid, mask=mask)
         diff = Difference2D(grid=grid, mask=mask)
@@ -176,5 +183,5 @@ class NonlinearConvection2D(Model):
             interp=interp,
             diff=diff,
             mask=mask,
-            method=method,
+            scheme=scheme,
         )

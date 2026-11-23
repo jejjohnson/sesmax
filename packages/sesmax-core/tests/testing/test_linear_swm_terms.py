@@ -28,12 +28,12 @@ from sesmax_core._src.testing.swm.linear_swm_terms import (
 
 def _gaussian_bump(model) -> LinearSW2DState:
     grid = model.grid
-    x = jnp.arange(grid.Nx) * grid.dx
-    y = jnp.arange(grid.Ny) * grid.dy
+    x = jnp.arange(grid.Nx) * grid.spacing("x")
+    y = jnp.arange(grid.Ny) * grid.spacing("y")
     X, Y = jnp.meshgrid(x, y)
-    cx = grid.Nx * grid.dx / 2
-    cy = grid.Ny * grid.dy / 2
-    sigma = grid.Nx * grid.dx / 8
+    cx = grid.Nx * grid.spacing("x") / 2
+    cy = grid.Ny * grid.spacing("y") / 2
+    sigma = grid.Nx * grid.spacing("x") / 8
     h = jnp.exp(-0.5 * (((X - cx) / sigma) ** 2 + ((Y - cy) / sigma) ** 2))
     return LinearSW2DState(h=h, u=jnp.zeros_like(h), v=jnp.zeros_like(h))
 

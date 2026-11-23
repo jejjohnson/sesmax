@@ -38,14 +38,15 @@ from __future__ import annotations
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
-    CartesianGrid2D,
+    CartesianCGrid2D,
     Coriolis2D,
     Difference2D,
-    enforce_periodic,
-    wall_boundaries,
+    fill_ghosts,
+    laplacian,
 )
 from jaxtyping import Array, PyTree
 
+from sesmax_core._src.fields import each, placed
 from sesmax_core._src.model import TermModel
 from sesmax_core._src.terms import (
     IMPLICIT,
@@ -56,7 +57,12 @@ from sesmax_core._src.terms import (
     _Kinded,
     implicit,
 )
-from sesmax_core._src.testing.swm.linear_2d import LinearShallowWater2D, LinearSW2DState
+from sesmax_core._src.testing.swm.linear_2d import (
+    BCS,
+    POINTS,
+    LinearShallowWater2D,
+    LinearSW2DState,
+)
 
 
 class LinearSWMGravityWave(Term):
@@ -85,9 +91,9 @@ class LinearSWMGravityWave(Term):
         self, t: float, state: LinearSW2DState, args: PyTree | None = None
     ) -> LinearSW2DState:
         return LinearSW2DState(
-            h=-self.H0 * self.diff.divergence(state.u, state.v),
-            u=-self.g * self.diff.diff_x_T_to_U(state.h),
-            v=-self.g * self.diff.diff_y_T_to_V(state.h),
+            h=each(lambda div: -self.H0 * div, self.diff.divergence(state.u, state.v)),
+            u=each(lambda dh: -self.g * dh, self.diff.diff_x_T_to_U(state.h)),
+            v=each(lambda dh: -self.g * dh, self.diff.diff_y_T_to_V(state.h)),
         )
 
 
@@ -105,8 +111,9 @@ class LinearSWMCoriolis(Term):
     def __call__(
         self, t: float, state: LinearSW2DState, args: PyTree | None = None
     ) -> LinearSW2DState:
-        du_cor, dv_cor = self.coriolis(state.u, state.v, self.f_field)
-        return LinearSW2DState(h=jnp.zeros_like(state.h), u=du_cor, v=dv_cor)
+        f = placed(self.f_field, state.u, "T")
+        du_cor, dv_cor = self.coriolis(state.u, state.v, f)
+        return LinearSW2DState(h=each(jnp.zeros_like, state.h), u=du_cor, v=dv_cor)
 
 
 class LinearSWMDiffusion(Term):
@@ -128,9 +135,9 @@ class LinearSWMDiffusion(Term):
         self, t: float, state: LinearSW2DState, args: PyTree | None = None
     ) -> LinearSW2DState:
         return LinearSW2DState(
-            h=jnp.zeros_like(state.h),
-            u=self.diff.laplacian(state.u),
-            v=self.diff.laplacian(state.v),
+            h=each(jnp.zeros_like, state.h),
+            u=laplacian(state.u, self.diff.grid, at="U", mask=self.diff.mask),
+            v=laplacian(state.v, self.diff.grid, at="V", mask=self.diff.mask),
         )
 
     @property
@@ -148,7 +155,7 @@ class LinearSWMDrag(Term):
     def __call__(
         self, t: float, state: LinearSW2DState, args: PyTree | None = None
     ) -> LinearSW2DState:
-        return LinearSW2DState(h=jnp.zeros_like(state.h), u=state.u, v=state.v)
+        return LinearSW2DState(h=each(jnp.zeros_like, state.h), u=state.u, v=state.v)
 
 
 def _assemble(
@@ -189,7 +196,7 @@ class LinearSWM2DTermModel(TermModel):
         bc_type: ``"periodic"`` or ``"wall"`` (static).
     """
 
-    grid: CartesianGrid2D = eqx.field(static=True)
+    grid: CartesianCGrid2D
     bc_type: str = eqx.field(static=True, default="periodic")
 
     def apply_boundary_conditions(self, state: LinearSW2DState) -> LinearSW2DState:
@@ -197,17 +204,7 @@ class LinearSWM2DTermModel(TermModel):
 
         Mirrors :meth:`LinearShallowWater2D.apply_boundary_conditions`.
         """
-        if self.bc_type == "periodic":
-            return LinearSW2DState(
-                h=enforce_periodic(state.h),
-                u=enforce_periodic(state.u),
-                v=enforce_periodic(state.v),
-            )
-        return LinearSW2DState(
-            h=wall_boundaries(state.h, "h"),
-            u=wall_boundaries(state.u, "u"),
-            v=wall_boundaries(state.v, "v"),
-        )
+        return fill_ghosts(state, self.grid, BCS[self.bc_type], stagger=POINTS)
 
     @property
     def g(self) -> Array:

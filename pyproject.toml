@@ -33,6 +33,7 @@ override-dependencies = [
     # vardax sources geonnax v0.0.10; hold the graph on the core's tag.
     "geonnax @ git+https://github.com/jejjohnson/geonnax.git@v0.0.11",
     "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-ops",
+    "pipekit-array @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-array",
     "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-cycle",
     "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-jax",
 ]

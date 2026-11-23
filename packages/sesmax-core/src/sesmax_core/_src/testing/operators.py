@@ -7,6 +7,8 @@ The general ``ModelOp`` it subclasses lives in ``sesmax_core.operators``.
 
 from __future__ import annotations
 
+import gridax.schemes
+
 from sesmax_core._src.operators import ModelOp
 from sesmax_core._src.testing.pde2d.burgers_terms import Burgers2DTermModel
 
@@ -33,7 +35,9 @@ class Burgers2DOp(ModelOp):
         Lx: Domain length in x.
         Ly: Domain length in y.
         nu: Kinematic viscosity (diffusion coefficient).
-        method: Advection reconstruction method.
+        scheme: Name of the scheme of `gridax.schemes` for the advective face
+            values: ``"Upwind"``, ``"Centred"`` or ``"WENO"``.
+        order: Its order.
         imex: Tag diffusion implicit for IMEX integration (see
             :meth:`Burgers2DTermModel.create`).
         dt: Default step size for :meth:`_apply`.
@@ -51,7 +55,8 @@ class Burgers2DOp(ModelOp):
         Lx: float = 2.0,
         Ly: float = 2.0,
         nu: float = 0.01,
-        method: str = "upwind1",
+        scheme: str = "Upwind",
+        order: int = 1,
         imex: bool = False,
         dt: float = 0.001,
     ) -> None:
@@ -60,7 +65,8 @@ class Burgers2DOp(ModelOp):
         self.Lx = Lx
         self.Ly = Ly
         self.nu = nu
-        self.method = method
+        self.scheme = scheme
+        self.order = order
         self.imex = imex
         self.dt = dt
         self._model = Burgers2DTermModel.create(
@@ -69,7 +75,7 @@ class Burgers2DOp(ModelOp):
             Lx=Lx,
             Ly=Ly,
             nu=nu,
-            method=method,
+            scheme=getattr(gridax.schemes, scheme)(order),
             imex=imex,
         )
 

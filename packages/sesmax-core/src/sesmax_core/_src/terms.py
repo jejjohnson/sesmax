@@ -44,12 +44,15 @@ to a diffusion coefficient flows straight through ``Scaled.coeff``.
 from __future__ import annotations
 
 import abc
+import operator
 from collections.abc import Callable, Iterator
 
 import diffrax as dfx
 import equinox as eqx
 import jax.tree_util as jtu
 from jaxtyping import Array, PyTree
+
+from sesmax_core._src.fields import each, is_field
 
 
 Kind = str  # "explicit" | "implicit"
@@ -139,6 +142,11 @@ class TermFn(Term):
         return self._kind
 
 
+def _add(a: PyTree, b: PyTree) -> PyTree:
+    """``a + b`` for one field of a state."""
+    return each(operator.add, a, b)
+
+
 class Sum(Term):
     """Additive composition of terms: ``sum_i terms[i](t, state, args)``.
 
@@ -146,7 +154,8 @@ class Sum(Term):
     sums so ``(a + b) + c`` and ``a + (b + c)`` yield the same flat tree).
 
     Args:
-        terms: The summands. Leaves are added leaf-wise across the pytree.
+        terms: The summands, added field by field. Fields that know their
+            point (`gridax.CField`) must sit on the same one.
     """
 
     terms: tuple[Term, ...]
@@ -176,7 +185,7 @@ class Sum(Term):
         contributions = [term(t, state, args) for term in self.terms]
         acc = contributions[0]
         for contribution in contributions[1:]:
-            acc = jtu.tree_map(lambda a, b: a + b, acc, contribution)
+            acc = jtu.tree_map(_add, acc, contribution, is_leaf=is_field)
         return acc
 
     @property

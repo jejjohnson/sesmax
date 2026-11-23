@@ -29,8 +29,8 @@ def _gaussian_2d(x, y, mux, muy, sigma):
 
 
 def _make_coords(grid):
-    x = jnp.arange(grid.Nx) * grid.dx
-    y = jnp.arange(grid.Ny) * grid.dy
+    x = jnp.arange(grid.Nx) * grid.spacing("x")
+    y = jnp.arange(grid.Ny) * grid.spacing("y")
     return jnp.meshgrid(x, y)
 
 

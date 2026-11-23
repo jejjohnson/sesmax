@@ -6,10 +6,19 @@ from typing import ClassVar
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import CartesianGrid1D, Difference1D, Interpolation1D, Mask1D
+from gridax import (
+    CartesianCGrid1D,
+    CField,
+    Difference1D,
+    Interpolation1D,
+    Mask1D,
+    laplacian,
+)
 from jaxtyping import Array, PyTree
 
+from sesmax_core._src.fields import each, values
 from sesmax_core._src.model import Model
+from sesmax_core._src.testing.pde1d._ghosts import fill_ends
 from sesmax_core._src.types import Diagnostics, Params, PhysConsts, State, as_parameter
 
 
@@ -22,14 +31,12 @@ class LinearSW1DState(State):
         v: y-velocity on T-points (Coriolis coupling), shape ``(Nx,)``.
     """
 
-    h: Array
-    u: Array
-    v: Array
+    h: Array | CField
+    u: Array | CField
+    v: Array | CField
 
     # ``h`` is the perturbation, so it is already centred on zero.
     scale_kinds: ClassVar[dict[str, str]] = {"h": "height_anomaly"}
-    # The 1-D Coriolis partner sits at T-points.
-    mask_locations: ClassVar[dict[str, str]] = {"v": "h"}
 
 
 class LinearSW1DParams(Params):
@@ -93,7 +100,7 @@ class LinearShallowWater1D(Model):
 
     params: LinearSW1DParams
     consts: LinearSW1DPhysConsts = eqx.field(static=True)
-    grid: CartesianGrid1D = eqx.field(static=True)
+    grid: CartesianCGrid1D
     diff: Difference1D
     interp: Interpolation1D
     mask: Mask1D | None
@@ -110,44 +117,49 @@ class LinearShallowWater1D(Model):
         kappa = self.params.bottom_drag
 
         # Mass equation: dh/dt = -H0 * du/dx
-        dh_dt = -H0 * self.diff.diff_x_U_to_T(u)
+        dh_dt = each(lambda du: -H0 * du, self.diff.diff_x_U_to_T(u))
 
         # Momentum equations
         # Pressure gradient: -g * dh/dx
-        pressure_grad = -g * self.diff.diff_x_T_to_U(h)
+        dh_dx = self.diff.diff_x_T_to_U(h)
 
         # Coriolis: du/dt += f0*v, dv/dt -= f0*u
         # v lives on T-points, interpolate to U-points for du/dt
         v_on_U = self.interp.T_to_U(v)
         u_on_T = self.interp.U_to_T(u)
 
-        du_dt = pressure_grad + f0 * v_on_U
-        dv_dt = -f0 * u_on_T
-
-        # Diffusion
-        du_dt = du_dt + nu * self.diff.laplacian(u)
-        dv_dt = dv_dt + nu * self.diff.laplacian(v)
-
-        # Bottom drag
-        du_dt = du_dt - kappa * u
-        dv_dt = dv_dt - kappa * v
+        # Pressure gradient and Coriolis, then diffusion and bottom drag
+        du_dt = each(
+            lambda dh, v_u, lap, u: -g * dh + f0 * v_u + nu * lap - kappa * u,
+            dh_dx,
+            v_on_U,
+            laplacian(u, self.grid, at="U", mask=self.mask),
+            u,
+        )
+        dv_dt = each(
+            lambda u_t, lap, v: -f0 * u_t + nu * lap - kappa * v,
+            u_on_T,
+            laplacian(v, self.grid, at="T", mask=self.mask),
+            v,
+        )
 
         return LinearSW1DState(h=dh_dt, u=du_dt, v=dv_dt)
 
     def apply_boundary_conditions(self, state: PyTree) -> LinearSW1DState:
         """Apply periodic boundary conditions."""
-        h = state.h.at[0].set(state.h[-2]).at[-1].set(state.h[1])
-        u = state.u.at[0].set(state.u[-2]).at[-1].set(state.u[1])
-        v = state.v.at[0].set(state.v[-2]).at[-1].set(state.v[1])
-        return LinearSW1DState(h=h, u=u, v=v)
+        return LinearSW1DState(
+            h=fill_ends(state.h, self.grid, periodic=True, at="T"),
+            u=fill_ends(state.u, self.grid, periodic=True, at="U"),
+            v=fill_ends(state.v, self.grid, periodic=True, at="T"),
+        )
 
     def diagnose(self, state: PyTree) -> LinearSW1DDiagnostics:
         """Compute energy and phase speed."""
         g = self.consts.gravity
         H0 = self.consts.H0
-        h, u, v = state.h, state.u, state.v
+        h, u, v = values(state.h), values(state.u), values(state.v)
         interior = slice(1, -1)
-        dx = self.grid.dx
+        dx = self.grid.spacing("x")
         # Energy: 0.5 * (g*h² + H0*(u² + v²)) * dx
         energy = (
             0.5
@@ -183,7 +195,7 @@ class LinearShallowWater1D(Model):
         Returns:
             A ``LinearShallowWater1D`` model instance.
         """
-        grid = CartesianGrid1D.from_interior(nx, Lx)
+        grid = CartesianCGrid1D.from_interior(nx, Lx)
         params = LinearSW1DParams(
             lateral_viscosity=as_parameter(lateral_viscosity),
             bottom_drag=as_parameter(bottom_drag),
