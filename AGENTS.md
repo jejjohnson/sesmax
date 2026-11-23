@@ -295,9 +295,8 @@ the code; when you fix a bug or add a feature, add the test that checks it.
   component per package with tags such as `sesmax-core-v0.1.0`: it bumps
   each package's version and writes its `packages/<dist>/CHANGELOG.md` from
   the `feat`, `fix`, `perf` and `revert` commits; don't bump versions by
-  hand. `sesmax-core` carries `"release-as": "0.1.0"` for its first release;
-  remove it once that release is cut. The umbrella `sesmax` joins
-  release-please with `sesmax-ocean` in phase C2.
+  hand. The umbrella `sesmax` joins release-please with `sesmax-ocean` in
+  phase C2.
 - **Never replace or remove an existing PR title or description.** An agent
   called for a small follow-up tends to write a fresh description scoped to
   its own work and silently discard the rest: read the existing description
