@@ -1,12 +1,14 @@
 ---
 title: "The packages of the sesmax workspace"
-subtitle: "Design · core, components, testing and experiment, with benchmarks in geobench"
+subtitle: "Design · core, param, components, testing and experiment, with benchmarks in geobench"
 short_title: Workspace packages
-description: "Rethinks which packages the sesmax workspace holds: a core of contracts, one package per component, a testing package with the toy models and the checks, an experiment package for simulation, estimation and monitoring, and benchmarks outside the repository."
+description: "Rethinks which packages the sesmax workspace holds: a core of contracts, a package for the parametric part of a model, one package per component, a testing package with the toy models and the checks, an experiment package for simulation, estimation and monitoring, and benchmarks outside the repository."
 date: 2026-11-23
 keywords:
   - sesmax
   - workspace
+  - parameterization
+  - forcing
   - testing
   - experiment
   - geobench
@@ -21,16 +23,17 @@ numbering:
 
 ## Decision
 
-Proposed: give the workspace four kinds of package. `sesmax-core` holds the contracts, each component of the Earth system is a package of models, `sesmax-testing` says whether a model is right, and `sesmax-experiment` is where models are used: simulation, parameter estimation, state estimation, bilevel problems and monitoring.
+Proposed: give the workspace five kinds of package. `sesmax-core` holds the contracts, `sesmax-param` the parametric part of a model (parameterizations, forcing and model error), each component of the Earth system is a package of models, `sesmax-testing` says whether a model is right, and `sesmax-experiment` is where models are used: simulation, parameter estimation, state estimation, bilevel problems and monitoring.
 Benchmarks, which say whether a model is good, live in the planned geobench repository.
 Alternative: keep one core and add modules to it as needed (`sesmax_core.testing`, `sesmax_core.sim`), which is fewer releases, but the core then carries every toy and every workflow to anyone who only wants the model contract.
-Status: proposed, for review. Nothing here is implemented. The owner has settled two points: the toys and the checks are one package, and the experiment package covers more than simulation.
+Status: proposed, for review. Nothing here is implemented. The owner has settled four points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, and model error belongs in it.
 
 ## What this page settles
 
 | Question | Answer |
 | --- | --- |
 | Where do the toy models live? | `sesmax-testing`, with the checks |
+| Where do drag, closures, forcing and model error live? | `sesmax-param` |
 | Where do runs and estimation live? | `sesmax-experiment` |
 | Who owns the methods? | vardax, filterax, argminax, as today |
 | Where do benchmarks live? | geobench |
@@ -41,10 +44,11 @@ Status: proposed, for review. Nothing here is implemented. The owner has settled
 | Tier | Package | Holds | Imports from the workspace |
 | --- | --- | --- | --- |
 | 0 | `sesmax-core` | contracts, terms, forcing, scales, adapters | nothing |
-| 1 | `sesmax-ocean`, later `-atmos`, `-land`, `-ice` | models and their scenarios | core |
-| 1 | `sesmax-testing` | toy models and checks | core |
-| 1 | `sesmax-experiment` | problems, runs, estimation, monitoring | core |
-| 2 | `sesmax-couple` | coupled models | core, components |
+| 1 | `sesmax-param` | parameterizations, forcing, model error | core |
+| 2 | `sesmax-ocean`, later `-atmos`, `-land`, `-ice` | models and their scenarios | core, param |
+| 2 | `sesmax-testing` | toy models and checks | core |
+| 2 | `sesmax-experiment` | problems, runs, estimation, monitoring | core, param |
+| 3 | `sesmax-couple` | coupled models | core, param, components |
 | – | `sesmax` | no code, installs the set | – |
 
 Three rules go with the tiers.
@@ -57,24 +61,80 @@ Three rules go with the tiers.
 
 ## The core
 
-The core keeps what a model is made of and what a model is handed to: the types and constraints, `Model`, the terms, the forcing, the scales, the layered-fluid code, stepping, `rollout`, the assimilation adapters, and I/O.
+The core keeps what a model is made of and what a model is handed to: the types and constraints, `Model`, the terms, the scales, the layered-fluid code, stepping, `rollout`, the assimilation adapters, and I/O.
+Of the forcing it keeps the slot: `ForcingProtocol`, and `ForcingTerm` with `add_to`, which lift a field into a tendency.
 
-Three things leave it. The lines are counted at `222d092`, where the whole core has 16,047.
+Four things leave it. The lines are counted at `222d092`, where the whole core has 16,047, and for the forcing at `3c64811`.
 
 | Leaves | Lines | Goes to |
 | --- | --- | --- |
 | `sesmax_core.testing` | 4,572 | `sesmax_testing` |
+| `sesmax_core.forcing`, but for the slot | 2,847 with it | `sesmax_param` |
 | `sesmax_core.monitor` | 490 | `sesmax_experiment.monitor` |
 | `sesmax_core.checkpoint` | 119 | `sesmax_experiment`, behind `[checkpoint]` |
 
 Nothing in the core calls a monitor, and the run loop which will call them is an experiment.
 The guards stay, because a guard is part of a tendency.
-The split does not lighten the core's install, as 17 of its other files import gridax.
+The forcing is the one part whose move lightens the install, as nothing else in the core imports geonnax. gridax stays, because other modules of the core import it.
 
 The core gains two things the other packages need.
 
 - **Public helpers.** The positivity checks, the Burger-number helpers, the diagnostics bridge, and `each`, `values` and `placed` for located fields are private today, and every component needs them.
 - **`Component`.** The small type in [the run-loop design](run_loop.md) through which a component registers its models, checks and units. It sits in the core so that a component can register without importing `sesmax-experiment`.
+
+(param)=
+## sesmax-param: what do the resolved dynamics not supply?
+
+Split the right-hand side of a model into the resolved dynamics and the part whose form we choose or learn,
+
+$$
+\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}t} = f(\mathbf{x}) + p(\mathbf{x}; \boldsymbol{\theta}) + u(t; \mathbf{w}) + \boldsymbol{\eta}(t)
+$$ (packages-rhs)
+
+where $\mathbf{x} \in \mathbb{R}^{D_x}$ is the state, $f: \mathbb{R}^{D_x} \to \mathbb{R}^{D_x}$ the resolved dynamics (advection, pressure, Coriolis), $p$ a parameterization with parameters $\boldsymbol{\theta} \in \mathbb{R}^{D_\theta}$, $u(t; \mathbf{w}) \in \mathbb{R}^{D_x}$ a forcing with coefficients $\mathbf{w} \in \mathbb{R}^{D_w}$, and $\boldsymbol{\eta}(t) \in \mathbb{R}^{D_x}$ the model error.
+
+The last three terms are the package. Each is parametric: a formula, a basis expansion or a network, whose parameters carry a prior.
+"Can be learned" is not the test, because every parameter of $f$ is a leaf too, gravity and layer depth included. The test is whether the term's form is ours to choose.
+
+| Part | Reads the state? | Prior | Today |
+| --- | --- | --- | --- |
+| Parameterization $p$ | yes | on $\boldsymbol{\theta}$ | drag and Rayleigh damping; `OperatorTerm` takes a network |
+| Forcing $u$, known | no | none | `WindStress2D`, `InterpolatedForcing` |
+| Forcing $u$, estimated | no | on $\mathbf{w}$ | `BasisForcing` |
+| Model error $\boldsymbol{\eta}$ | no | on $\boldsymbol{\eta}$ | only in vardax and filterax |
+
+**Parameterization or forcing.**
+The second column decides. Drag and Rayleigh damping are filed under `forcing` today and move to the parameterizations, because they read the state.
+
+**Model error is a forcing we do not know.**
+vardax writes it as $\boldsymbol{\eta} = \boldsymbol{\chi} \mathbf{W} \boldsymbol{\Phi}^\top$ (`ModelErrorBasis`), a space-time basis times coefficients with a prior, which is the form of `BasisForcing`. One basis can therefore serve both.
+They differ in units. vardax adds its increment to the state after each step, so it is in state units, and a forcing is a tendency. The package has to say which one a prior describes.
+An ensemble draws $\boldsymbol{\eta}$ instead of estimating it, and the core has only hooks for that: a model may override `build_terms` for an SDE, and `as_forward_model` takes a `diffusion`.
+What the estimated error shows to be systematic is what a parameterization should absorb.
+
+**One hierarchy.**
+The core has two that do not meet. `ForcingProtocol` maps a time and a grid to a field and has a wrapper into the term algebra; `AbstractForcing` leaves the call to each subclass, has its own `ForcingSum` and `ForcingProduct`, and has no wrapper.
+In the package everything is a `Term`, and the sums are the term algebra's.
+
+**What exists.**
+The package starts with the forcing, the drag and the damping. There is no Smagorinsky, Leith, Gent–McWilliams or backscatter scheme in sesmax, somax or gridax, so the sub-grid half starts empty.
+
+| Concern | Owner |
+| --- | --- |
+| diffusion operators and stencils | gridax |
+| `Term`, `OperatorTerm`, the forcing slot | `sesmax-core` |
+| bulk fluxes between components | `sesmax-couple` |
+| turbulence closures of plumes | plumax |
+| fitting any of it | `sesmax-experiment` |
+
+**The models.**
+All seven ocean models write wind and drag into their `vector_field`. They become sums of terms once they have been ported, so that the port can still be compared with somax, and the comparison then holds the rewrite to the same numbers.
+
+**The readme and the figures.**
+Forcing is one of the five uses in the core's readme, its quickstart inverts for a `BasisForcing`, and geostack#299 draws it. All three change in W5.
+
+**The name.**
+"Closure" names the sub-grid part only, and "physics" does not fit a network. "Param" is short for what the parts share. It is close to `Params`, the base class of a model's parameters, and to paramax, so prose says "parameterization" in full and keeps "parameter" for a leaf.
 
 (testing)=
 ## sesmax-testing: is the model right?
@@ -146,7 +206,7 @@ $$ (packages-inner)
 
 It owns no method. Every algorithm in the table above already has a home, and the package holds what is missing between them.
 
-- **The problem.** One object says which leaves of a model, a state and a forcing are unknown, with their priors. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
+- **The problem.** One object says which leaves of a model, a state and a forcing are unknown, and reads the priors that `sesmax-param` put on them. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
 - **The work.** A thin function per row that takes a problem, hands it to a method and returns the estimate with a record.
 - **The run.** The chunk loop, checkpoints, restarts, run specs, artifacts and the command line of [the run-loop design](run_loop.md), which become the simulation part of this package.
 - **The monitoring.** The monitors of a run, and the statistics of an analysis (innovations, spread against skill) with the same verdict and the same record.
@@ -227,6 +287,7 @@ Timing the steppers (sesmax#107) compares our own code with itself and stays in 
 | assimilation adapters (444 lines) | an extra does the job, and the README uses them without an experiment |
 | flows, I/O | extras do the job |
 | layered-fluid code | one user until there is an atmosphere |
+| forcing presets of the ocean | named after ocean fields, so `sesmax-ocean` |
 | scenarios | a double gyre is ocean science; the run of it is the experiment |
 
 A package costs a release, a CI job, a README and an icon, so a new one needs a second user or a different set of dependencies.
@@ -239,9 +300,11 @@ A package costs a release, a CI job, a README and an icon, so a new one needs a 
 | W2 | the ocean models ([ocean plan](ocean.md)) | the reference check against somax |
 | W3 | `sesmax-experiment`: monitors, checkpoints, the run loop | the run-loop design's checks |
 | W4 | the ocean's scenarios and configs; somax is archived | somax's configs give somax's first chunk |
-| W5 | `sesmax-experiment`: problems, estimation, bilevel, twins | its own design page |
+| W5 | `sesmax-param`: the forcing, drag and damping move; one hierarchy; model error; the ocean models as sums of terms | the moved tests; the reference check of every ocean model, unchanged |
+| W6 | `sesmax-experiment`: problems, estimation, bilevel, twins | its own design page |
 
 W1 is first because the ocean's gate is one of its checks, and because only notebooks and READMEs depend on the toys' import path today.
+W5 comes after the port, which needs models with their physics inside to compare with somax, and before W6, which reads the priors.
 
 ## Open questions
 
@@ -252,9 +315,12 @@ W1 is first because the ocean's gate is one of its checks, and because only note
 | WP-3 | `rollout_loss` | stays in the core, next to `rollout` | moves to `sesmax-experiment` |
 | WP-4 | `Component` | in the core | an entry point with no shared type |
 | WP-5 | Name of the command | `sesmax-experiment simulate …` | `sesmax-sim`, as in the run-loop design |
+| WP-6 | Units of a model-error prior | a tendency, converted for vardax by the adapter | state increments, as vardax has them |
+| WP-7 | Noise that scales with a parameterization | left out until a user needs it | in the package from the start |
+| WP-8 | vardax's `ModelErrorBasis` | built from our basis by the adapter | one basis class, in vardax |
 
 ## Relationships
 
 - Changes: [the workspace and core design](workspace_and_core.md) (its tier table and C2 to C3 rows) and [the run-loop design](run_loop.md) (`sesmax_core.sim` becomes `sesmax_experiment`). Both keep their text until this page is accepted.
 - Needs in geostack: the layer map and the dependency graph list the new packages.
-- Related: sesmax#29 (levels), sesmax#105, sesmax#107, somax#234 (atmosphere and coupling).
+- Related: sesmax#29 (levels), sesmax#105, sesmax#106 (scale-selective stabilisation, a parameterization), sesmax#107, sesmax#114 (bases from functax), somax#213 (hybrid terms), somax#234 (atmosphere and coupling).

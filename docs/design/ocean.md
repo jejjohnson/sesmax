@@ -100,7 +100,7 @@ The line counts are `wc -l` at `9cb19b3`.
 | `models/qg/`, `swm/nonlinear_2d.py`, `swm/multilayer.py`, `spherical/` | 3,714 | `sesmax_ocean` (models) | W2 |
 | `core/resolution.py` | 401 | `sesmax_ocean.resolution` | W2 |
 | `eval/` | 390 | `sesmax_ocean.eval` | W2 |
-| ocean presets of `core/forcing_bank.py` | 172 | `sesmax_ocean.forcing` | W2 |
+| ocean presets of `core/forcing_bank.py` | 172 | `sesmax_ocean.forcing`; their imports change again in W5 | W2 |
 | runner, run specs, units, progress, checks | 3,214 | `sesmax_experiment`; the ocean's own checks in `sesmax_ocean` | W3 |
 | model registry, scenarios, dispatch | 2,030 | `sesmax_ocean.scenarios` | W4 |
 | basin data, configs, DVC | 1,083 | `sesmax_ocean.scenarios` and `configs/` | W4 |
@@ -132,6 +132,11 @@ Only imports, grids, `method=` and ghost handling change in them.
 
 **Package mechanics.**
 A workspace member with a `[tool.uv.sources]` entry, a `dev` group entry and a release-please component; the umbrella depends on it; `tests/test_workspace.py` gains the tier; the capability index and `docs/api/` gain its pages; its readme and icon follow the family of the other packages.
+
+## Wind and drag after the move
+
+The ported models keep wind, drag and viscosity inside `vector_field`, as somax has them.
+In W5 they become sums of terms, with the wind and the drag from [`sesmax-param`](workspace_packages.md), and the reference check holds the rewrite to the numbers of the port.
 
 ## somax after the move
 
