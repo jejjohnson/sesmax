@@ -37,10 +37,10 @@ def advective_tendency(
     the ``u div(w)`` term is added back. The result is not conservative, so a
     sharp front's speed is only as good as the viscosity that resolves it.
 
-    A periodic box needs ``wall="open"``, because a closed wall writes no
-    tendency on the outermost cells, and the interpolated face velocities need
-    their ghosts filled, because the interpolations write only the interior. A
-    masked domain keeps closed walls, which gridax requires.
+    A periodic box is said so with ``bc=``: a closed wall would write no
+    tendency on the outermost cells. The divergence reads the ghost faces, which
+    the interpolations do not write, so they are filled for it. A masked domain
+    keeps closed walls.
 
     Args:
         u: x-velocity at T-points, with its ghost cells filled.
@@ -53,20 +53,20 @@ def advective_tendency(
     """
     u_on_U = ops.interpolate(u, src="T", dst="U")
     v_on_V = ops.interpolate(v, src="T", dst="V")
-    wall = "closed"
+    bc = None
     if ops.mask is None:
         grid = ops.grid
         u_on_U = fill_ghosts(u_on_U, grid, PERIODIC, stagger="U")
         v_on_V = fill_ghosts(v_on_V, grid, PERIODIC, stagger="V")
-        wall = "open"
+        bc = PERIODIC
     divergence = ops.divergence(u_on_U, v_on_V)
-    if wall == "closed":
+    if bc is None:
         # A closed wall leaves the ring [1] without a tendency; keep it so.
         divergence = each(
             lambda d: d * jnp.zeros_like(d).at[2:-2, 2:-2].set(1.0), divergence
         )
-    flux_u = ops.advect(u, u_on_U, v_on_V, scheme=scheme, wall=wall)
-    flux_v = ops.advect(v, u_on_U, v_on_V, scheme=scheme, wall=wall)
+    flux_u = ops.advect(u, u_on_U, v_on_V, scheme=scheme, bc=bc)
+    flux_v = ops.advect(v, u_on_U, v_on_V, scheme=scheme, bc=bc)
 
     def add_back(flux: Array, q: Array, div: Array) -> Array:
         return flux + q * div
