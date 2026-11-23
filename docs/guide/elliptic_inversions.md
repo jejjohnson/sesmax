@@ -178,7 +178,7 @@ $$
 
 so the solve runs on $E$ with a corrected right-hand side (gaussx's `lift_known_values`), and the known values are added back. The spectral method takes known values on the rectangle's wall nodes with `bc="dst"` and no mask. The capacitance method takes them with a solver built on the same wet mask, and no `known_mask`. `pv_inversion` broadcasts `known_values` against its input, and each layer's correction uses its own $\lambda_k$.
 
-`bc` also accepts a `gridax.BoundaryConditionSet`. Its face types choose the transform (all `Dirichlet1D` gives `"dst"`, all zero `Neumann1D` gives `"dct"`, all `Periodic1D` gives `"fft"`), its `mask` feeds the masked methods, and non-zero `Dirichlet1D` values become known values on each face's wall nodes. That needs a basin whose outer coast lies on the four walls, a rectangle with islands allowed. For any other coastline, pass `known_values` on `gridax.solvers.coast_ring(mask)`.
+`bc` also accepts a `gridax.BC`. Its face types choose the transform (all `Dirichlet` gives `"dst"`, all zero `Neumann` gives `"dct"`, all `Periodic` gives `"fft"`), and non-zero `Dirichlet` values become known values on each face's wall nodes. That needs a basin whose outer coast lies on the four walls, a rectangle with islands allowed. For any other coastline, pass `known_values` on `gridax.solvers.coast_ring(mask)`.
 
 ## Examples
 

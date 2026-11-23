@@ -86,12 +86,12 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 - `as_forward_model(dt=, dt0=, **settings)` returns a `pipekit_jax.DiffraxForwardModel`, which holds the solver, step controller, adjoint and step budget and satisfies `pipekit_cycle.ForwardModel`. It holds one vector field, so a model whose `build_terms` gives anything but one `ODETerm` (IMEX, SDE, or a `ScaledModel` around either) raises `ValueError`. pipekit is imported inside the method, so `import sesmax_core` stays pipekit-free.
 - Boundary conditions usually live in `apply_boundary_conditions`, which fills the ghosts once per state. A term may fill its own instead, because advection and diffusion need different Dirichlet ghost values: the first reads the exterior value, the second a reflection about the face. The model's method is then a pass-through.
 - A model whose right-hand side is an assembled term tree subclasses `TermModel`, which owns `vector_field` and `build_terms`; it overrides `apply_boundary_conditions` when it has boundaries.
-- States subclass `State`, parameters `Params`, fixed constants `PhysConsts` and diagnostics `Diagnostics`. Physical parameters are leaves; shapes and flags are `eqx.field(static=True)`. A state sets `scale_kinds` and `mask_locations` where a field's name does not determine its meaning (`StateAffine` reads them).
+- States subclass `State`, parameters `Params`, fixed constants `PhysConsts` and diagnostics `Diagnostics`. Physical parameters are leaves; shapes and flags are `eqx.field(static=True)`. A state sets `scale_kinds` where a field's name does not determine its meaning (`StateAffine` reads it). A field is an array or a `gridax.CField`, which knows its point: write element-wise maths with `each` of `sesmax_core._src.fields`, so that one formula serves both and fields on different points raise, and fill ghosts with `gridax.fill_ghosts` and a `BC` per field.
 
 ### Terms
 
 - A term subclasses `Term` and implements `__call__(t, state, args=None)`, which returns a tendency with the state's structure, zero in the fields it does not touch.
-- Terms compose with `+`, `-`, `*` and `@` (`Sum`, `Scaled`, `Compose`). A coefficient is a JAX leaf, so `jax.grad` flows through it.
+- Terms compose with `+`, `-`, `*` and `@` (`Sum`, `Scaled`, `Compose`). A `Sum` adds field by field, and located fields on different points raise `StaggerMismatchError` when it is traced. A coefficient is a JAX leaf, so `jax.grad` flows through it.
 - A term is explicit unless wrapped with `implicit`. `partition` flattens a `Sum` by kind, and `build_diffrax_terms` returns one `ODETerm` when all summands share a kind, or a `MultiTerm` of (explicit, implicit) for an IMEX solver.
 - Use `TermFn` to wrap a plain callable and `OperatorTerm` to lift a pipekit operator. `OperatorTerm` is a lazy top-level export, so `import sesmax_core` stays pipekit-free.
 
