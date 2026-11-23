@@ -68,11 +68,11 @@ Write $`f(\mathbf{x}, t; \boldsymbol{\theta})`$ for the whole sum above. Everyth
 
 | Use | Equation | Names |
 |---|---|---|
-| Integrate it | $`\mathbf{x}(t_1) = \mathbf{x}(t_0) + \int_{t_0}^{t_1} f(\mathbf{x}, t; \boldsymbol{\theta}) \, \mathrm{d}t`$ | `Model.integrate`, `Model.step`, `solve_pde` |
-| Force it | $`u(\mathbf{s}, t) = \sum_{m} w_m \, b_m(t) \, \phi_m(\mathbf{s})`$ | `BasisForcing`, `ForcingTerm`, `spatial_from_*` |
-| Rescale it | $`\frac{\mathrm{d}\tilde{\mathbf{x}}}{\mathrm{d}\tilde{t}} = \tau \, \boldsymbol{\sigma}^{-1} \odot f(\boldsymbol{\mu} + \boldsymbol{\sigma} \odot \tilde{\mathbf{x}}, \tau \tilde{t}; \boldsymbol{\theta})`$ | `Scales`, `StateAffine`, `ScaledModel` |
-| Fit it | $`\mathcal{L}(\boldsymbol{\theta}) = \frac{1}{T} \sum_{t=1}^{T} \ell(\mathbf{x}_t(\boldsymbol{\theta}), \mathbf{x}_t^\text{ref})`$ | `rollout`, `rollout_loss` |
-| Assimilate with it | $`\mathcal{J}(\mathbf{v}) = \frac{1}{2} \Vert \mathbf{v} \Vert^2 + \frac{1}{2} \sum_{t=1}^{T} \Vert \mathbf{y}_t - \mathbf{H} \mathbf{x}_t(\mathbf{v}) \Vert^2_{\boldsymbol{\Sigma}_\varepsilon^{-1}}`$ | `sesmax_core.da` |
+| Integrate it | $`\mathbf{x}(t_1) = \mathbf{x}(t_0) + \int_{t_0}^{t_1} f(\mathbf{x}, t; \boldsymbol{\theta}) \mathrm{d}t`$ | `Model.integrate`, `Model.step`, `solve_pde` |
+| Force it | $`u(\mathbf{s}, t) = \sum_{m} w_m b_m(t) \phi_m(\mathbf{s})`$ | `BasisForcing`, `ForcingTerm`, `spatial_from_*` |
+| Rescale it | $`\frac{\mathrm{d}\tilde{\mathbf{x}}}{\mathrm{d}\tilde{t}} = \tau \boldsymbol{\sigma}^{-1} \odot f(\boldsymbol{\mu} + \boldsymbol{\sigma} \odot \tilde{\mathbf{x}}, \tau \tilde{t}; \boldsymbol{\theta})`$ | `Scales`, `StateAffine`, `ScaledModel` |
+| Fit it | $`\mathcal{L}(\boldsymbol{\theta}) = \frac{1}{T} \sum_{t \leq T} \ell(\mathbf{x}_t(\boldsymbol{\theta}), \mathbf{x}_t^\text{ref})`$ | `rollout`, `rollout_loss` |
+| Assimilate with it | $`\mathcal{J}(\mathbf{v}) = \frac{1}{2} \Vert \mathbf{v} \Vert^2 + \frac{1}{2} \sum_{t \leq T} \Vert \mathbf{y}_t - \mathbf{H} \mathbf{x}_t(\mathbf{v}) \Vert^2_{\boldsymbol{\Sigma}_\varepsilon^{-1}}`$ | `sesmax_core.da` |
 
 **Forcing.** The forcing field $`u`$ at the point $`\mathbf{s}`$ is a sum over $`D_w`$ atoms, each with a spatial shape $`\phi_m`$, a gate in time $`b_m`$ and a coefficient $`w_m \in \mathbb{R}`$. The coefficients are the only control, and the rest of the dictionary is fixed. `ForcingTerm` writes the field onto one component of the tendency, so a forcing is a term like any other.
 
@@ -82,19 +82,26 @@ Write $`f(\mathbf{x}, t; \boldsymbol{\theta})`$ for the whole sum above. Everyth
 
 ## 📥 Install
 
-sesmax-core is not on PyPI, and its git dependencies are pinned, so install it from the repository. It needs Python 3.12 or newer and brings in JAX, Equinox, diffrax, lineax, optimistix, einops, paramax, gridax, spectraldiffx, geonnax, geophysix, integrix and pipekit.
+sesmax-core is not on PyPI; it is installed from this repository with [uv](https://docs.astral.sh/uv/). It needs Python 3.12 or newer and brings in JAX, Equinox, diffrax, lineax, optimistix, einops, paramax, gridax, spectraldiffx, geonnax, geophysix, integrix and pipekit.
 
-```bash
-pip install "sesmax-core @ git+https://github.com/jejjohnson/sesmax.git#subdirectory=packages/sesmax-core"
+The libraries of the stack pin each other at different git tags, so a plain `pip install` or `uv pip install` of the git URL stops at a conflict (on gaussx today). In your project, name the source and copy the `override-dependencies` list of the [workspace `pyproject.toml`](../../pyproject.toml), which holds one tag for each:
+
+```toml
+[project]
+dependencies = ["sesmax-core"]
+
+[tool.uv]
+override-dependencies = [
+    # copy the list from sesmax's root pyproject.toml
+]
+
+[tool.uv.sources]
+sesmax-core = { git = "https://github.com/jejjohnson/sesmax.git", subdirectory = "packages/sesmax-core" }
 ```
 
-Four extras add the optional parts: `da` (filterax and vardax, for `sesmax_core.da`), `flows` (flowjax, for `sesmax_core.flows`), `xarray` (xarray and zarr, for `sesmax_core.io`) and `checkpoint` (orbax, for `SimulationCheckpointer`). An optional module imported without its extra raises an `ImportError` that names it.
+Four extras add the optional parts: `da` (filterax and vardax, for `sesmax_core.da`), `flows` (flowjax, for `sesmax_core.flows`), `xarray` (xarray and zarr, for `sesmax_core.io`) and `checkpoint` (orbax, for `SimulationCheckpointer`). An optional module used without its extra raises an `ImportError` that names it. For the assimilation adapters, write `sesmax-core[da]` in the dependencies above.
 
-```bash
-pip install "sesmax-core[da] @ git+https://github.com/jejjohnson/sesmax.git#subdirectory=packages/sesmax-core"
-```
-
-The packages of the stack pin each other at different tags. When uv reports a conflict, copy the `override-dependencies` of the [workspace `pyproject.toml`](../../pyproject.toml) into your own project.
+To work on the package itself, a clone needs no overrides (see Development).
 
 ## 🌊 Quickstart: which sources raised the sea surface?
 
@@ -291,7 +298,7 @@ make typecheck  # ty on packages/*/src and scripts
 
 ## 🎓 References
 
-- Lorenz (1963). [Deterministic nonperiodic flow](https://doi.org/10.1175/1520-0469(1963)020%3C0130:DNF%3E2.0.CO;2). *Journal of the Atmospheric Sciences*.
+- Lorenz (1963). [Deterministic nonperiodic flow](https://doi.org/10.1175/1520-0469%281963%29020%3C0130%3ADNF%3E2.0.CO%3B2). *Journal of the Atmospheric Sciences*.
 - Lorenz (1996). Predictability: a problem partly solved. *Proceedings of the Seminar on Predictability*, ECMWF.
 
 ## 📄 License
