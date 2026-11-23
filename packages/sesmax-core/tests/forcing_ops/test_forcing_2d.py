@@ -7,7 +7,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from gridax import CartesianCGrid2D, Difference2D, Mask2D
+from gridax import CartesianCGrid2D, Mask2D, curl
 from gridax_inputs import (
     make_grid_2d,
     make_h_field_2d,
@@ -420,10 +420,10 @@ class TestWindCurl2D:
         assert float(out[8, 5]) < 0.0 < float(out[24, 5])
 
     def test_matches_curl_of_wind_stress_tendency(self):
-        """Interior X-points equal Difference2D.curl of WindStress2D's (du, dv)."""
+        """Interior X-points equal the curl of WindStress2D's (du, dv)."""
         g, tx, ty, _ = self._gaussian(16)
         du, dv = WindStress2D(grid=g, rho0=1000.0)(tx, ty, dz_top=2.0)
-        ref = Difference2D(grid=g).curl(du, dv)
+        ref = curl(du, dv, g)
         out = WindCurl2D(grid=g, rho0=1000.0)(tx, ty, 2.0)
         # away from the north / east walls, where WindStress2D's zero ghost ring differs
         np.testing.assert_allclose(

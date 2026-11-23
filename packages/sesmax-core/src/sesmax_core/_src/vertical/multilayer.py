@@ -6,22 +6,22 @@ multiple layers) treat the leading axis of a ``[nl, Ny, Nx]`` array as a
 There are no ghost cells in the layer dimension; every slice is a real,
 physical 2D field.
 
-This is fundamentally different from the :class:`~gridax.Difference3D`
-(or :class:`~gridax.Interpolation3D`) operators, which treat the leading
+This is fundamentally different from a 3-D grid
+(:class:`~gridax.CartesianCGrid3D`), whose functions treat the leading
 axis as a *spatial* vertical dimension with ghost shells at ``k=0`` and
 ``k=Nz-1`` that must be filled by boundary conditions before use.  Only the
-interior ``k=1..Nz-2`` slices are written by those operators.
+interior ``k=1..Nz-2`` slices are written there.
 
-Use :func:`multilayer` to lift any 2D callable (e.g., a bound method of
-:class:`~gridax.Difference2D`) to operate on all layers in parallel:
+Use :func:`multilayer` to lift any 2D callable (e.g., a method of
+:class:`~gridax.GridOps`) to operate on all layers in parallel:
 
     >>> import jax.numpy as jnp
     >>> import gridax
     >>> from sesmax_core.vertical import multilayer
     >>> grid = gridax.CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
-    >>> diff2d = gridax.Difference2D(grid=grid)
+    >>> ops = gridax.GridOps(grid)
     >>> h = jnp.ones((4, grid.Ny, grid.Nx))  # 4 layers
-    >>> dh_dx = multilayer(diff2d.diff_x_T_to_U)(h)  # shape [4, Ny, Nx]
+    >>> lap = multilayer(ops.laplacian)(h)  # shape [4, Ny, Nx]
 """
 
 from __future__ import annotations
@@ -45,8 +45,8 @@ def multilayer(fn: Callable[..., Any]) -> Callable[..., Any]:
     ----------
     fn : callable
         A callable that maps one or more ``[Ny, Nx]`` arrays to one or more
-        ``[Ny, Nx]`` arrays (e.g., a bound method of
-        :class:`~gridax.Difference2D`).
+        ``[Ny, Nx]`` arrays (e.g., a method of
+        :class:`~gridax.GridOps`).
 
     Returns
     -------
@@ -58,43 +58,43 @@ def multilayer(fn: Callable[..., Any]) -> Callable[..., Any]:
     Notes
     -----
     **Multilayer** (this function) vs. **true 3D**
-    (:class:`~gridax.Difference3D`):
+    (:class:`~gridax.CartesianCGrid3D`):
 
     * ``multilayer(fn)`` treats every layer as a real, independent 2D field.
       There are **no ghost layers**; the operator applies to **all** ``nl``
       slices, including ``k=0`` and ``k=nl-1``.
-    * :class:`~gridax.Difference3D` treats the leading axis as a vertical
+    * A 3-D grid treats the leading axis as a vertical
       *spatial* dimension with ghost shells at ``k=0`` and ``k=Nz-1`` that
       are kept at zero until filled by boundary conditions.  Only the interior
       ``k=1..Nz-2`` slices are written.
 
     These two approaches are **not interchangeable**.  Use ``multilayer`` for
     baroclinic or quasi-geostrophic layered models where every layer holds a
-    real, independent horizontal field.  Use ``Difference3D`` for true 3D
+    real, independent horizontal field.  Use a 3-D grid for true 3D
     primitive-equation discretizations where vertical ghost layers are
     required at the top and bottom boundaries.
 
     Examples
     --------
-    Apply :meth:`~gridax.Difference2D.diff_x_T_to_U` to 3 layers at once:
+    Apply :func:`~gridax.laplacian` to 3 layers at once:
 
     >>> import jax.numpy as jnp
     >>> import gridax
     >>> from sesmax_core.vertical import multilayer
     >>> grid = gridax.CartesianCGrid2D.from_interior(8, 8, 1.0, 1.0)
-    >>> diff2d = gridax.Difference2D(grid=grid)
+    >>> ops = gridax.GridOps(grid)
     >>> h = jnp.ones((3, grid.Ny, grid.Nx))  # 3 layers
-    >>> dh = multilayer(diff2d.diff_x_T_to_U)(h)
-    >>> dh.shape
+    >>> lap = multilayer(ops.laplacian)(h)
+    >>> lap.shape
     (3, 10, 10)
 
     For operators that take multiple arguments (e.g., divergence), pass the
-    bound method directly — :func:`eqx.filter_vmap` batches each positional
+    method directly — :func:`eqx.filter_vmap` batches each positional
     argument over the leading axis independently:
 
     >>> u = jnp.ones((3, grid.Ny, grid.Nx))
     >>> v = jnp.ones((3, grid.Ny, grid.Nx))
-    >>> div = multilayer(diff2d.divergence)(u, v)
+    >>> div = multilayer(ops.divergence)(u, v)
     >>> div.shape
     (3, 10, 10)
     """

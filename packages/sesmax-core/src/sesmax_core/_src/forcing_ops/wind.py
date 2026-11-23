@@ -173,7 +173,7 @@ class WindCurl2D(AbstractForcing):
                           / (rho0 * H)
 
     i.e. the curl of the stress interpolated to the faces (the C-grid curl of
-    :class:`Difference2D` / :class:`Vorticity2D`), divided by ``rho0 * H``.
+    :func:`~gridax.curl`), divided by ``rho0 * H``.
     ``tau_x``, ``tau_y`` are given at T-points **with the ghost ring filled**
     (e.g. an analytic stress evaluated at the ghost-cell centres): the face
     averages are formed on the full arrays, so the X-points next to the

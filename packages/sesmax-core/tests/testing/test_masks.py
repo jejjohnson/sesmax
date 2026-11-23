@@ -48,29 +48,28 @@ class TestAllOceanMaskSmoke:
         mask = Mask2D.from_dimensions(ny=16, nx=16)
         model = LinearShallowWater2D.create(nx=14, ny=14, mask=mask)
         assert model.mask is mask
-        assert model.diff.mask is mask
+        assert model.ops.mask is mask
 
     def test_pde2d_burgers(self):
         mask = Mask2D.from_dimensions(ny=16, nx=16)
         model = Burgers2D.create(nx=14, ny=14, mask=mask)
-        assert model.advection.mask is mask
+        assert model.ops.mask is mask
 
     def test_pde1d_burgers(self):
         mask = Mask1D.from_dimensions(nx=32)
         model = Burgers1D.create(nx=30, mask=mask)
-        assert model.diff.mask is mask
-        assert model.advection.mask is mask
+        assert model.ops.mask is mask
 
     def test_swm_linear_1d(self):
         mask = Mask1D.from_dimensions(nx=32)
         model = LinearShallowWater1D.create(nx=30, mask=mask)
         assert model.mask is mask
-        assert model.interp.mask is mask
+        assert model.ops.mask is mask
 
     def test_swm_nonlinear_1d(self):
         mask = Mask1D.from_dimensions(nx=32)
         model = NonlinearShallowWater1D.create(nx=30, mask=mask)
-        assert model.advection.mask is mask
+        assert model.ops.mask is mask
 
 
 # ---------------------------------------------------------------------------
