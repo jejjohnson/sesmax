@@ -248,7 +248,7 @@ Two runs that differ only in filter strength can give different results, so a re
 ### Dependencies
 
 `run_chunks` needs only `pipekit` and `pipekit-cycle`, which are already in the base install.
-`sesmax_core.sim` stays out of the top-level `__init__`, because `import sesmax_core` must stay pipekit-free.
+`sesmax_core.sim` stays out of the top-level `__init__`, because `import sesmax_core` must not load pipekit-jax or pipekit-cycle.
 The `[sim]` extra needs `cyclopts`, `loguru`, `pyyaml`, `xarray` and `zarr`.
 That is smaller than #28 expected: somax's `sim` group also lists `hydra-core`, `hydra-zen`, `omegaconf`, `orbax-checkpoint` and `dvc`, but nothing under `cli/` imports the first four, and only the ocean's `_data.py` needs `dvc`.
 

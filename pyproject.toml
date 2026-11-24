@@ -16,9 +16,9 @@ members = ["packages/*"]
 
 [tool.uv]
 # filterax pins gaussx to a commit while vardax asks for a bare ``gaussx`` and
-# gridax needs gaussx >= 0.8.1: force one tag across the graph. gridax
-# and vardax pin pipekit at their own tags: force sesmax-core's one tag,
-# pipekit-ops-v0.2.1, everywhere (bump these with
+# gridax needs gaussx >= 0.8.1: force one tag across the graph. vardax v0.3.5
+# pins pipekit at its own tag: force sesmax-core's one tag,
+# pipekit-array-v0.1.4, everywhere (bump these with
 # packages/sesmax-core/pyproject.toml).
 override-dependencies = [
     "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.8.1",
@@ -32,10 +32,12 @@ override-dependencies = [
     "functax[jax] @ git+https://github.com/jejjohnson/functax@v0.0.13",
     # vardax sources geonnax v0.0.10; hold the graph on the core's tag.
     "geonnax @ git+https://github.com/jejjohnson/geonnax.git@v0.0.11",
-    "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-ops",
-    "pipekit-array @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-array",
-    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-cycle",
-    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-jax",
+    "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-ops",
+    # An override replaces the requirement, extras included: the backend that
+    # gridax and geophysix import needs both.
+    "pipekit-array[numpy,compat] @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-array",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-cycle",
+    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-jax",
 ]
 
 [tool.uv.sources]

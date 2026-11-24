@@ -39,18 +39,18 @@ dependencies = [
     # The grids, masks and C-grid operators every grid-based model is written
     # on, with gridax.solvers (the ``jax`` extra: masked operators, multigrid,
     # capacitance) and gridax.pipekit (the ``pipekit`` extra: the diagnostic
-    # graphs). Pinned to gridax main at 42fe52d (gridax#549: the functions and
-    # ``GridOps`` in place of the operator classes), which no release holds yet.
-    "gridax[jax,pipekit] @ git+https://github.com/jejjohnson/gridax.git@42fe52d9633f4bd08ec076cf014c4ee64fa5ca71#subdirectory=packages/gridax",
-    # Every pipekit package at the one tag pipekit-ops-v0.2.1: per-package
+    # graphs). 0.3.1 is the first release on geophysix v0.0.7 and on pipekit's
+    # array backend; it, geophysix and pipekit move together.
+    "gridax[jax,pipekit] @ git+https://github.com/jejjohnson/gridax@gridax-v0.3.1#subdirectory=packages/gridax",
+    # Every pipekit package at the one tag pipekit-array-v0.1.4: per-package
     # tags make uv report conflicting URLs for pipekit-ops.
-    "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-ops",
-    "pipekit-array @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-array",
-    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-cycle",
-    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-ops-v0.2.1#subdirectory=packages/pipekit-jax",
+    "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-ops",
+    "pipekit-array @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-array",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-cycle",
+    "pipekit-jax @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.4#subdirectory=packages/pipekit-jax",
     # The reference density the wind-stress operators default to; geophysix
     # owns the physical constants.
-    "geophysix @ git+https://github.com/jejjohnson/geophysix.git@v0.0.3",
+    "geophysix @ git+https://github.com/jejjohnson/geophysix@v0.0.7",
     # The spatial bases of the forcing bank (only ``geonnax.basis`` is used).
     "geonnax @ git+https://github.com/jejjohnson/geonnax.git@v0.0.11",
     # The IMEX solver, its step-size controller and the CFL bound
@@ -100,5 +100,5 @@ packages = ["src/sesmax_core"]
 # package across the graph, and a source takes precedence over the direct
 # reference above (which pip users still get).
 spectraldiffx = { git = "https://github.com/jejjohnson/spectraldiffx.git", tag = "0.1.2" }
-geophysix = { git = "https://github.com/jejjohnson/geophysix.git", tag = "v0.0.3" }
-gridax = { git = "https://github.com/jejjohnson/gridax.git", rev = "42fe52d9633f4bd08ec076cf014c4ee64fa5ca71", subdirectory = "packages/gridax" }
+geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.7" }
+gridax = { git = "https://github.com/jejjohnson/gridax", tag = "gridax-v0.3.1", subdirectory = "packages/gridax" }
