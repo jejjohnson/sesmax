@@ -1,8 +1,9 @@
 """Top-level names that are imported on first use.
 
-``OperatorTerm`` needs pipekit, so the top-level package exports it lazily:
+``OperatorTerm`` needs pipekit-jax, so the top-level package exports it lazily:
 ``from sesmax_core import OperatorTerm`` works, and a plain
-``import sesmax_core`` does not import pipekit.
+``import sesmax_core`` does not import pipekit-jax. pipekit-ops and pipekit-array
+are loaded all the same: they hold the array backend of gridax and geophysix.
 """
 
 from __future__ import annotations
@@ -19,11 +20,11 @@ def test_operator_term_is_exported_from_the_top_level() -> None:
     assert sesmax_core.OperatorTerm is sesmax_core.terms.OperatorTerm
 
 
-def test_plain_import_does_not_load_pipekit() -> None:
+def test_plain_import_does_not_load_pipekit_jax() -> None:
     code = (
         "import sys, sesmax_core\n"
         "loaded = {m.split('.')[0] for m in sys.modules}\n"
-        "stray = loaded & {'pipekit', 'pipekit_ops', 'pipekit_jax'}\n"
+        "stray = loaded & {'pipekit', 'pipekit_cycle', 'pipekit_jax'}\n"
         "assert not stray, stray\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)

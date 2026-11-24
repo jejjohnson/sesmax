@@ -30,7 +30,7 @@ still works, but it is opaque to ``jax.grad``: its internals are not
 leaves, so its parameters are constants.
 
 This lives on the pipekit side of sesmax (``sesmax_core.operators``); the term
-algebra in :mod:`sesmax_core._src.terms` stays pipekit-free.
+algebra in :mod:`sesmax_core._src.terms` stays free of pipekit-jax.
 """
 
 from __future__ import annotations

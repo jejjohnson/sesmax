@@ -237,7 +237,7 @@ __all__ = [
 def __getattr__(name: str) -> object:
     """Import ``OperatorTerm`` on first use.
 
-    It needs pipekit, so a plain ``import sesmax_core`` stays pipekit-free.
+    It needs pipekit-jax, which a plain ``import sesmax_core`` does not load.
     """
     if name == "OperatorTerm":
         from sesmax_core._src.operator_term import OperatorTerm
