@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/jejjohnson/sesmax/compare/sesmax-core-v0.2.0...sesmax-core-v0.3.0) (2026-11-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deps:** move to gridax 42fe52d, GridOps and the functions in place of the operator classes ([#146](https://github.com/jejjohnson/sesmax/issues/146))
+
+### Miscellaneous
+
+* **deps:** move to gridax 42fe52d, GridOps and the functions in place of the operator classes ([#146](https://github.com/jejjohnson/sesmax/issues/146)) ([629103f](https://github.com/jejjohnson/sesmax/commit/629103f373d41f413d67705737c0ba8d92bc754e))
+
 ## [0.2.0](https://github.com/jejjohnson/sesmax/compare/sesmax-core-v0.1.0...sesmax-core-v0.2.0) (2026-11-23)
 
 
