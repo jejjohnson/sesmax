@@ -16,7 +16,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Terms](terms.md) | `Term`, `TermFn`, `Sum`, `Scaled`, `Compose`, `explicit`, `implicit`, `partition`, `build_diffrax_terms`, `OperatorTerm` |
 | [Forcing](forcing.md) | `ForcingProtocol` and the constant, seasonal and interpolated forcings; `AbstractForcing`, `ForcingSum`, `ForcingProduct`, `TimeVaryingForcing`, the wind, drag and Rayleigh operators and their tendency functions, `linear_drag`, `rayleigh_relaxation`; `SpatialBasis`, `TemporalBasis`, `BasisForcing`, `ForcingTerm`, the vector versions; the `spatial_from_*` constructors, `tile_in_time`, `GaussianWindowsInTime`, `HatInTime`, `matern_spectral_density` |
 | [Scales](scales.md) | `Scales`, `StateAffine`, `ScaledModel` |
-| [Layered fluids](gfd.md) | `StratificationProfile`, `ModalTransform`, `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion` |
+| [Layered fluids](gfd.md) | `StratificationProfile`, `ModalTransform`, `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`; `resolve_burger`, `burger_to_g_prime`, `resolve_burger_spherical` |
 | [Vertical modes](vertical.md) | `build_coupling_matrix`, `decompose_vertical_modes`, `layer_to_mode`, `mode_to_layer`, `multilayer`, `barotropic_filter` |
 | [Domains](domain.md) | `Domain`, `TimeDomain` |
 | [Solvers](solvers.md) | `imex_solver`, `imex_stepsize_controller`, `stable_step` |
@@ -28,6 +28,8 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [I/O](io.md) (`[xarray]`) | `state_to_dataset`, `dataset_to_state`, `snapshots_to_dataset`, `append_to_dataset`, `save_dataset`, `load_dataset`, `scales_attrs`, `transform_attrs`, `apply_scale_metadata` |
 | [Checkpointing](checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
 | [Guards](guards.md) | `guard_finite`, `guard_positive`, `guard_ceiling` |
+| [Fields](fields.md) | `each`, `map_fields`, `placed`, `values`, `is_field` |
+| [Validation](validation.md) | `require_positive`, `require_non_negative`, `reject_derived_kwargs` |
 | [Test problems](testing.md) | `Lorenz63`, `Lorenz96`, `Lorenz96t`; `LinearConvection1D`, `NonlinearConvection1D`, `Diffusion1D`, `Burgers1D` and their 2D versions; `Burgers2DTermModel`, `Burgers2DOp`; `IncompressibleNS2D`; `PoissonSolver2D`, `LaplaceSolver2D`, `HelmholtzSolver2D`; `LinearShallowWater1D`, `NonlinearShallowWater1D`, `LinearShallowWater2D`, `LinearSWM2DTermModel` and its terms; `gravity_wave_1d`, `inertial_oscillation_1d`, `geostrophic_adjustment_2d`; and their state, parameter and diagnostic classes |
 
 ## Package overview

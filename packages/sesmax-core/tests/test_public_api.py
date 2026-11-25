@@ -21,6 +21,7 @@ SUBMODULES: list[str] = [
     "checkpoint",
     "da",
     "domain",
+    "fields",
     "flows",
     "forcing",
     "gfd",
@@ -33,6 +34,7 @@ SUBMODULES: list[str] = [
     "terms",
     "testing",
     "train",
+    "validation",
     "vertical",
 ]
 

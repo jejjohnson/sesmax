@@ -23,7 +23,7 @@ The public API of each package is its top-level `__all__`, plus its public submo
 
 ### Boundaries
 
-- **Tiers.** A package imports only packages in a lower tier; `sesmax_core` imports no component and nothing from `somax` (`tests/test_workspace.py` reads the sources and fails otherwise). Two components never import each other: what they share goes into the core, and what couples them goes into the coupler.
+- **Tiers.** A package imports only packages in a lower tier; `sesmax_core` imports no component and nothing from `somax` (`tests/test_workspace.py` reads the sources and fails otherwise). Only public names cross packages: an import of another package's `_src` fails the same test. Two components never import each other: what they share goes into the core, and what couples them goes into the coupler.
 - **Dependencies.** `sesmax-core`'s base install: JAX, jaxtyping, Equinox, diffrax, lineax, optimistix, einops, paramax, gridax, spectraldiffx, pipekit-ops (with pipekit-cycle and pipekit-jax), geonnax, functax and integrix; git dependencies are direct references in `packages/sesmax-core/pyproject.toml`, kept in step with the overrides in the root `pyproject.toml`. An optional dependency goes behind an extra (`[da]` for filterax and vardax, `[flows]`, `[xarray]`, `[checkpoint]`) and an import that raises an `ImportError` naming the extra.
 - **Nobody imports sesmax yet.** When other projects build on it, list them here and keep their imports working: a rename or removal of a public name then goes through a deprecation (the old name keeps working with a `DeprecationWarning` that names the replacement for at least one release).
 
@@ -71,6 +71,8 @@ find out whether it exists:
 | A softplus or sigmoid on a parameter, or `stop_gradient` to freeze one | `positive`, `interval`, `frozen`, `trainable_mask` |
 | Non-dimensionalising or standardising a state | `Scales`, `StateAffine`, `ScaledModel` |
 | A vertical-mode transform | `ModalTransform` |
+| Element-wise maths on a state whose fields may be `CField`s | `each`, `map_fields`, `placed`, `values` (`sesmax_core.fields`) |
+| A check on a factory's arguments, or a Burger number from a Froude number | `sesmax_core.validation`; `resolve_burger`, `burger_to_g_prime` (`sesmax_core.gfd`) |
 | A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_core.monitor` |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 
@@ -146,7 +148,7 @@ Most rules here are tests, so CI tells you when one breaks. Read a test's docstr
 | Test | Enforces |
 |---|---|
 | `packages/*/tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of public modules; every submodule declares a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
-| `tests/test_workspace.py` | The tiers (the core imports no component and nothing from somax); the umbrella holds no code; each `__version__` matches its `pyproject.toml` |
+| `tests/test_workspace.py` | The tiers (the core imports no component and nothing from somax); no package imports another's `_src`; the umbrella holds no code; each `__version__` matches its `pyproject.toml` |
 | `tests/test_capabilities.py` | `docs/api/capabilities.md` is current; no name is bound to two different objects |
 | `packages/sesmax-core/tests/test_lazy_exports.py` | `OperatorTerm` is exported lazily, so `import sesmax_core` does not import pipekit-jax |
 | `packages/sesmax-core/tests/da/test_missing_extra.py` | Importing `sesmax_core.da` or `sesmax_core.flows` without its extra raises an `ImportError` naming the extra |

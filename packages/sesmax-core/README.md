@@ -223,6 +223,7 @@ Every name below is public in the module named beside it. The [capability index]
 | `sesmax_core.da` | `FilteraxDynamics`, `VardaxForwardModel`, `WindowOperator`, `make_ensemble`, `state_to_vector`, `SubsampleObs` | Needs `[da]`; `VardaxForwardModel` is exact only for autonomous models |
 | `sesmax_core.gfd`, `sesmax_core.vertical` | `ModalTransform`, `StratificationProfile`, `pv_inversion`, `streamfunction_from_vorticity`, `pressure_from_divergence`, `barotropic_filter` | Layered fluids: vertical modes and the elliptic inversions |
 | `sesmax_core.guards`, `sesmax_core.monitor` | `guard_finite`, `guard_positive`, `guard_ceiling`; `BaseMonitor`, `default_monitors` and the built-in monitors | Guards stop inside a step; the run loop that calls the monitors is not in the package yet |
+| `sesmax_core.fields`, `sesmax_core.validation` | `each`, `map_fields`, `placed`, `values`; `require_positive`, `require_non_negative`, `reject_derived_kwargs` | For writing a model once for arrays and located fields, and for checking a factory's arguments |
 | `sesmax_core.operators` | `ModelOp`, `OperatorTerm` | pipekit operators in and out of a model |
 | `sesmax_core.domain` | `Domain`, `TimeDomain` | Spatial and time domains |
 | `sesmax_core.io`, `sesmax_core.checkpoint`, `sesmax_core.flows` | `state_to_dataset`, `save_dataset`; `SimulationCheckpointer`; `to_flowjax`, `learned_prior` | Need `[xarray]`, `[checkpoint]` and `[flows]` |

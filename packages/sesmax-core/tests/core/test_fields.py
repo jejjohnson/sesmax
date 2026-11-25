@@ -18,7 +18,6 @@ import pytest
 from gridax import CField, Mask1D, Mask2D, StaggerMismatchError
 from gridax.schemes import WENO
 
-from sesmax_core._src.fields import each, map_fields, placed, values
 from sesmax_core._src.terms import Scaled, TermFn
 from sesmax_core._src.testing.pde1d import burgers, diffusion, linear_convection
 from sesmax_core._src.testing.pde1d.nonlinear_convection import (
@@ -35,6 +34,7 @@ from sesmax_core._src.testing.pde2d import (
 from sesmax_core._src.testing.pde2d.burgers_terms import Burgers2DTermModel
 from sesmax_core._src.testing.swm import linear_1d, linear_2d, nonlinear_1d
 from sesmax_core._src.testing.swm.linear_swm_terms import LinearSWM2DTermModel
+from sesmax_core.fields import each, map_fields, placed, values
 
 
 def _wet_1d():
