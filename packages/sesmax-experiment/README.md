@@ -87,7 +87,14 @@ uv run sesmax-experiment simulate --config adjustment.yaml --output-dir runs/adj
 uv run sesmax-experiment restart --config adjustment.yaml --from runs/adjustment/final_state.zarr --output-dir runs/more
 ```
 
-A run that succeeds leaves `snapshots.zarr`, `final_state.zarr`, `metrics.json`, `resolved.yaml`, `manifest.json` and `run.log`. One that fails leaves its log and the snapshots it had taken, as `snapshots.partial.zarr`.
+A run that succeeds leaves `snapshots.zarr`, `final_state.zarr`, `metrics.json`, `resolved.yaml`, `manifest.json`, `run.log` and `metrics.jsonl`, a line of numbers per chunk. One that fails leaves its two logs and the snapshots it had taken, as `snapshots.partial.zarr`.
+
+A long run writes checkpoints, each a store of its own that is finished by a rename, so a crash leaves the older ones. A run whose wall time is up stops with a checkpoint and exit code 75, and the rest of it takes the steps the whole run would have taken:
+
+```bash
+uv run sesmax-experiment simulate --config adjustment.yaml --output-dir runs/long --checkpoint-every-n-chunks 1 --keep-last 2 --max-wall-seconds 3600
+uv run sesmax-experiment restart --config adjustment.yaml --from runs/long --output-dir runs/long-2
+```
 
 ## 📄 License
 

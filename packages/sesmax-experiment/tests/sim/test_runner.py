@@ -1,8 +1,7 @@
 """The runner: its artifacts, its log, its failures, and restarts.
 
 Ported from somax 9cb19b3 (``tests/test_cli_run.py``) to the testing component. The
-tests of ``checkpoint.zarr`` wait for versioned checkpoints (sesmax#191); the attrs a
-checkpoint carries are written here by hand.
+tests of checkpoints are in ``test_checkpoints.py``.
 """
 
 from __future__ import annotations
@@ -93,6 +92,7 @@ class TestSimulate:
             "resolved.yaml",
             "manifest.json",
             "run.log",
+            "metrics.jsonl",
         }
         assert result.output_dir == tmp_path
         assert result.metrics_path is not None
@@ -285,6 +285,7 @@ class TestRestart:
             "resolved.yaml",
             "manifest.json",
             "run.log",
+            "metrics.jsonl",
         }
         result = restart(
             shallow_water(), tmp_path / "prod", restart_from=spun.final_state_path

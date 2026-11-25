@@ -5,7 +5,7 @@ from __future__ import annotations
 import dataclasses
 import shutil
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -14,15 +14,16 @@ import jax
 import numpy as np
 import paramax
 from loguru import logger
-from pipekit_ops import Tap
+from pipekit_ops import Operator, Tap
 
-from sesmax_core import io
+from sesmax_core import Model, io
 from sesmax_core.component import BuiltRun, Component
 from sesmax_core.fields import values
 from sesmax_experiment._src.components import find_model
 from sesmax_experiment._src.monitor import Monitor, default_monitors
-from sesmax_experiment._src.run.chunks import ChunkedRun, run_chunks
+from sesmax_experiment._src.run.chunks import run_chunks
 from sesmax_experiment._src.run.frame import ChunkFrame, RunStopped
+from sesmax_experiment._src.run.schedules import Due
 from sesmax_experiment._src.run.timeline import Timeline
 from sesmax_experiment._src.sim.artifacts import (
     SnapshotStore,
@@ -31,14 +32,22 @@ from sesmax_experiment._src.sim.artifacts import (
     run_attrs,
     write_json,
 )
+from sesmax_experiment._src.sim.checkpoints import (
+    DIRECTORY,
+    Checkpointing,
+    CheckpointStore,
+    checkpoint_stage,
+    remove_stale,
+    resolve,
+)
 from sesmax_experiment._src.sim.checks import preflight
 from sesmax_experiment._src.sim.progress import (
-    RunLogContext,
     start_run_log,
     stop_run_log,
 )
+from sesmax_experiment._src.sim.record import HealthRecord, JsonLinesWriter
 from sesmax_experiment._src.sim.report import chunk_line
-from sesmax_experiment._src.sim.spec import RunSpec, TimesteppingSpec, dump_yaml
+from sesmax_experiment._src.sim.spec import RunSpec, dump_yaml
 from sesmax_experiment._src.sim.units import (
     field_units,
     format_time_seconds,
@@ -47,6 +56,7 @@ from sesmax_experiment._src.sim.units import (
 
 
 Mode = Literal["simulate", "spinup", "restart"]
+Status = Literal["finished", "stopped"]
 
 
 class IntegrationDivergedError(RuntimeError):
@@ -63,18 +73,22 @@ class SimulationResult:
 
     Args:
         output_dir: The directory.
+        status: ``"finished"``, or ``"stopped"`` if a monitor stopped it resumably.
         snapshots_path: The snapshots, or ``None`` if there are none.
-        final_state_path: The final state, which a restart reads.
+        final_state_path: The final state, or ``None`` if it stopped before the end.
         metrics_path: The metrics, or ``None`` if there are none.
+        checkpoint_path: The newest checkpoint, which a restart reads, or ``None``.
         wallclock_seconds: How long the integration took.
         n_steps: The steps the solver took.
-        state: The final state.
+        state: The last state.
     """
 
     output_dir: Path
+    status: Status
     snapshots_path: Path | None
-    final_state_path: Path
+    final_state_path: Path | None
     metrics_path: Path | None
+    checkpoint_path: Path | None
     wallclock_seconds: float
     n_steps: int
     state: Any
@@ -144,61 +158,89 @@ def _diverged(mode: Mode, cause: Exception) -> IntegrationDivergedError:
     )
 
 
+@dataclasses.dataclass
+class _Observers:
+    """What looks at the frames of a run, beside its monitors."""
+
+    model: Model
+    units: dict[str, str]
+    log: Any
+    record: HealthRecord
+    store: SnapshotStore | None
+    steps: int = 0
+    last: int = -1
+
+    def chunk(self, frame: ChunkFrame) -> None:
+        """After every chunk: the log and the record, once."""
+        if frame.info.index <= self.last:
+            return
+        self.last = frame.info.index
+        self.steps += int(frame.info.stats.get("num_steps", 0))
+        self.line(frame)
+        self.record(frame)
+
+    def line(self, frame: ChunkFrame) -> None:
+        """One line of the log."""
+        self.log.debug(chunk_line(self.model, frame, self.units))
+
+    def snapshot(self, frame: ChunkFrame) -> None:
+        """At a snapshot, the start included."""
+        _assert_finite(frame)
+        if frame.info.index < 0:
+            self.line(frame)
+        if self.store is not None:
+            self.store(frame)
+
+
 def _integrate(
     spec: RunSpec,
-    built: BuiltRun,
+    model: Model,
     state0: Any,
     timeline: Timeline,
     *,
     mode: Mode,
     monitors: Sequence[Monitor],
-    store: SnapshotStore | None,
-    units: dict[str, str],
-    run_log: RunLogContext,
-    steps: list[int],
-) -> ChunkedRun:
-    """The chunks of a run, with its log and its snapshots."""
-    model = built.model
-
-    def log_chunk(frame: ChunkFrame) -> None:
-        steps.append(int(frame.info.stats.get("num_steps", 0)))
-        run_log.log.debug(chunk_line(model, frame, units))
-
-    def snapshot(frame: ChunkFrame) -> None:
-        _assert_finite(frame)
-        if frame.info.index < 0:
-            run_log.log.debug(chunk_line(model, frame, units))
-        if store is not None:
-            store(frame)
-
+    seen: _Observers,
+    due: Due | None,
+    checkpoint: Callable[[ChunkFrame], Any],
+) -> tuple[Any, RunStopped | None]:
+    """The chunks of a run: its last state, and the stop if it was resumable."""
+    stages: list[Operator] = [Tap(seen.chunk)]
+    if due is not None:
+        stages.append(checkpoint_stage(checkpoint, due, seen.log.warning))
+    if 0 not in timeline.snapshots:
+        start = float(timeline.edges[0])
+        seen.log.debug(f"starting between two snapshots, at t={start:g}")
     try:
-        return run_chunks(
+        run = run_chunks(
             model,
             state0,
             timeline,
             dt=spec.timestepping.dt,
             monitors=monitors,
-            on_snapshot=snapshot,
-            stages=[Tap(log_chunk)],
+            on_snapshot=seen.snapshot,
+            stages=stages,
             spec=spec,
         )
-    except RunStopped as exc:
-        run_log.log.debug(chunk_line(model, exc.frame, units))
-        raise _diverged(mode, exc) from exc
+    except RunStopped as stop:
+        seen.chunk(stop.frame)
+        bad = _not_finite(stop.frame.state)
+        if bad or not stop.resumable:
+            raise _diverged(mode, stop) from stop
+        if stop.frame.info.index + 1 == timeline.n_chunks:
+            # Its time was up as it ended: there is nothing to resume.
+            seen.snapshot(stop.frame)
+            return stop.frame.state, None
+        checkpoint(stop.frame)
+        return stop.frame.state, stop
     except eqx.EquinoxRuntimeError as exc:
         # A guard inside the tendency halted the step that went wrong.
         raise _diverged(mode, exc) from exc
+    return run.state, None
 
 
 def _metrics(
-    spec: RunSpec,
-    component: Component,
-    built: BuiltRun,
-    state: Any,
-    *,
-    mode: Mode,
-    wall_seconds: float,
-    n_steps: int,
+    component: Component, built: BuiltRun, state: Any, run: dict[str, Any]
 ) -> dict[str, Any]:
     """The numbers about the final state, and about the run."""
     out: dict[str, Any] = {}
@@ -211,15 +253,17 @@ def _metrics(
             out |= component.evaluate(built.model, state)
         except Exception as exc:
             logger.warning("the component's metrics failed: {}", exc)
-    times = spec.timestepping
-    return out | {
-        "wallclock_seconds": wall_seconds,
-        "n_steps": n_steps,
-        "t0": times.t0,
-        "t1": times.t1,
-        "save_interval": times.save_interval,
-        "mode": mode,
-    }
+    return out | run
+
+
+def _clear(output_dir: Path) -> None:
+    """Remove what an earlier run left, which would be taken for this one's."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    remove_stale(output_dir)
+    if (output_dir / "final_state.zarr").exists():
+        shutil.rmtree(output_dir / "final_state.zarr")
+    for name in ("metrics.json", "manifest.json"):
+        (output_dir / name).unlink(missing_ok=True)
 
 
 def _run(
@@ -230,80 +274,97 @@ def _run(
     built: BuiltRun,
     component: Component,
     state0: Any,
-    diagnostics_per_save: int,
+    whole: Timeline,
+    timeline: Timeline,
     monitors: Sequence[Monitor] | None,
+    checkpointing: Checkpointing | None,
 ) -> SimulationResult:
-    """Integrate, and write everything a successful run writes."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    only_final = mode == "spinup"
+    """Integrate, and write everything a run writes."""
+    model, only_final = built.model, mode == "spinup"
     logger.info("{}: {} x {}", mode, spec.scenario.name, spec.model.name)
     logger.info("output_dir={}", output_dir)
-    preflight(spec, built.model, component)
+    preflight(spec, model, component)
+    _clear(output_dir)
 
-    timeline = timeline_of(
-        spec, only_final=only_final, diagnostics_per_save=diagnostics_per_save
-    )
-    attrs = run_attrs(spec, mode=mode, coordinates=built.coordinates)
-    store = SnapshotStore(output_dir, attrs)
-    for stale in ("final_state.zarr",):
-        if (output_dir / stale).exists():
-            shutil.rmtree(output_dir / stale)
-    for stale in ("metrics.json", "manifest.json"):
-        (output_dir / stale).unlink(missing_ok=True)
-    units = field_units(
-        [field.name for field in dataclasses.fields(state0)],
-        component.field_units.get(spec.model.name, {}),
-        nondimensional=built.coordinates == "nondimensional",
-    )
-    times = spec.timestepping
+    t0, t1 = float(timeline.edges[0]), float(timeline.edges[-1])
+    first_step = whole.n_chunks - timeline.n_chunks
+    attrs = run_attrs(spec, mode=mode, coordinates=built.coordinates, t0=t0)
+    snapshots = SnapshotStore(output_dir, attrs)
     writes_snapshots = spec.output.write_snapshots and not only_final
     writes_metrics = spec.output.write_metrics and not only_final
+    keep = checkpointing or Checkpointing(due=Due(lambda frame: False))
+    checkpoints = CheckpointStore(
+        output_dir / DIRECTORY, keep_last=keep.keep_last, keep_every=keep.keep_every
+    )
+
+    def checkpoint(frame: ChunkFrame) -> None:
+        _assert_finite(frame)
+        step, t = first_step + frame.info.index + 1, frame.info.t1
+        path = checkpoints.save(frame.state, step=step, time=t, attrs=attrs)
+        run_log.log.debug(f"checkpoint at t={format_time_seconds(t)}: {path.name}")
+
     run_log = start_run_log(output_dir, label=f"sesmax-experiment/{mode}")
+    writer = JsonLinesWriter(output_dir / "metrics.jsonl")
+    seen = _Observers(
+        model=model,
+        units=field_units(
+            [field.name for field in dataclasses.fields(state0)],
+            component.field_units.get(spec.model.name, {}),
+            nondimensional=built.coordinates == "nondimensional",
+        ),
+        log=run_log.log,
+        record=HealthRecord(writer, t1=t1, first_step=first_step),
+        store=snapshots if writes_snapshots else None,
+    )
     run_log.log.debug(
         f"integration starting: scenario={spec.scenario.name} "
-        f"model={spec.model.name} t0={format_time_seconds(times.t0)} "
-        f"t1={format_time_seconds(times.t1)} dt={times.dt} s "
+        f"model={spec.model.name} t0={format_time_seconds(t0)} "
+        f"t1={format_time_seconds(t1)} dt={spec.timestepping.dt} s "
         f"chunks={timeline.n_chunks} snapshots={len(timeline.snapshots)}"
     )
     message = "finished cleanly"
     try:
-        steps: list[int] = []
         start = time.perf_counter()
-        run = _integrate(
+        state, stop = _integrate(
             spec,
-            built,
+            model,
             state0,
             timeline,
             mode=mode,
             monitors=default_monitors() if monitors is None else monitors,
-            store=store if writes_snapshots else None,
-            units=units,
-            run_log=run_log,
-            steps=steps,
+            seen=seen,
+            due=None if checkpointing is None else checkpointing.due,
+            checkpoint=checkpoint,
         )
         wall_seconds = time.perf_counter() - start
-        logger.info("integration finished in {}", format_wallclock(wall_seconds))
-        state = run.state
+        status: Status = "finished" if stop is None else "stopped"
+        if stop is None:
+            logger.info("integration finished in {}", format_wallclock(wall_seconds))
+        else:
+            message = f"stopped, and can be resumed: {stop}"
+            logger.warning(message)
 
-        metrics_path = None
-        if writes_metrics:
-            metrics = _metrics(
-                spec,
-                component,
-                built,
-                state,
-                mode=mode,
-                wall_seconds=wall_seconds,
-                n_steps=sum(steps),
+        metrics_path = final_state_path = None
+        if writes_metrics and stop is None:
+            run = {
+                "wallclock_seconds": wall_seconds,
+                "n_steps": seen.steps,
+                "t0": t0,
+                "t1": t1,
+                "save_interval": spec.timestepping.save_interval,
+                "mode": mode,
+            }
+            metrics_path = write_json(
+                output_dir / "metrics.json", _metrics(component, built, state, run)
             )
-            metrics_path = write_json(output_dir / "metrics.json", metrics)
-        snapshots_path = store.finish() if writes_snapshots else None
-        final_state_path = output_dir / "final_state.zarr"
-        io.save_dataset(
-            io.state_to_dataset(state, time=float(times.t1), attrs=attrs),
-            final_state_path,
-            mode="w",
-        )
+        snapshots_path = snapshots.finish() if writes_snapshots else None
+        if stop is None:
+            final_state_path = output_dir / "final_state.zarr"
+            io.save_dataset(
+                io.state_to_dataset(state, time=t1, attrs=attrs),
+                final_state_path,
+                mode="w",
+            )
         dump_yaml(spec, str(output_dir / "resolved.yaml"))
         describe = component.describe_numerics
         write_json(
@@ -311,8 +372,12 @@ def _run(
             manifest(
                 spec,
                 mode=mode,
+                status=status,
+                reason=None if stop is None else stop.reason,
+                t0=t0,
+                t1=t1 if stop is None else stop.frame.info.t1,
                 wall_seconds=wall_seconds,
-                numerics={} if describe is None else describe(built.model),
+                numerics={} if describe is None else describe(model),
             ),
         )
         logger.info("wrote {}", output_dir)
@@ -320,14 +385,17 @@ def _run(
         message = f"FAILED: {type(exc).__name__}: {exc}"
         raise
     finally:
+        writer.close()
         stop_run_log(run_log, final_message=message)
     return SimulationResult(
         output_dir=output_dir,
+        status=status,
         snapshots_path=snapshots_path,
         final_state_path=final_state_path,
         metrics_path=metrics_path,
+        checkpoint_path=checkpoints.latest(),
         wallclock_seconds=wall_seconds,
-        n_steps=sum(steps),
+        n_steps=seen.steps,
         state=state,
     )
 
@@ -338,14 +406,17 @@ def simulate(
     *,
     diagnostics_per_save: int = 1,
     monitors: Sequence[Monitor] | None = None,
+    checkpointing: Checkpointing | None = None,
     among: Mapping[str, Component] | None = None,
 ) -> SimulationResult:
     """Run a spec from its initial condition, and write its artifacts.
 
-    ``run.log`` is written as the run goes, and snapshots are streamed to
-    ``snapshots.partial.zarr``. A run that succeeds leaves ``snapshots.zarr``,
-    ``final_state.zarr``, ``metrics.json``, ``resolved.yaml`` and
-    ``manifest.json``; one that fails leaves none of these.
+    ``run.log`` and ``metrics.jsonl``, a line of numbers per chunk, are written as
+    the run goes, and snapshots are streamed to ``snapshots.partial.zarr``. A run
+    that succeeds leaves ``snapshots.zarr``, ``final_state.zarr``, ``metrics.json``,
+    ``resolved.yaml`` and ``manifest.json``; one that fails leaves none of these. One
+    that a monitor stops resumably, as ``WatchdogMonitor`` does, leaves a checkpoint
+    in place of ``final_state.zarr`` and ``metrics.json``.
 
     Args:
         spec: The spec, with its debug block merged.
@@ -353,6 +424,8 @@ def simulate(
         diagnostics_per_save: Chunks between two snapshots, each a line in
             ``run.log``.
         monitors: The monitors; ``default_monitors()`` by default.
+        checkpointing: When checkpoints are written, and which are kept; by default
+            only where a monitor stops the run resumably.
         among: The components to look in; the installed ones by default.
 
     Returns:
@@ -362,6 +435,10 @@ def simulate(
         IntegrationDivergedError: If a monitor or a guard halted the run.
     """
     component, built = build_run(spec, among)
+    timeline = timeline_of(
+        spec,
+        diagnostics_per_save=diagnostics_per_save,
+    )
     return _run(
         spec,
         Path(output_dir),
@@ -369,8 +446,10 @@ def simulate(
         built=built,
         component=component,
         state0=built.state0,
-        diagnostics_per_save=diagnostics_per_save,
+        whole=timeline,
+        timeline=timeline,
         monitors=monitors,
+        checkpointing=checkpointing,
     )
 
 
@@ -380,6 +459,7 @@ def spinup(
     *,
     diagnostics_per_save: int = 1,
     monitors: Sequence[Monitor] | None = None,
+    checkpointing: Checkpointing | None = None,
     among: Mapping[str, Component] | None = None,
 ) -> SimulationResult:
     """Run a spec for its final state alone, which a restart then starts from.
@@ -389,6 +469,8 @@ def spinup(
         output_dir: Where to write.
         diagnostics_per_save: Chunks of the run, each a line in ``run.log``.
         monitors: The monitors; ``default_monitors()`` by default.
+        checkpointing: When checkpoints are written, and which are kept; by default
+            only where a monitor stops the run resumably.
         among: The components to look in; the installed ones by default.
 
     Returns:
@@ -398,6 +480,11 @@ def spinup(
         IntegrationDivergedError: If a monitor or a guard halted the run.
     """
     component, built = build_run(spec, among)
+    timeline = timeline_of(
+        spec,
+        only_final=True,
+        diagnostics_per_save=diagnostics_per_save,
+    )
     return _run(
         spec,
         Path(output_dir),
@@ -405,8 +492,10 @@ def spinup(
         built=built,
         component=component,
         state0=built.state0,
-        diagnostics_per_save=diagnostics_per_save,
+        whole=timeline,
+        timeline=timeline,
         monitors=monitors,
+        checkpointing=checkpointing,
     )
 
 
@@ -432,11 +521,11 @@ def _require_coordinates(wanted: str, attrs: Mapping[str, Any], path: Path) -> N
         )
 
 
-def _continued(spec: RunSpec, attrs: Mapping[str, Any]) -> RunSpec:
-    """The spec, starting where a checkpoint stopped."""
+def _rest(timeline: Timeline, attrs: Mapping[str, Any]) -> Timeline:
+    """What is left of a run's timeline after a checkpoint."""
     raw = _attr(attrs, "sim_t")
     if raw is None:
-        return spec
+        return timeline
     try:
         t = float(raw)
     except (TypeError, ValueError) as exc:
@@ -444,24 +533,16 @@ def _continued(spec: RunSpec, attrs: Mapping[str, Any]) -> RunSpec:
             f"the state to restart from has a non-numeric sim_t={raw!r}; it must be "
             "a number of seconds"
         ) from exc
-    times = spec.timestepping
-    if t <= times.t0:
-        return spec
-    if t >= times.t1:
+    try:
+        rest = timeline.after(t)
+    except ValueError as exc:
         raise ValueError(
             f"the state to restart from is at t={t}, and the run ends at "
-            f"t1={times.t1}: there is nothing left to run. Extend t1."
-        )
-    logger.info("restart: continuing at t={}", t)
-    rest = TimesteppingSpec(
-        t0=t,
-        t1=times.t1,
-        dt=times.dt,
-        save_interval=min(times.save_interval, times.t1 - t),
-    )
-    spec = dataclasses.replace(spec, timestepping=rest)
-    spec.validate()
-    return spec
+            f"t1={timeline.edges[-1]}: there is nothing left to run. Extend t1."
+        ) from exc
+    if rest is not timeline:
+        logger.info("restart: continuing at t={}", t)
+    return rest
 
 
 def restart(
@@ -471,34 +552,41 @@ def restart(
     restart_from: str | Path,
     diagnostics_per_save: int = 1,
     monitors: Sequence[Monitor] | None = None,
+    checkpointing: Checkpointing | None = None,
     among: Mapping[str, Component] | None = None,
 ) -> SimulationResult:
     """Run a spec from a saved state.
 
     The model is built from the spec, so a viscosity or a forcing may differ from
     the earlier run's; only the state is loaded. A state that records its time, as
-    a checkpoint does, moves the start of the run there. One that does not, a
-    ``final_state.zarr``, starts the spec's whole window. Stores written by somax
-    load too.
+    a checkpoint does, starts the run there, and the chunks and the snapshots after
+    it are those of the spec's whole window. A chunk starts from the state alone, so
+    with the same spec the run takes the steps it would have taken. A state without
+    a time, a ``final_state.zarr``, starts the whole window. Stores written by
+    somax load too.
 
     Args:
         spec: The spec, with its debug block merged.
         output_dir: Where to write, not the directory of ``restart_from``.
-        restart_from: A zarr store with a state.
+        restart_from: A zarr store with a state, a directory of checkpoints, or the
+            directory of a run. The newest complete checkpoint is taken.
         diagnostics_per_save: Chunks between two snapshots.
         monitors: The monitors; ``default_monitors()`` by default.
+        checkpointing: When checkpoints are written, and which are kept; by default
+            only where a monitor stops the run resumably.
         among: The components to look in; the installed ones by default.
 
     Returns:
         What was written.
 
     Raises:
+        FileNotFoundError: If there is no store or no complete checkpoint.
         TypeError: If the store holds another kind of state than the model's.
         ValueError: If its units or its grid are not the run's, there is nothing
             left to run, or the store is inside ``output_dir``.
         IntegrationDivergedError: If a monitor or a guard halted the run.
     """
-    path = Path(restart_from)
+    path = resolve(Path(restart_from))
     if path.resolve().is_relative_to(Path(output_dir).resolve()):
         raise ValueError(
             f"{path} is inside the output directory {output_dir}, whose artifacts "
@@ -519,13 +607,16 @@ def restart(
     if shapes != wanted:
         raise ValueError(f"{path} has fields of shape {shapes}, the run {wanted}")
     _require_coordinates(built.coordinates, ds.attrs, path)
+    whole = timeline_of(spec, diagnostics_per_save=diagnostics_per_save)
     return _run(
-        _continued(spec, ds.attrs),
+        spec,
         Path(output_dir),
         mode="restart",
         built=built,
         component=component,
         state0=state0,
-        diagnostics_per_save=diagnostics_per_save,
+        whole=whole,
+        timeline=_rest(whole, ds.attrs),
         monitors=monitors,
+        checkpointing=checkpointing,
     )

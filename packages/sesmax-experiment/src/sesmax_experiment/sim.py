@@ -21,6 +21,8 @@ except ImportError as exc:
     ) from exc
 
 from sesmax_experiment._src.sim.app import app, main
+from sesmax_experiment._src.sim.checkpoints import Checkpointing, CheckpointStore
+from sesmax_experiment._src.sim.record import JsonLinesWriter, MetricWriter
 from sesmax_experiment._src.sim.runner import (
     IntegrationDivergedError,
     SimulationResult,
@@ -43,8 +45,12 @@ from sesmax_experiment._src.sim.spec import (
 
 
 __all__ = [
+    "CheckpointStore",
+    "Checkpointing",
     "DebugSpec",
     "IntegrationDivergedError",
+    "JsonLinesWriter",
+    "MetricWriter",
     "ModelSpec",
     "OutputSpec",
     "RunSpec",

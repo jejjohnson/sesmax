@@ -33,11 +33,15 @@ class RunStopped(RuntimeError):
     Args:
         reason: The monitor and its reason.
         frame: The frame it stopped at, which no later stage has seen.
+        resumable: Whether the state is good, so the run may be continued from it.
     """
 
-    def __init__(self, reason: str, frame: ChunkFrame) -> None:
+    def __init__(
+        self, reason: str, frame: ChunkFrame, *, resumable: bool = False
+    ) -> None:
         self.reason = reason
         self.frame = frame
+        self.resumable = resumable
         info = frame.info
         super().__init__(
             f"run stopped in chunk {info.index + 1}/{info.n_chunks}, between "
@@ -45,4 +49,4 @@ class RunStopped(RuntimeError):
         )
 
     def __reduce__(self) -> Any:
-        return type(self), (self.reason, self.frame)
+        return type(self), (self.reason, self.frame), {"resumable": self.resumable}

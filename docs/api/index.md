@@ -40,7 +40,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Runs in chunks](experiment_run.md) | `run_chunks`, `Timeline`, `ChunkedRun`, `ChunkFrame`, `RunStopped`; the schedules `every_chunks`, `every_sim_seconds`, `every_wall_seconds`, `at_snapshots`; the stages `AdvanceChunk`, `RunMonitors` |
 | [Monitors](experiment_monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
 | [Checkpointing](experiment_checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
-| [Run specs](experiment_sim.md) (`[sim]`) | `RunSpec` and its blocks, `load_yaml`, `dump_yaml`; `simulate`, `spinup`, `restart`, `SimulationResult`, `IntegrationDivergedError`; `build_run`, `timeline_of`; the command `sesmax-experiment` |
+| [Run specs](experiment_sim.md) (`[sim]`) | `RunSpec` and its blocks, `load_yaml`, `dump_yaml`; `simulate`, `spinup`, `restart`, `SimulationResult`, `IntegrationDivergedError`; `build_run`, `timeline_of`; `Checkpointing`, `CheckpointStore`; `MetricWriter`, `JsonLinesWriter`; the command `sesmax-experiment` |
 | [Components](experiment_components.md) | `components`, `find_model` |
 
 ### sesmax-ocean
