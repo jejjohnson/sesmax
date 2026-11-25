@@ -8,7 +8,7 @@ from typing import Any
 
 import jax.numpy as jnp
 
-from sesmax_core._src.component import BuiltRun, Component
+from sesmax_core._src.component import AssertionFailedError, BuiltRun, Component
 from sesmax_core._src.fields import values
 from sesmax_core._src.model import Model
 from sesmax_core._src.testing.gfd_testcases import geostrophic_adjustment_2d
@@ -62,15 +62,17 @@ def check_gravity_wave_cfl(spec: Any, model: Model, *, limit: float = 1.0) -> No
     """``c Δt / Δx`` of the fastest wave, below a limit.
 
     Raises:
-        ValueError: If it is not.
+        AssertionFailedError: If it is not, or the model has no such wave.
     """
     if not isinstance(model, LinearShallowWater2D):
-        raise TypeError(f"not a shallow-water model: {type(model).__name__}")
+        raise AssertionFailedError(f"not a shallow-water model: {type(model).__name__}")
     speed = (model.consts.gravity * model.consts.H0) ** 0.5
     spacing = min(float(model.grid.spacing(axis)) for axis in "xy")
     courant = speed * spec.timestepping.dt / spacing
     if not courant < limit:
-        raise ValueError(f"the Courant number {courant:.2f} is not below {limit}")
+        raise AssertionFailedError(
+            f"the Courant number {courant:.2f} is not below {limit}"
+        )
 
 
 def _evaluate(model: Model, state: State) -> dict[str, float]:

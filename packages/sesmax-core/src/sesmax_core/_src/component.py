@@ -11,6 +11,10 @@ from sesmax_core._src.model import Model
 from sesmax_core._src.types import State
 
 
+class AssertionFailedError(RuntimeError):
+    """A run fails a check its spec asks for."""
+
+
 @dataclasses.dataclass(frozen=True)
 class BuiltRun:
     """A model and the state it starts from.
@@ -29,8 +33,8 @@ class BuiltRun:
 
 #: Builds a run from the ``model`` and ``scenario`` mappings of a run spec.
 Builder = Callable[[Mapping[str, Any]], BuiltRun]
-#: Raises if a run fails a check: called with the run spec, the model and the
-#: parameters the spec gives the check.
+#: Called before a run with the run spec, the model and the parameters the spec
+#: gives the check; raises :class:`AssertionFailedError` if the run fails it.
 Check = Callable[..., None]
 
 _EMPTY: Mapping[str, Any] = MappingProxyType({})

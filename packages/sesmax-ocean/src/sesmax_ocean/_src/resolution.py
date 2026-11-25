@@ -20,15 +20,13 @@ import numpy as np
 import paramax
 from gridax import SphericalCGrid2D
 
+from sesmax_core.component import AssertionFailedError
+
 
 try:  # pragma: no cover - exercised by whichever install is in use
     from loguru import logger as _logger
 except ModuleNotFoundError:  # pragma: no cover
     _logger = None
-
-
-class AssertionFailedError(RuntimeError):
-    """Raised when an opt-in preflight or postflight assertion fails."""
 
 
 def _warn(template: str, *args: Any) -> None:
