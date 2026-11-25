@@ -77,10 +77,8 @@ def solid_body_rotation(model, speed=JET_SPEED):
 class TestCoriolis:
     def test_is_the_full_latitudinal_sine(self):
         model = build()
-        lat_corner = latitudes(model.grid) + 0.5 * model.grid.dlat
-        expected = 2.0 * OMEGA_EARTH * jnp.sin(lat_corner)
-        # The absolute tolerance is for the equator, where f is zero to rounding.
-        np.testing.assert_allclose(model.f_field, expected, rtol=1e-6, atol=1e-18)
+        expected = 2.0 * OMEGA_EARTH * jnp.sin(latitudes(model.grid))
+        np.testing.assert_allclose(model.f_field, expected, rtol=1e-6)
 
     def test_changes_sign_across_the_equator(self):
         model = build()
@@ -90,7 +88,7 @@ class TestCoriolis:
     def test_is_not_a_beta_plane(self):
         """A beta plane is linear in y; the sphere is not."""
         model = build(lat_range=(-80.0, 80.0))
-        lat = latitudes(model.grid)[1:-1, 0] + 0.5 * model.grid.dlat
+        lat = latitudes(model.grid)[1:-1, 0]
         f = np.asarray(model.f_field)[1:-1, 0]
         linear = np.polyfit(lat, f, 1)
         residual = np.abs(f - np.polyval(linear, lat)).max()
@@ -99,7 +97,7 @@ class TestCoriolis:
     def test_implied_beta_is_largest_at_the_equator(self):
         """beta = 2 Omega cos(phi)/R falls to zero at the poles."""
         model = build()
-        lat = latitudes(model.grid)[1:-1, 0] + 0.5 * model.grid.dlat
+        lat = latitudes(model.grid)[1:-1, 0]
         f = np.asarray(model.f_field)[1:-1, 0]
         beta = np.gradient(f, lat * RADIUS)
         equator = int(np.argmin(np.abs(lat)))
@@ -148,21 +146,21 @@ class TestSolidBodyRotation:
         coriolis = 2.0 * OMEGA_EARTH * JET_SPEED
         assert residual < 0.1 * coriolis
 
-    def test_meridional_residual_converges_first_order(self):
+    def test_meridional_residual_converges_second_order(self):
         """It is discretisation error, not a bug — so it must shrink.
 
-        ``u`` is specified at T-latitudes while the meridional balance
-        is evaluated at V-points, half a cell away, which is a
-        first-order offset on a C-grid.
+        somax's converged at first order, because its Coriolis parameter
+        was half a cell too far north.
         """
         residuals = []
-        for ny in (16, 32, 64):
-            model = build(nx=2 * ny, ny=ny)
-            tendency = model.vector_field(0.0, solid_body_rotation(model))
-            interior = (slice(2, -2), slice(2, -2))
-            residuals.append(float(jnp.abs(tendency.v[interior]).max()))
+        with jax.enable_x64(True):
+            for ny in (16, 32, 64):
+                model = build(nx=2 * ny, ny=ny)
+                tendency = model.vector_field(0.0, solid_body_rotation(model))
+                interior = (slice(2, -2), slice(2, -2))
+                residuals.append(float(jnp.abs(tendency.v[interior]).max()))
         for coarse, fine in itertools.pairwise(residuals):
-            assert coarse / fine == pytest.approx(2.0, rel=0.15)
+            assert coarse / fine == pytest.approx(4.0, rel=0.15)
 
 
 class TestSphericalMetric:

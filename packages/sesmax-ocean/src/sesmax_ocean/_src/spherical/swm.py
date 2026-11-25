@@ -167,7 +167,8 @@ class SphericalSWM(Model):
         grid: Spherical Arakawa C-grid.
         ops: gridax's operations on the grid and the mask.
         mask: Optional land/ocean mask (``None`` = all-ocean).
-        f_field: Precomputed Coriolis field at X-points.
+        f_field: Precomputed Coriolis field at T-points, which the PV averages
+            to its corners.
         wind_stress_x: Normalised zonal wind-stress pattern.
         wind_stress_y: Normalised meridional wind-stress pattern.
         scheme: Scheme of the face values in the mass equation.
@@ -509,9 +510,10 @@ class SphericalSWM(Model):
         )
         consts = SphericalSWMPhysConsts(gravity=g, omega=omega, radius=radius, H0=H0)
 
-        # Coriolis on X-points, where the PV lives: f = 2 Omega sin(lat).
+        # Coriolis on T-points: f = 2 Omega sin(lat). The PV averages it to the
+        # corners, as it does the thickness.
         lat_T = latitudes(grid)
-        f_field = 2.0 * omega * jnp.sin(lat_T + 0.5 * grid.dlat)
+        f_field = 2.0 * omega * jnp.sin(lat_T)
 
         if wind_stress_x is None:
             if wind_profile == "none":
