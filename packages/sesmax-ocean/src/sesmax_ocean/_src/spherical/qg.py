@@ -15,6 +15,7 @@ from gridax import (
     Dirichlet,
     GridOps,
     Mask2D,
+    Neumann,
     Periodic,
     SphericalCGrid2D,
     apply_mask,
@@ -49,7 +50,9 @@ from sesmax_ocean._src.swm._shared import UPWIND
 # Periodic in longitude; zero on the wall of a streamfunction, which lies between
 # the last cell centre and its ghost.
 _STREAMFUNCTION = BC(x=Periodic(), y=Dirichlet(0.0))
-_VORTICITY = BC(x=Periodic())
+_WRAP = BC(x=Periodic())
+# No flux of vorticity through the walls.
+_FLAT = BC(x=Periodic(), y=Neumann())
 
 
 class SphericalQGState(State):
@@ -252,20 +255,35 @@ class SphericalQG(Model):
         """Non-divergent velocity from the streamfunction.
 
         ``u = -(1/R) dpsi/dlat`` at U-points and
-        ``v = (1/(R cos(phi))) dpsi/dlon`` at V-points; both metric
-        factors are supplied by the spherical difference operators.
+        ``v = (1/(R cos(phi))) dpsi/dlon`` at V-points, from ``psi``
+        averaged to the corners. It is zero on the walls, so no flow
+        crosses them, and the discrete divergence vanishes.
 
         Args:
-            psi: Streamfunction at T-points.
+            psi: Streamfunction at T-points, with its ghosts filled.
 
         Returns:
             ``(u, v)`` on their staggered points.
         """
-        dpsi_dlat = self.ops.difference(psi, axis="y", src="T", dst="V")
-        dpsi_dlon = self.ops.difference(psi, axis="x", src="T", dst="U")
-        u = -self.ops.interpolate(dpsi_dlat, src="V", dst="U")
-        v = self.ops.interpolate(dpsi_dlon, src="U", dst="V")
-        return u, v
+        u, v = self.ops.grad_perp(psi, at="T")
+        return (
+            fill_ghosts(u, self.grid, _WRAP, stagger="U"),
+            fill_ghosts(v, self.grid, _WRAP, stagger="V"),
+        )
+
+    def _advection(
+        self,
+        q: Float[Array, "Ny Nx"],
+        u: Float[Array, "Ny Nx"],
+        v: Float[Array, "Ny Nx"],
+    ) -> Float[Array, "Ny Nx"]:
+        """``-div(q u)``, with no flux through the walls."""
+        return self.ops.advect(q, u, v, scheme=self.scheme, bc=_FLAT)
+
+    def _laplacian_of_vorticity(self, q: Any) -> Any:
+        """The Laplacian of the vorticity, with no flux through the walls."""
+        q = fill_ghosts(q, self.grid, _FLAT, stagger="T")
+        return self.ops.laplacian(q, at="T")
 
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
@@ -280,28 +298,28 @@ class SphericalQG(Model):
         u, v = self.velocities(psi)
 
         # Advect absolute vorticity: this is where beta comes from.
-        advection = self.ops.advect(q + self.f_field, u, v, scheme=self.scheme)
+        advection = self._advection(q + self.f_field, u, v)
 
         # Masked at T-points, like every other operator here: an
         # unmasked source would inject vorticity over land, and
         # nothing projects it back out of the saved state.
         wind = tau0 * self._masked(self.wind_forcing)
 
-        def tendency(diffusion: Array, vorticity: Array) -> Array:
-            dq_dt = advection + wind + diffusion - kappa * vorticity
+        def tendency(lap: Array, vorticity: Array) -> Array:
+            dq_dt = advection + wind + nu * lap - kappa * vorticity
             # Same reason as the shallow-water model: the polar rows carry
             # a Dirichlet condition that the integrator does not reapply to
             # the returned state, so the tendency there has to be zero for
             # the condition to survive a step.
             return dq_dt.at[0, :].set(0.0).at[-1, :].set(0.0)
 
-        diffusion = self.ops.diffuse(state.q, kappa=nu)
-        return SphericalQGState(q=each(tendency, diffusion, state.q))
+        lap = self._laplacian_of_vorticity(state.q)
+        return SphericalQGState(q=each(tendency, lap, state.q))
 
     def apply_boundary_conditions(self, state: PyTree) -> SphericalQGState:
         """Periodic in longitude, zero vorticity on the polar edges."""
         q = embed(interior(state.q, self.grid), self.grid)
-        return SphericalQGState(q=fill_ghosts(q, self.grid, _VORTICITY, stagger="T"))
+        return SphericalQGState(q=fill_ghosts(q, self.grid, _WRAP, stagger="T"))
 
     def diagnose(self, state: PyTree) -> SphericalQGDiagnostics:
         """Area-weighted energy, enstrophy and circulation."""
