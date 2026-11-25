@@ -66,6 +66,6 @@ jobs:
       - name: Import ${{ matrix.package.module }}; no optional extra present
         run: >-
           bare/bin/python -c "import importlib.util as u, ${{ matrix.package.module }};
-          extras = ['xarray', 'zarr', 'orbax', 'filterax', 'vardax', 'flowjax'];
+          extras = ['xarray', 'zarr', 'orbax', 'filterax', 'vardax', 'flowjax', 'cyclopts', 'loguru'];
           present = [m for m in extras if u.find_spec(m)];
           assert not present, present"

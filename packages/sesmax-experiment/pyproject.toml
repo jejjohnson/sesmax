@@ -37,6 +37,17 @@ dependencies = [
 checkpoint = [
     "orbax-checkpoint>=0.11.37",
 ]
+# Run specs, their artifacts and the command line in ``sesmax_experiment.sim``.
+sim = [
+    "cyclopts>=4.0",
+    "loguru>=0.7.3",
+    "pyyaml>=6.0.2",
+    "xarray>=2026.4.0",
+    "zarr>=3.1.6",
+]
+
+[project.scripts]
+sesmax-experiment = "sesmax_experiment._src.sim.launch:main"
 
 [project.urls]
 Repository = "https://github.com/jejjohnson/sesmax"

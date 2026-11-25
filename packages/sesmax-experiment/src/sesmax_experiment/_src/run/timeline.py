@@ -100,3 +100,28 @@ class Timeline:
             if is_snapshot:
                 snapshots.add(len(edges) - 1)
         return cls(edges=np.asarray(edges), snapshots=frozenset(snapshots))
+
+    def subdivided(self, n: int) -> Timeline:
+        """The same snapshots, with each chunk cut into ``n`` equal ones.
+
+        Args:
+            n: The chunks in place of one, at least one.
+
+        Returns:
+            The timeline.
+
+        Raises:
+            ValueError: If ``n`` is less than one.
+
+        Examples:
+            >>> from sesmax_experiment.run import Timeline
+            >>> timeline = Timeline.build(0.0, 10.0, chunk=6.0, snapshot=6.0)
+            >>> timeline.subdivided(2).edges.tolist()
+            [0.0, 3.0, 6.0, 8.0, 10.0]
+        """
+        if n < 1:
+            raise ValueError(f"a chunk is cut into one or more, got {n!r}")
+        starts, lengths = self.edges[:-1], np.diff(self.edges)
+        inner = starts[:, None] + lengths[:, None] * np.arange(n) / n
+        edges = np.append(inner.ravel(), self.edges[-1])
+        return Timeline(edges=edges, snapshots=frozenset(n * k for k in self.snapshots))
