@@ -268,7 +268,7 @@ sesmax-core is tier 0 of the [sesmax workspace](https://github.com/jejjohnson/se
 | Variational assimilation (the `da` extra) | [`vardax`](https://github.com/jejjohnson/vardax) |
 | Normalising flows (the `flows` extra) | [`flowjax`](https://github.com/danielward27/flowjax) |
 
-Imports point down the tiers: a component such as `sesmax-ocean` (planned) will import the core, and the core imports no component. No other project imports it yet.
+Imports point down the tiers: `sesmax-ocean` imports the core, and the core imports no component. No project outside the workspace imports it yet.
 
 ## 🌳 Repository layout
 

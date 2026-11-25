@@ -18,10 +18,10 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Development Status :: 2 - Pre-Alpha",
 ]
-# Code-free umbrella (SX-1): it only installs the components. sesmax-ocean
-# joins in phase C2.
+# Code-free umbrella (SX-1): it only installs the components.
 dependencies = [
     "sesmax-core",
+    "sesmax-ocean",
 ]
 
 [project.urls]

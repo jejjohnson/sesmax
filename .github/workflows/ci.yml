@@ -51,6 +51,7 @@ jobs:
       matrix:
         package:
           - {dist: sesmax-core, module: sesmax_core}
+          - {dist: sesmax-ocean, module: sesmax_ocean}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7

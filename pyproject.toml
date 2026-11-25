@@ -43,6 +43,7 @@ override-dependencies = [
 [tool.uv.sources]
 sesmax = { workspace = true }
 sesmax-core = { workspace = true }
+sesmax-ocean = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -50,6 +51,7 @@ dev = [
     # every optional extra so the tests of the optional modules run.
     "sesmax",
     "sesmax-core[da,flows,xarray,checkpoint]",
+    "sesmax-ocean",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
@@ -144,6 +146,8 @@ testpaths = [
     "tests",
     "packages/sesmax-core/tests",
     "packages/sesmax-core/src/sesmax_core",
+    "packages/sesmax-ocean/tests",
+    "packages/sesmax-ocean/src/sesmax_ocean",
 ]
 # Test tiers (see "Test tiers" in AGENTS.md). CI runs every tier.
 strict_markers = true
@@ -154,13 +158,18 @@ markers = [
     "integration: end-to-end workflows, optional dependencies, external tools",
 ]
 # The moved gridax tests share one input module (grids, masks and fields),
-# which sits on the path as ``gridax_inputs``.
-pythonpath = ["packages/sesmax-core/tests/support"]
+# which sits on the path as ``gridax_inputs``; the ocean's tests read somax's
+# numbers through ``somax_reference``.
+pythonpath = [
+    "packages/sesmax-core/tests/support",
+    "packages/sesmax-ocean/tests/support",
+]
 # importlib mode lets two packages each have a tests/test_public_api.py.
 addopts = """\
     --import-mode=importlib \
     --doctest-modules \
     --cov=sesmax_core \
+    --cov=sesmax_ocean \
     --cov=sesmax \
     --cov-report=term-missing \
     --cov-report=xml:coverage.xml\

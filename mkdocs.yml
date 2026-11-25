@@ -50,7 +50,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [packages/sesmax-core/src]
+          paths: [packages/sesmax-core/src, packages/sesmax-ocean/src]
           options:
             docstring_style: google
             # Docstrings moved from somax document **kwargs without a type and
@@ -98,3 +98,6 @@ nav:
   - Fields: fields.md
   - Validation: validation.md
   - Test problems: testing.md
+  - Ocean resolution checks: ocean_resolution.md
+  - Ocean metrics: ocean_eval.md
+  - Ocean forcing presets: ocean_forcing.md
