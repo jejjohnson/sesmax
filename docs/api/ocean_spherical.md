@@ -11,4 +11,9 @@ Fixed since, in `SphericalSWM`:
 - The viscous term is the Laplacian of a velocity component at its own points, with the ghosts of the boundary conditions. somax diffused it as a tracer, with no flux through the edge faces.
 - The Coriolis parameter is at T, and averaged to the corners once. somax averaged the one at the corners, which put it half a cell too far north.
 
+Fixed since, in `SphericalQG`:
+
+- The velocity is the rotated gradient of the streamfunction averaged to the corners, so it is non-divergent and none of it crosses the walls. somax averaged the two derivatives, whose ghosts no one had filled.
+- The advection and the viscous term take their fluxes through the seam in longitude.
+
 ::: sesmax_ocean.spherical
