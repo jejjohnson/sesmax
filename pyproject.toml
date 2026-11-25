@@ -52,7 +52,7 @@ dev = [
     # every optional extra so the tests of the optional modules run.
     "sesmax",
     "sesmax-core[da,flows,xarray]",
-    "sesmax-experiment[checkpoint]",
+    "sesmax-experiment[checkpoint,sim]",
     "sesmax-ocean",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
@@ -163,9 +163,10 @@ markers = [
 ]
 # The moved gridax tests share one input module (grids, masks and fields),
 # which sits on the path as ``gridax_inputs``; the ocean's tests read somax's
-# numbers through ``somax_reference``.
+# numbers through ``somax_reference``; the runner's share their run specs.
 pythonpath = [
     "packages/sesmax-core/tests/support",
+    "packages/sesmax-experiment/tests/support",
     "packages/sesmax-ocean/tests/support",
 ]
 # importlib mode lets two packages each have a tests/test_public_api.py.

@@ -17,7 +17,7 @@ Each distribution lives in `packages/<dist>/` with its own `pyproject.toml`, `sr
 | — | `sesmax` | `sesmax` | code-free umbrella that installs the packages | scaffolded |
 | 2 | `sesmax-couple` | `sesmax_couple` | flux exchange, regridding, coupled runs | later |
 | 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, their resolution checks, metrics and forcing presets | moving from somax (#152) |
-| 1 | `sesmax-experiment` | `sesmax_experiment` | runs of models in chunks, their monitors and checkpoints; names no component | the run loop is moving from somax (#186) |
+| 1 | `sesmax-experiment` | `sesmax_experiment` | runs of models in chunks or from a run spec, their monitors and checkpoints; names no component | the run loop is moving from somax (#186) |
 | 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, I/O, test problems | moved from somax; first release 0.1.0 |
 
 The public API of each package is its top-level `__all__`, plus its public submodules.
@@ -76,6 +76,7 @@ find out whether it exists:
 | A check on a factory's arguments, or a Burger number from a Froude number | `sesmax_core.validation`; `resolve_burger`, `burger_to_g_prime` (`sesmax_core.gfd`) |
 | A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_experiment.monitor` |
 | A loop over chunks of a run, a cadence, a retry around a write | `run_chunks`, `Timeline`, `every_chunks` and the other schedules (`sesmax_experiment.run`); pipekit's `Branch`, `Sink`, `Retry`, `Try` |
+| A run described by a file, with its snapshots, metrics and manifest | `RunSpec`, `simulate`, `spinup`, `restart` (`sesmax_experiment.sim`); `sesmax-experiment simulate` |
 | What a package of models offers to a run | `Component`, `BuiltRun` (`sesmax_core.component`) |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 | A check that the grid resolves a boundary layer or a deformation radius, or a metric of an ocean state | `sesmax_ocean.resolution`, `sesmax_ocean.eval` |
@@ -121,6 +122,13 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 - Monitors run host-side between jitted chunks, so they may hold Python state and never run inside a trace. A halt that must happen at the offending step is a `guard_finite`, `guard_positive` or `guard_ceiling` in the tendency instead.
 - `on_chunk_end` returns a `MonitorVerdict`; `terminate=True` needs a `reason`.
 - They live in `sesmax_experiment.monitor`, and `sesmax_experiment.run.run_chunks` calls them.
+
+### Components and runs
+
+- A package of models holds one `sesmax_core.component.Component` and names it under the entry-point group `sesmax.components`. A builder gets the `scenario` and `model` mappings of a run spec and returns a `BuiltRun`; the run loop reads nothing else of them.
+- A model's name belongs to one component. Two components with one name, or one model name in two, raise.
+- `sesmax_experiment.sim` needs `[sim]`, stays out of the top-level `__init__` and raises an `ImportError` naming the extra. A run that fails leaves no `snapshots.zarr`, `final_state.zarr`, `metrics.json` or `manifest.json`.
+- Attributes of a store are written as `sesmax_*`, and those of somax (`somax_*`) are read.
 
 ### Migrated code
 

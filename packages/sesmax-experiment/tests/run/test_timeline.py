@@ -51,3 +51,17 @@ def test_a_run_that_makes_no_sense_is_rejected(bad: dict[str, float]) -> None:
     t0, t1 = bad.pop("t0"), bad.pop("t1")
     with pytest.raises(ValueError):
         Timeline.build(t0, t1, **bad)
+
+
+def test_chunks_are_cut_and_the_snapshots_kept() -> None:
+    timeline = Timeline.build(0.0, 1.0, chunk=0.3, snapshot=0.3)
+    cut = timeline.subdivided(3)
+    assert cut.n_chunks == 3 * timeline.n_chunks
+    for whole, part in zip(
+        sorted(timeline.snapshots), sorted(cut.snapshots), strict=True
+    ):
+        # The snapshots' times are the same numbers, not close ones.
+        assert cut.edges[part] == timeline.edges[whole]
+    assert (np.diff(cut.edges) > 0.0).all()
+    with pytest.raises(ValueError, match="one or more"):
+        timeline.subdivided(0)

@@ -227,7 +227,7 @@ The [core's README](packages/sesmax-core/README.md) inverts for an unknown sourc
 | – | [`sesmax`](packages/sesmax/README.md) | no code: it installs the others | scaffolded |
 | 2 | `sesmax-couple` | flux exchange, regridding, coupled runs | later |
 | 1 | [`sesmax-ocean`](packages/sesmax-ocean/README.md) | shallow-water, QG and spherical ocean models | moving from somax (#152) |
-| 1 | [`sesmax-experiment`](packages/sesmax-experiment/README.md) | runs in chunks, monitors and checkpoints | the run loop is moving from somax (#186) |
+| 1 | [`sesmax-experiment`](packages/sesmax-experiment/README.md) | runs in chunks, run specs and a command line, monitors and checkpoints | the run loop is moving from somax (#186) |
 | 1 | `sesmax-atmos`, `sesmax-land`, `sesmax-ice` | one component each | later |
 | 0 | [`sesmax-core`](packages/sesmax-core/README.md) | states, terms, forcing, rescaling, rollouts, assimilation adapters | released (0.1.0) |
 

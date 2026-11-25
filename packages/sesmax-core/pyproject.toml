@@ -80,6 +80,11 @@ xarray = [
     "xarray>=2026.4.0",
     "zarr>=3.1.6",
 ]
+
+# The test problems, as a component that ``sesmax-experiment`` can run.
+[project.entry-points."sesmax.components"]
+testing = "sesmax_core._src.testing.component:COMPONENT"
+
 [project.urls]
 Repository = "https://github.com/jejjohnson/sesmax"
 

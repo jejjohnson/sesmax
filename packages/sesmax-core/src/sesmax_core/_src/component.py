@@ -29,8 +29,9 @@ class BuiltRun:
 
 #: Builds a run from the ``model`` and ``scenario`` mappings of a run spec.
 Builder = Callable[[Mapping[str, Any]], BuiltRun]
-#: Raises if a run's initial or final state, or its model, fails a check.
-Check = Callable[[Any, Model], None]
+#: Raises if a run fails a check: called with the run spec, the model and the
+#: parameters the spec gives the check.
+Check = Callable[..., None]
 
 _EMPTY: Mapping[str, Any] = MappingProxyType({})
 

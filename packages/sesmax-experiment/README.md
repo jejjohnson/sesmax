@@ -11,6 +11,8 @@ The run loop is moving here from [somax](https://github.com/jejjohnson/somax) (c
 | `sesmax_experiment.run` | `run_chunks`, `Timeline`, the schedules | Run a model in chunks, with stages between them |
 | `sesmax_experiment.monitor` | `BaseMonitor`, `MonitorVerdict`, `default_monitors` and the built-in monitors | Watch a run between its chunks, and stop it |
 | `sesmax_experiment.checkpoint` (`[checkpoint]`) | `SimulationCheckpointer` | Periodic checkpoints with orbax |
+| `sesmax_experiment.sim` (`[sim]`) | `RunSpec`, `simulate`, `spinup`, `restart` | Run a model described by a YAML file, and write its artifacts |
+| `sesmax_experiment.components` | `components`, `find_model` | The installed components and the models they offer |
 
 ## 📥 Install
 
@@ -63,6 +65,29 @@ run = run_chunks(
     stages=[Branch(every_chunks(5), sturdy)],
 )
 ```
+
+A run can also be described by a file. This one names a model of the testing component that `sesmax-core` registers; the component of a model is found by its name, so nothing here imports it:
+
+```yaml
+scenario:
+  name: adjustment
+  grid: {nx: 32, ny: 32, Lx: 1.0e6, Ly: 1.0e6}
+  consts: {f0: 1.0e-4}
+  initial_condition: {type: step, params: {amplitude: 1.0}}
+model:
+  name: linear_swm
+  params: {H0: 100.0}
+timestepping: {t0: 0.0, t1: 86400.0, dt: 100.0, save_interval: 21600.0}
+```
+
+```bash
+uv sync --package sesmax-experiment --extra sim
+uv run sesmax-experiment list-models
+uv run sesmax-experiment simulate --config adjustment.yaml --output-dir runs/adjustment
+uv run sesmax-experiment restart --config adjustment.yaml --from runs/adjustment/final_state.zarr --output-dir runs/more
+```
+
+A run that succeeds leaves `snapshots.zarr`, `final_state.zarr`, `metrics.json`, `resolved.yaml`, `manifest.json` and `run.log`. One that fails leaves its log and the snapshots it had taken, as `snapshots.partial.zarr`.
 
 ## 📄 License
 
