@@ -1,7 +1,9 @@
 """Compare sesmax-ocean with the arrays somax computed.
 
 The arrays are in ``tests/reference/*.npz``, written by
-``tests/reference/make_reference.py`` with somax at 9cb19b3.
+``tests/reference/make_reference.py`` with somax at 9cb19b3. That script runs
+in somax's environment and reads the cases from here, so this module imports
+nothing of sesmax.
 """
 
 from __future__ import annotations
@@ -9,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import jax
 import numpy as np
@@ -17,6 +20,35 @@ import numpy as np
 REFERENCE = Path(__file__).resolve().parents[1] / "reference"
 #: The relative difference over the interior cells a port may show in float64.
 RTOL = 1e-12
+
+#: Interior cells of every case.
+SIZE = {"nx": 16, "ny": 12}
+#: Steps of the Heun scheme from ``init`` to ``end``.
+N_STEPS = 20
+#: ``family -> (arguments of create, time step)``.
+CASES: dict[str, tuple[dict[str, Any], float]] = {
+    "eval": ({"Lx": 1e6, "Ly": 8e5, "beta": 1e-11, "bc": "wall"}, 0.0),
+    "barotropic_qg": (
+        {
+            "Lx": 1e6,
+            "Ly": 8e5,
+            "lateral_viscosity": 500.0,
+            "bottom_drag": 1e-7,
+            "wind_amplitude": 1e-11,
+        },
+        600.0,
+    ),
+    "baroclinic_qg": (
+        {
+            "Lx": 1e6,
+            "Ly": 8e5,
+            "lateral_viscosity": 500.0,
+            "bottom_drag": 1e-7,
+            "wind_amplitude": 1e-9,
+        },
+        600.0,
+    ),
+}
 
 
 def load(family: str) -> dict[str, dict[str, dict[str, np.ndarray]]]:

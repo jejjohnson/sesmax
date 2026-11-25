@@ -98,6 +98,7 @@ nav:
   - Fields: fields.md
   - Validation: validation.md
   - Test problems: testing.md
+  - Ocean QG models: ocean_qg.md
   - Ocean resolution checks: ocean_resolution.md
   - Ocean metrics: ocean_eval.md
   - Ocean forcing presets: ocean_forcing.md

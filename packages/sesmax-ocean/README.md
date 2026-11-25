@@ -8,6 +8,7 @@ The models are moving here from [somax](https://github.com/jejjohnson/somax) (co
 
 | Module | Names | What it does |
 |---|---|---|
+| `sesmax_ocean.qg` | `BarotropicQG`, `BaroclinicQG` | Quasi-geostrophic models, one layer or several |
 | `sesmax_ocean.resolution` | `check_munk_width`, `check_stommel_width`, `check_deformation_radius`, `check_equatorial_deformation_radius` | Does the grid span the boundary layers and the deformation radius? |
 | `sesmax_ocean.eval` | `compute_eval_metrics` and the metrics it picks from | Numbers about one state, with no truth to compare with |
 | `sesmax_ocean.forcing` | `ssh_geostrophic`, `sss_coastal`, `sst_frontal`, `geostrophic_currents` | Reduced-order forcings for one ocean field each |
@@ -26,15 +27,18 @@ uv sync --package sesmax-ocean
 
 ```python
 import jax.numpy as jnp
-from sesmax_core.testing import LinearShallowWater2D, LinearSW2DState
 from sesmax_ocean.eval import compute_eval_metrics
+from sesmax_ocean.qg import BarotropicQG, BarotropicQGState
 
-# an f-plane box with a uniform flow
-model = LinearShallowWater2D.create(nx=32, ny=32, Lx=1e6, Ly=1e6)
-flow = jnp.ones((model.grid.Ny, model.grid.Nx))
-state = LinearSW2DState(h=0.0 * flow, u=0.5 * flow, v=-0.3 * flow)
+# a wind-driven double gyre, from rest
+model = BarotropicQG.create(
+    nx=64, ny=64, lateral_viscosity=500.0, bottom_drag=1e-7, wind_amplitude=1e-11
+)
+rest = BarotropicQGState(q=jnp.zeros((model.grid.Ny, model.grid.Nx)))
 
-# with no pressure gradient, the imbalance is the whole Coriolis term: 1
+# one day of hourly steps
+solution = model.integrate(rest, t0=0.0, t1=86400.0, dt=3600.0)
+state = BarotropicQGState(q=solution.ys.q[-1])
 metrics = compute_eval_metrics(model, state)
 ```
 

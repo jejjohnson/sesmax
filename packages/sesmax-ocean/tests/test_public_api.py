@@ -20,6 +20,7 @@ import sesmax_ocean
 SUBMODULES: list[str] = [
     "eval",
     "forcing",
+    "qg",
     "resolution",
 ]
 
