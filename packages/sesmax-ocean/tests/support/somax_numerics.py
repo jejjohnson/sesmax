@@ -68,6 +68,10 @@ class _SomaxNumerics:
         f = self.f_field_ml if hasattr(self, "f_field_ml") else self.f_field  # type: ignore[attr-defined]
         return self.ops.sw_potential_vorticity(u, v, h, placed(f, h, "T"))  # type: ignore[attr-defined]
 
+    def _hold_walls(self, tendency: Any, at: str) -> Any:
+        """The wall faces have a tendency of their own."""
+        return tendency
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """No flux through the edge faces of the array."""
         return self.ops.advect(h, u, v, scheme=self.scheme)  # type: ignore[attr-defined]
