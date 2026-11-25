@@ -33,6 +33,18 @@ dependencies = [
     "geophysix @ git+https://github.com/jejjohnson/geophysix@v0.0.9",
 ]
 
+[project.optional-dependencies]
+# The bundles of real basins and the command that fetches and builds them.
+data = [
+    "cyclopts>=4.0",
+    "loguru>=0.7.3",
+    "xarray>=2026.4.0",
+    "zarr>=3.1.6",
+]
+
+[project.scripts]
+sesmax-ocean = "sesmax_ocean._src.basins.launch:main"
+
 [project.entry-points."sesmax.components"]
 ocean = "sesmax_ocean._src.component:COMPONENT"
 

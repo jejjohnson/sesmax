@@ -106,6 +106,7 @@ nav:
   - Ocean shallow-water models: ocean_swm.md
   - Ocean models on the sphere: ocean_spherical.md
   - Ocean scenarios: ocean_scenarios.md
+  - Ocean basin data: ocean_basins.md
   - Ocean resolution checks: ocean_resolution.md
   - Ocean model checks: ocean_checks.md
   - Ocean metrics: ocean_eval.md
