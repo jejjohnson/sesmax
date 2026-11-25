@@ -153,7 +153,7 @@ On a chaotic model the gradient is useful only within the horizon, so a window i
 A forcing or an error that depends on time needs the model's clock in every step. `rollout` carries `(t, state)`, and `VardaxForwardModel` does not. The problem always goes through a rollout that carries time.
 
 **Compile once.**
-`Model.integrate` recompiles on every call today (sesmax#187), which turns every iteration of an optimiser that calls it into a compile. The problem builds one function, and the fix of sesmax#187 is needed for everything else.
+Until sesmax#196, `Model.integrate` compiled again on every call. A problem builds one function of the control and reuses it, so an optimiser or an ensemble compiles once.
 
 **Precision.**
 4D-Var on a chaotic model loses significant digits, so the default of the package is float64, and a float32 run is opt-in.
