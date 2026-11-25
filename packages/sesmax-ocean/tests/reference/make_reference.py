@@ -5,6 +5,7 @@ float64. Run this in somax's environment, from a checkout of that commit:
 
     git -C ../somax archive 9cb19b3 | tar -x -C /tmp/somax-9cb19b3
     cd /tmp/somax-9cb19b3 && uv sync --no-dev
+    uv pip install pyyaml  # for the family "configs"
     uv run --no-sync python <this file> <family> [<family> ...]
 
 Each family is one ``<family>.npz`` beside this file, whose keys are
@@ -28,6 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
 
 from somax_reference import (
     CASES,
+    CHUNK,
+    CONFIGS,
     HALF_CELL,
     LAT_RANGE,
     N_STEPS,
@@ -192,7 +195,33 @@ def spherical(family: str) -> Arrays:
     return out
 
 
+def configs() -> Arrays:
+    """somax's run configs: where they start, and their first chunk."""
+    import yaml
+    from somax._src.cli._factories import build
+
+    out: Arrays = {}
+    for name, n in CONFIGS.items():
+        spec = yaml.safe_load(Path(f"configs/simulation/{name}.yaml").read_text())
+        scenario, model_spec = spec["scenario"], spec["model"]
+        scenario["grid"] |= {"nx": n, "ny": n}
+        model, state = build(
+            scenario.pop("name"),
+            model_spec.pop("name"),
+            nondim=scenario.pop("nondim", None),
+            scenario_params=scenario,
+            model_params=model_spec,
+        )
+        state = model.apply_boundary_conditions(state)
+        dt = spec["timestepping"]["dt"]
+        solution = model.integrate(state, t0=0.0, t1=CHUNK * dt, dt=dt)
+        record(out, name, "init", state)
+        record(out, name, "end", jax.tree.map(lambda x: x[-1], solution.ys))
+    return out
+
+
 FAMILIES: dict[str, Callable[[], Arrays]] = {
+    "configs": configs,
     "eval": eval_metrics,
     "barotropic_qg": partial(quasi_geostrophic, "barotropic_qg"),
     "baroclinic_qg": partial(quasi_geostrophic, "baroclinic_qg"),

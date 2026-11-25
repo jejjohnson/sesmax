@@ -83,6 +83,7 @@ timestepping: {t0: 0.0, t1: 86400.0, dt: 100.0, save_interval: 21600.0}
 ```bash
 uv sync --package sesmax-experiment --extra sim
 uv run sesmax-experiment list-models
+uv run sesmax-experiment list-scenarios
 uv run sesmax-experiment simulate --config adjustment.yaml --output-dir runs/adjustment
 uv run sesmax-experiment restart --config adjustment.yaml --from runs/adjustment/final_state.zarr --output-dir runs/more
 ```

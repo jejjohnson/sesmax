@@ -210,6 +210,16 @@ def list_models() -> None:
             print(f"  - {name}")
 
 
+@app.command(name="list-scenarios")
+def list_scenarios() -> None:
+    """List the scenarios that can be run, with the models each goes with."""
+    for component in components().values():
+        if component.scenarios:
+            print(f"{component.name}:")
+        for name, models in sorted(component.scenarios.items()):
+            print(f"  - {name}: {', '.join(models)}")
+
+
 @app.command(name="show-config")
 def show_config(path: Config) -> None:
     """Print a spec as it is after loading and validation."""
