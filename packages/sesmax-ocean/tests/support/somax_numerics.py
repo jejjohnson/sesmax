@@ -63,6 +63,11 @@ class _SomaxNumerics:
         diffusion = self.ops.diffuse(values(velocity), kappa=1.0)  # type: ignore[attr-defined]
         return placed(diffusion, velocity, at)
 
+    def _potential_vorticity(self, u: Any, v: Any, h: Any) -> Any:
+        """Zero on the coasts and on two of the four walls."""
+        f = self.f_field_ml if hasattr(self, "f_field_ml") else self.f_field  # type: ignore[attr-defined]
+        return self.ops.sw_potential_vorticity(u, v, h, placed(f, h, "T"))  # type: ignore[attr-defined]
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """No flux through the edge faces of the array."""
         return self.ops.advect(h, u, v, scheme=self.scheme)  # type: ignore[attr-defined]
