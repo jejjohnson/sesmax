@@ -2818,7 +2818,7 @@ requires-dist = [
 
 [[package]]
 name = "sesmax-core"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/sesmax-core" }
 dependencies = [
     { name = "diffrax" },
