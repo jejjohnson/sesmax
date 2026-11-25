@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/jejjohnson/sesmax/compare/sesmax-core-v0.3.0...sesmax-core-v0.3.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **deps:** declare gaussx, which the elliptic inversions import ([#150](https://github.com/jejjohnson/sesmax/issues/150)) ([566b3c7](https://github.com/jejjohnson/sesmax/commit/566b3c760086b00cdd6aca65ce1c98063b98563e))
+
 ## [0.3.0](https://github.com/jejjohnson/sesmax/compare/sesmax-core-v0.2.0...sesmax-core-v0.3.0) (2026-11-24)
 
 
