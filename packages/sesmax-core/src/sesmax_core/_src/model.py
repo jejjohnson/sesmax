@@ -11,12 +11,11 @@ import diffrax as dfx
 import equinox as eqx
 import jax.tree_util as jtu
 import paramax
+from integrix.march import DiffraxForwardModel
 from jaxtyping import PyTree
 
 
 if TYPE_CHECKING:
-    from pipekit_jax import DiffraxForwardModel
-
     from sesmax_core._src.terms import Term
 
 
@@ -208,7 +207,7 @@ class Model(eqx.Module):
     def as_forward_model(
         self, *, dt: float, dt0: float, **settings: Any
     ) -> DiffraxForwardModel:
-        """This model as a ``pipekit_jax.DiffraxForwardModel``.
+        """This model as an ``integrix.march.DiffraxForwardModel``.
 
         That object holds the solver, step controller, adjoint and step budget
         in one place, and satisfies ``pipekit_cycle.ForwardModel``. Its
@@ -266,9 +265,6 @@ class Model(eqx.Module):
                 "DiffraxForwardModel holds one vector field. Use integrate() with "
                 "the solver these terms need instead."
             )
-        # Imported here because pipekit is kept out of `import sesmax_core`.
-        from pipekit_jax import DiffraxForwardModel
-
         return DiffraxForwardModel(
             vector_field=_ModelVectorField(self), dt=dt, dt0=dt0, **settings
         )
