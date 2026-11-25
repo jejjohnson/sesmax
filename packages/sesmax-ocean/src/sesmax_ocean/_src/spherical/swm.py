@@ -160,14 +160,6 @@ class SphericalSWM(Model):
     gradient ``beta = 2 Omega cos(phi)/R`` is then implicit in the field
     and varies correctly from equator to pole.
 
-    Known limitation
-    ----------------
-    Mass is not conserved. The mass equation takes no flux through the
-    edge faces of the array, so the cells along the edge get a wrong
-    tendency: a balanced solid-body rotation loses ``1e-3`` of its mass
-    in six hours, whatever the time step. Treat the mass diagnostic as a
-    drift signal rather than a conserved quantity.
-
     Args:
         params: Differentiable parameters.
         consts: Frozen physical constants.
@@ -194,6 +186,10 @@ class SphericalSWM(Model):
         """``field`` zeroed on land at the given C-grid stagger."""
         return field if self.mask is None else apply_mask(field, self.mask, at=at)
 
+    def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
+        """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
+        return self.ops.advect(h, u, v, scheme=self.scheme, bc=_BAND["h"])
+
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> SphericalSWMState:
@@ -205,7 +201,7 @@ class SphericalSWM(Model):
         tau0 = self.params.wind_amplitude
 
         # 1. Mass: dh/dt = -div_sphere(h u)
-        dh_dt = self.ops.advect(h, u, v, scheme=self.scheme)
+        dh_dt = self._mass_tendency(h, u, v)
 
         # 2. Potential vorticity q = (zeta + f)/h at X-points.
         f = placed(self.f_field, h, "T")

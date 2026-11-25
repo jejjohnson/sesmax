@@ -243,35 +243,16 @@ class TestDiagnostics:
         tendency = model.vector_field(0.0, solid_body_rotation(model))
         np.testing.assert_array_equal(np.asarray(tendency.h)[1:-1, 1:-1], 0.0)
 
-    def test_mass_drift_is_bounded(self):
-        """Not machine precision: no flux crosses the edge faces.
-
-        Mass drifts at the 1e-3 level. The drift is bounded, and pinning
-        it here makes a regression that worsens it visible.
-        """
-        model = build()
-        state = solid_body_rotation(model)
-        before = float(model.diagnose(state).mass)
-        final = jax.tree_util.tree_map(
-            lambda leaf: leaf[-1],
-            model.integrate(state, t0=0.0, t1=6 * 3600.0, dt=600.0).ys,
-        )
-        after = float(model.diagnose(final).mass)
-        assert abs(after - before) / before < 5e-3
-
-    def test_mass_drift_does_not_depend_on_the_time_step(self):
-        """Which is what rules out time-integration error as the cause."""
-        model = build()
-        state = solid_body_rotation(model)
-        before = float(model.diagnose(state).mass)
-        drifts = []
-        for dt in (600.0, 300.0):
-            final = jax.tree_util.tree_map(
-                lambda leaf: leaf[-1],
-                model.integrate(state, t0=0.0, t1=6 * 3600.0, dt=dt).ys,
-            )
-            drifts.append(abs(float(model.diagnose(final).mass) - before) / before)
-        assert drifts[0] == pytest.approx(drifts[1], rel=0.05)
+    def test_mass_does_not_drift(self):
+        """Six hours of solid-body rotation, whose mass somax lost 1e-3 of."""
+        with jax.enable_x64(True):
+            model = build()
+            state = solid_body_rotation(model)
+            before = float(model.diagnose(state).mass)
+            out = model.integrate(state, t0=0.0, t1=6 * 3600.0, dt=600.0).ys
+            final = jax.tree_util.tree_map(lambda leaf: leaf[-1], out)
+            after = float(model.diagnose(final).mass)
+        assert abs(after - before) / before < 1e-13
 
     def test_energy_is_positive_for_a_moving_state(self):
         model = build()

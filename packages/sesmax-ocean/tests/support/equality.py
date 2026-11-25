@@ -16,6 +16,7 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 from gridax import CField
+from somax_numerics import with_somax_numerics
 from somax_reference import (
     CASES,
     N_STEPS,
@@ -107,7 +108,7 @@ def assert_reproduces_somax(
             differ by a known factor.
     """
     expected = load(family)[case]
-    got = _run(model, given, state, CASES[family][1])
+    got = _run(with_somax_numerics(model), given, state, CASES[family][1])
     for field in dataclasses.fields(state):
         located = isinstance(getattr(state, field.name), CField)
         assert isinstance(getattr(got["tendency"], field.name), CField) == located

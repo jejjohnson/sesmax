@@ -40,7 +40,7 @@ from sesmax_core.validation import (
     require_non_negative,
     require_positive,
 )
-from sesmax_ocean._src.swm._shared import UPWIND, fill_box
+from sesmax_ocean._src.swm._shared import BCS, UPWIND, fill_box
 
 
 class MultilayerSW2DState(State):
@@ -178,6 +178,10 @@ class MultilayerShallowWater2D(Model):
     bc_type: str = eqx.field(static=True, default="periodic")
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
+    def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
+        """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
+        return self.ops.advect(h, u, v, scheme=self.scheme, bc=BCS[self.bc_type]["h"])
+
     def vector_field(
         self, t: float, state: PyTree, args: PyTree | None = None
     ) -> MultilayerSW2DState:
@@ -193,7 +197,7 @@ class MultilayerShallowWater2D(Model):
         tau0 = self.params.wind_amplitude
 
         # --- 1. Mass equation: dh_k/dt = -div(h_k * u_k, h_k * v_k) ---
-        dh_dt = self.ops.advect(h, u, v, scheme=self.scheme)
+        dh_dt = self._mass_tendency(h, u, v)
 
         # --- 2. Potential vorticity: q_k = (zeta_k + f) / h_k at X-points ---
         f = placed(self.f_field_ml, h, "T")
