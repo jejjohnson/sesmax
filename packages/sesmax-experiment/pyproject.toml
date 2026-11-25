@@ -26,6 +26,10 @@ dependencies = [
     "equinox>=0.13.8",
     "numpy>=2.0",
     "paramax>=0.0.5",
+    "diffrax>=0.7.2",
+    # The chunk pipeline; sesmax-core's tag.
+    "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.6#subdirectory=packages/pipekit-ops",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.6#subdirectory=packages/pipekit-cycle",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +44,9 @@ Repository = "https://github.com/jejjohnson/sesmax"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sesmax_experiment"]

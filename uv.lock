@@ -2894,11 +2894,14 @@ name = "sesmax-experiment"
 version = "0.0.0"
 source = { editable = "packages/sesmax-experiment" }
 dependencies = [
+    { name = "diffrax" },
     { name = "equinox" },
     { name = "jax" },
     { name = "jaxtyping" },
     { name = "numpy" },
     { name = "paramax" },
+    { name = "pipekit-cycle" },
+    { name = "pipekit-ops" },
     { name = "sesmax-core" },
 ]
 
@@ -2909,12 +2912,15 @@ checkpoint = [
 
 [package.metadata]
 requires-dist = [
+    { name = "diffrax", specifier = ">=0.7.2" },
     { name = "equinox", specifier = ">=0.13.8" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxtyping", specifier = ">=0.3.9" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "orbax-checkpoint", marker = "extra == 'checkpoint'", specifier = ">=0.11.37" },
     { name = "paramax", specifier = ">=0.0.5" },
+    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.6" },
+    { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-array-v0.1.6" },
     { name = "sesmax-core", editable = "packages/sesmax-core" },
 ]
 provides-extras = ["checkpoint"]

@@ -75,6 +75,7 @@ find out whether it exists:
 | Element-wise maths on a state whose fields may be `CField`s | `each`, `map_fields`, `placed`, `values` (`sesmax_core.fields`) |
 | A check on a factory's arguments, or a Burger number from a Froude number | `sesmax_core.validation`; `resolve_burger`, `burger_to_g_prime` (`sesmax_core.gfd`) |
 | A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_experiment.monitor` |
+| A loop over chunks of a run, a cadence, a retry around a write | `run_chunks`, `Timeline`, `every_chunks` and the other schedules (`sesmax_experiment.run`); pipekit's `Branch`, `Sink`, `Retry`, `Try` |
 | What a package of models offers to a run | `Component`, `BuiltRun` (`sesmax_core.component`) |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 | A check that the grid resolves a boundary layer or a deformation radius, or a metric of an ocean state | `sesmax_ocean.resolution`, `sesmax_ocean.eval` |
@@ -119,7 +120,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 - A monitor subclasses `BaseMonitor`, sets `name` and overrides what it needs of `on_run_start(model, state0, *, spec)`, `on_chunk_end(model, state, info)` and `on_run_end(model, final_state, *, ok)`.
 - Monitors run host-side between jitted chunks, so they may hold Python state and never run inside a trace. A halt that must happen at the offending step is a `guard_finite`, `guard_positive` or `guard_ceiling` in the tendency instead.
 - `on_chunk_end` returns a `MonitorVerdict`; `terminate=True` needs a `reason`.
-- They live in `sesmax_experiment.monitor`. Nothing calls them yet: the run loop that does arrives with #189.
+- They live in `sesmax_experiment.monitor`, and `sesmax_experiment.run.run_chunks` calls them.
 
 ### Migrated code
 
