@@ -42,6 +42,7 @@ from sesmax_ocean._src.swm._shared import (
     WRAPS,
     FreeSlip,
     fill_box,
+    hold_walls,
     velocity_laplacian,
     wrap,
 )
@@ -184,6 +185,10 @@ class NonlinearShallowWater2D(Model):
             wraps=WRAPS[self.bc_type],
         )
 
+    def _hold_walls(self, tendency: Any, at: str) -> Any:
+        """The tendency of a velocity, zero on the walls."""
+        return hold_walls(tendency, WALLS[self.bc_type], at)
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
         return self.ops.advect(h, u, v, scheme=self.scheme, bc=BCS[self.bc_type]["h"])
@@ -246,6 +251,7 @@ class NonlinearShallowWater2D(Model):
         dP_dy = self.ops.difference(P, axis="y", src="T", dst="V")
         du_dt = each(x_momentum, q_on_U, vh_on_U, dP_dx, self._laplacian(u, "U"), u)
         dv_dt = each(y_momentum, q_on_V, uh_on_V, dP_dy, self._laplacian(v, "V"), v)
+        du_dt, dv_dt = self._hold_walls(du_dt, "U"), self._hold_walls(dv_dt, "V")
 
         return NonlinearSW2DState(h=dh_dt, u=du_dt, v=dv_dt)
 

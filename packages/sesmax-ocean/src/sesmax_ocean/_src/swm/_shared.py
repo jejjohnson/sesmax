@@ -22,7 +22,7 @@ from gridax import (
 from gridax.schemes import Upwind
 from jaxtyping import Array, Bool, Float
 
-from sesmax_core.fields import placed, values
+from sesmax_core.fields import each, placed, values
 
 
 #: The default scheme of the face values in the mass equation.
@@ -114,6 +114,28 @@ def velocity_laplacian(
     total = difference(normal, grid, axis=along, src="T", dst=at, mask=mask)
     total = total + difference(shear, grid, axis=across, src="X", dst=at, mask=mask)
     return placed(total / grid.area(at=at), velocity, at)
+
+
+def hold_walls(tendency: Any, walls: str, at: str) -> Any:
+    """The tendency of a velocity, zero on the wall faces normal to it.
+
+    The integrator applies the boundary conditions to the input of a tendency,
+    not to the state it returns, so a tendency on a wall would add up there.
+
+    Args:
+        tendency: An array or a field at ``at``.
+        walls: The axes the box is closed along.
+        at: ``"U"`` or ``"V"``.
+
+    Returns:
+        The tendency.
+    """
+    axis = "x" if at == "U" else "y"
+    if axis not in walls:
+        return tendency
+    faces = jnp.array([0, -2, -1])
+    where = (..., faces) if axis == "x" else (..., faces, slice(None))
+    return each(lambda array: array.at[where].set(0.0), tendency)
 
 
 def fill_box(state: Any, grid: CartesianCGrid2D, bc_type: str) -> Any:
