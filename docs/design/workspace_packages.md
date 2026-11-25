@@ -3,7 +3,7 @@ title: "The packages of the sesmax workspace"
 subtitle: "Design · core, param, components, testing and experiment, with benchmarks in geobench"
 short_title: Workspace packages
 description: "Rethinks which packages the sesmax workspace holds: a core of contracts, a package for the parametric part of a model, one package per component, a testing package with the toy models and the checks, an experiment package for simulation, estimation and monitoring, and benchmarks outside the repository."
-date: 2026-11-23
+date: 2026-11-25
 keywords:
   - sesmax
   - workspace
@@ -19,14 +19,14 @@ numbering:
   code: true
 ---
 
-23 Nov 2026 · J. Emmanuel Johnson (drafted with Claude Code)
+23 Nov 2026, revised 25 Nov 2026 · J. Emmanuel Johnson (drafted with Claude Code)
 
 ## Decision
 
 Proposed: give the workspace five kinds of package. `sesmax-core` holds the contracts, `sesmax-param` the parametric part of a model (parameterizations, forcing and model error), each component of the Earth system is a package of models, `sesmax-testing` says whether a model is right, and `sesmax-experiment` is where models are used: simulation, parameter estimation, state estimation, bilevel problems and monitoring.
 Benchmarks, which say whether a model is good, live in the planned geobench repository.
 Alternative: keep one core and add modules to it as needed (`sesmax_core.testing`, `sesmax_core.sim`), which is fewer releases, but the core then carries every toy and every workflow to anyone who only wants the model contract.
-Status: proposed, for review. Nothing here is implemented. The owner has settled four points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, and model error belongs in it.
+Status: proposed, for review. Nothing here is implemented. The owner has settled five points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, and the ocean models come before the split (25 November).
 
 ## What this page settles
 
@@ -37,7 +37,7 @@ Status: proposed, for review. Nothing here is implemented. The owner has settled
 | Where do runs and estimation live? | `sesmax-experiment` |
 | Who owns the methods? | vardax, filterax, argminax, as today |
 | Where do benchmarks live? | geobench |
-| When do we split? | Before the ocean moves |
+| When do we split? | After the ocean models, before the run loop |
 
 ## The packages
 
@@ -296,14 +296,14 @@ A package costs a release, a CI job, a README and an icon, so a new one needs a 
 
 | Step | Pull requests | Gate |
 | --- | --- | --- |
-| W1 | `sesmax-testing`: the toys, then the checks; public helpers of the core | the moved tests and notebooks give the same numbers; the new checks run on every toy |
-| W2 | the ocean models ([ocean plan](ocean.md)) | the reference check against somax |
+| W1 | public helpers of the core; the ocean models ([ocean plan](ocean.md)) | the equality test against somax |
+| W2 | `sesmax-testing`: the toys, then the checks | the moved tests and notebooks give the same numbers; the new checks run on every toy and every ocean model |
 | W3 | `sesmax-experiment`: monitors, checkpoints, the run loop | the run-loop design's checks |
 | W4 | the ocean's scenarios and configs; somax is archived | somax's configs give somax's first chunk |
 | W5 | `sesmax-param`: the forcing, drag and damping move; one hierarchy; model error; the ocean models as sums of terms | the moved tests; the reference check of every ocean model, unchanged |
 | W6 | `sesmax-experiment`: problems, estimation, bilevel, twins | its own design page |
 
-W1 is first because the ocean's gate is one of its checks, and because only notebooks and READMEs depend on the toys' import path today.
+The ocean is first because its gate needs one equality test, small enough for its own tests, and not the split. That test becomes the reference check of `sesmax-testing` in W2.
 W5 comes after the port, which needs models with their physics inside to compare with somax, and before W6, which reads the priors.
 
 ## Open questions
