@@ -126,7 +126,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 
 ### Moving code from somax
 
-Code moves from somax at commit `9cb19b3` (phase C1 moved the core, and phase C2 moves the ocean). Every moved file is checked against its source with the import rewriter:
+Code moves from somax at commit `9cb19b3` (phase C1 moved the core, and phase C2 moves the ocean). Every moved core file is checked against its source with the import rewriter:
 
 ```bash
 diff <(git -C ../somax show 9cb19b3:somax/_src/core/types.py | sed -f scripts/somax_imports.sed) \
@@ -134,6 +134,8 @@ diff <(git -C ../somax show 9cb19b3:somax/_src/core/types.py | sed -f scripts/so
 ```
 
 The diff may show only the changes allowed above (imports, the four renames, docstrings that say "somax", behaviour-neutral lint or type fixes). The somax tests for the module are copied to the same relative path under `packages/sesmax-core/tests/`. The commit message names the source: `Moved from somax 9cb19b3: somax/_src/core/types.py`.
+
+The ocean models (phase C2, [`docs/design/ocean.md`](docs/design/ocean.md)) also move from finitevolX to gridax, so a diff cannot check them. Instead a ported model has to give somax's numbers: `packages/sesmax-ocean/tests/reference/make_reference.py` runs somax at `9cb19b3` and writes arrays, and the `test_equal_to_somax.py` files compare tendencies, end states and diagnostics with them to a relative 1e-12 in float64, on arrays and on located fields. A change that moves a number is its own PR, after the port.
 
 ### The public API
 

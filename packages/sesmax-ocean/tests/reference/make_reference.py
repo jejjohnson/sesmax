@@ -16,6 +16,7 @@ from __future__ import annotations
 import dataclasses
 import sys
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 
 import jax
@@ -23,16 +24,13 @@ import jax.numpy as jnp
 import numpy as np
 
 
-NX, NY = 16, 12
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
+
+from somax_reference import CASES, N_STEPS, SIZE, island
+
+
+SHAPE = (SIZE["ny"] + 2, SIZE["nx"] + 2)
 Arrays = dict[str, np.ndarray]
-
-
-def island() -> np.ndarray:
-    """Wet cells of a closed box with an island, with the ghost ring."""
-    wet = np.zeros((NY + 2, NX + 2), dtype=bool)
-    wet[1:-1, 1:-1] = True
-    wet[5:8, 7:10] = False
-    return wet
 
 
 def masks() -> dict[str, object]:
@@ -63,14 +61,12 @@ def eval_metrics() -> Arrays:
     rng = np.random.default_rng(0)
     out: Arrays = {}
     for name, mask in masks().items():
-        model = LinearShallowWater2D.create(
-            nx=NX, ny=NY, Lx=1e6, Ly=8e5, beta=1e-11, bc="wall", mask=mask
-        )
+        model = LinearShallowWater2D.create(**SIZE, **CASES["eval"][0], mask=mask)
         wet_t, wet_u, wet_v = wet(mask)
         state = LinearSW2DState(
-            h=jnp.asarray(rng.normal(size=(NY + 2, NX + 2)) * wet_t),
-            u=jnp.asarray(0.1 * rng.normal(size=(NY + 2, NX + 2)) * wet_u),
-            v=jnp.asarray(0.1 * rng.normal(size=(NY + 2, NX + 2)) * wet_v),
+            h=jnp.asarray(rng.normal(size=SHAPE) * wet_t),
+            u=jnp.asarray(0.1 * rng.normal(size=SHAPE) * wet_u),
+            v=jnp.asarray(0.1 * rng.normal(size=SHAPE) * wet_v),
         )
         state = model.apply_boundary_conditions(state)
         record(out, name, "init", state)
@@ -79,7 +75,43 @@ def eval_metrics() -> Arrays:
     return out
 
 
-FAMILIES: dict[str, Callable[[], Arrays]] = {"eval": eval_metrics}
+def integrate(out: Arrays, case: str, model: object, state: object, dt: float) -> None:
+    """The tendency, the end state and the diagnostics from one initial state."""
+    import diffrax as dfx
+
+    state = model.apply_boundary_conditions(state)
+    solution = model.integrate(state, t0=0.0, t1=N_STEPS * dt, dt=dt, solver=dfx.Heun())
+    end = jax.tree.map(lambda x: x[-1], solution.ys)
+    record(out, case, "init", state)
+    record(out, case, "tendency", model.vector_field(0.0, state))
+    record(out, case, "end", end)
+    record(out, case, "diagnostics", model.diagnose(state))
+
+
+def quasi_geostrophic(family: str) -> Arrays:
+    """One of the QG models, from random PV."""
+    from somax._src.models.qg import baroclinic, barotropic
+
+    model_class, state_class, layers = {
+        "barotropic_qg": (barotropic.BarotropicQG, barotropic.BarotropicQGState, ()),
+        "baroclinic_qg": (baroclinic.BaroclinicQG, baroclinic.BaroclinicQGState, (3,)),
+    }[family]
+    kwargs, dt = CASES[family]
+    rng = np.random.default_rng(0)
+    out: Arrays = {}
+    for name, mask in masks().items():
+        wet_t, _, _ = wet(mask)
+        q = jnp.asarray(1e-5 * rng.normal(size=(*layers, *SHAPE)) * wet_t)
+        model = model_class.create(**SIZE, **kwargs, mask=mask)
+        integrate(out, name, model, state_class(q=q), dt)
+    return out
+
+
+FAMILIES: dict[str, Callable[[], Arrays]] = {
+    "eval": eval_metrics,
+    "barotropic_qg": partial(quasi_geostrophic, "barotropic_qg"),
+    "baroclinic_qg": partial(quasi_geostrophic, "baroclinic_qg"),
+}
 
 
 def main(families: list[str]) -> None:
