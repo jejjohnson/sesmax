@@ -276,7 +276,7 @@ class BaroclinicQG(Model):
         --------------------
         Scale set: **advective** (:meth:`sesmax_core.Scales.advective`), with
         ``L = U = 1`` so that ``T = L/U = 1`` and ``f0 = 1/Ro`` — the
-        same set :meth:`sesmax_core.BarotropicQG.from_nondimensional` uses,
+        same set :meth:`sesmax_ocean.qg.BarotropicQG.from_nondimensional` uses,
         plus stratification.
 
         =================  ===============================  ======================

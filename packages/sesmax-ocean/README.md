@@ -8,7 +8,8 @@ The models are moving here from [somax](https://github.com/jejjohnson/somax) (co
 
 | Module | Names | What it does |
 |---|---|---|
-| `sesmax_ocean.qg` | `BarotropicQG`, `BaroclinicQG` | Quasi-geostrophic models, one layer or several |
+| `sesmax_ocean.qg` | `BarotropicQG`, `BaroclinicQG`, `ReparameterizedQG` | Quasi-geostrophic models, one layer or several; the last is shallow water projected onto geostrophic balance |
+| `sesmax_ocean.swm` | `NonlinearShallowWater2D`, `MultilayerShallowWater2D` | Shallow-water models, one layer or several |
 | `sesmax_ocean.resolution` | `check_munk_width`, `check_stommel_width`, `check_deformation_radius`, `check_equatorial_deformation_radius` | Does the grid span the boundary layers and the deformation radius? |
 | `sesmax_ocean.eval` | `compute_eval_metrics` and the metrics it picks from | Numbers about one state, with no truth to compare with |
 | `sesmax_ocean.forcing` | `ssh_geostrophic`, `sss_coastal`, `sst_frontal`, `geostrophic_currents` | Reduced-order forcings for one ocean field each |
