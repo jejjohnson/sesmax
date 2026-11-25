@@ -79,7 +79,8 @@ class TestCoriolis:
         model = build()
         lat_corner = latitudes(model.grid) + 0.5 * model.grid.dlat
         expected = 2.0 * OMEGA_EARTH * jnp.sin(lat_corner)
-        np.testing.assert_allclose(model.f_field, expected, rtol=1e-6)
+        # The absolute tolerance is for the equator, where f is zero to rounding.
+        np.testing.assert_allclose(model.f_field, expected, rtol=1e-6, atol=1e-18)
 
     def test_changes_sign_across_the_equator(self):
         model = build()
