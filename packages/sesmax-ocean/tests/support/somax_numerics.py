@@ -3,6 +3,11 @@
 Each fix since the port moves numbers, so a model of `sesmax_ocean` no longer
 gives somax's. These subclasses put one piece of somax's back per method, and the
 equality tests run them: whatever is not overridden here still reproduces somax.
+
+One change is gridax's: since v0.3 no operation with a mask reads land. finitevolX,
+at the commit somax pins, computed as if all were ocean and then zeroed the dry
+outputs, so a wet cell beside land read what land held. `_ReadsLand` does that
+for the two operations the quasi-geostrophic models use.
 """
 
 from __future__ import annotations
@@ -12,12 +17,38 @@ from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
+from gridax import GridOps, apply_mask, grad_perp, laplacian
 
 from sesmax_core import Model
 from sesmax_core.fields import placed, values
-from sesmax_ocean.qg import ReparameterizedQG
+from sesmax_ocean.qg import BaroclinicQG, BarotropicQG, ReparameterizedQG
 from sesmax_ocean.spherical import SphericalQG, SphericalSWM
 from sesmax_ocean.swm import MultilayerShallowWater2D, NonlinearShallowWater2D
+
+
+class _ReadsLand(eqx.Module):
+    """The operations of a model, with the two that read land in finitevolX."""
+
+    ops: GridOps
+
+    def __getattr__(self, name: str) -> Any:
+        if name == "ops":
+            raise AttributeError(name)
+        return getattr(self.ops, name)
+
+    def laplacian(self, field: Any, *, at: str) -> Any:
+        """The cells beside land take a gradient from what land holds."""
+        out = laplacian(field, self.ops.grid, at=at)
+        mask = self.ops.mask
+        return out if mask is None else apply_mask(out, mask, at=at)
+
+    def grad_perp(self, psi: Any, *, at: str) -> Any:
+        """A corner beside land averages what land holds."""
+        mask = self.ops.mask
+        u, v = grad_perp(psi, self.ops.grid, at=at)
+        if mask is None:
+            return u, v
+        return apply_mask(u, mask, at="U"), apply_mask(v, mask, at="V")
 
 
 class _SomaxNumerics:
@@ -77,7 +108,11 @@ _CLASSES = {
 def with_somax_numerics(model: Model) -> Model:
     """``model`` with the pieces that were fixed after the port put back."""
     if isinstance(model, ReparameterizedQG):
-        return eqx.tree_at(lambda m: m.swm, model, with_somax_numerics(model.swm))
+        swm = with_somax_numerics(model.swm)
+        swm = eqx.tree_at(lambda m: m.ops, swm, _ReadsLand(swm.ops))
+        return eqx.tree_at(lambda m: m.swm, model, swm)
+    if isinstance(model, BarotropicQG | BaroclinicQG | SphericalQG):
+        model = eqx.tree_at(lambda m: m.ops, model, _ReadsLand(model.ops))
     if type(model) not in _CLASSES:
         return model
     fields = {f.name: getattr(model, f.name) for f in dataclasses.fields(model)}
