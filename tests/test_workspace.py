@@ -16,6 +16,7 @@ import pytest
 
 import sesmax
 import sesmax_core
+import sesmax_experiment
 import sesmax_ocean
 
 
@@ -28,8 +29,21 @@ if not PACKAGES.is_dir():
 # Top-level imports each package must never make: anything beside or above it
 # in the tiers, and somax and finitevolX, which sesmax and gridax replace.
 FORBIDDEN: dict[str, set[str]] = {
-    "sesmax_core": {"sesmax", "sesmax_ocean", "sesmax_atmos", "somax"},
-    "sesmax_ocean": {"sesmax", "sesmax_atmos", "somax", "finitevolx"},
+    "sesmax_core": {
+        "sesmax",
+        "sesmax_ocean",
+        "sesmax_atmos",
+        "sesmax_experiment",
+        "somax",
+    },
+    "sesmax_ocean": {
+        "sesmax",
+        "sesmax_atmos",
+        "sesmax_experiment",
+        "somax",
+        "finitevolx",
+    },
+    "sesmax_experiment": {"sesmax", "sesmax_ocean", "sesmax_atmos", "somax"},
 }
 
 
@@ -94,7 +108,9 @@ def test_umbrella_holds_no_code() -> None:
     assert sesmax.__all__ == ["__version__"]
 
 
-@pytest.mark.parametrize("module", [sesmax, sesmax_core, sesmax_ocean])
+@pytest.mark.parametrize(
+    "module", [sesmax, sesmax_core, sesmax_experiment, sesmax_ocean]
+)
 def test_version_matches_pyproject(module: object) -> None:
     """``__version__`` and ``pyproject.toml`` move together (release-please)."""
     name = module.__name__  # type: ignore[attr-defined]

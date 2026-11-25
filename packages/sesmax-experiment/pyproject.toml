@@ -1,0 +1,52 @@
+[project]
+name = "sesmax-experiment"
+version = "0.0.0"
+description = "Runs of sesmax models: a chunked run loop, its monitors and its checkpoints."
+authors = [
+    {name = "J. Emmanuel Johnson", email = "jemanjohnson34@gmail.com"},
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+keywords = ["jax", "equinox", "simulation", "experiment"]
+requires-python = ">=3.12"
+classifiers = [
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Natural Language :: English",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Development Status :: 2 - Pre-Alpha",
+]
+dependencies = [
+    "sesmax-core",
+    "jax>=0.10.2",
+    "jaxtyping>=0.3.9",
+    "equinox>=0.13.8",
+    "numpy>=2.0",
+    "paramax>=0.0.5",
+    "diffrax>=0.7.2",
+    # The chunk pipeline; sesmax-core's tag.
+    "pipekit-ops @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.6#subdirectory=packages/pipekit-ops",
+    "pipekit-cycle @ git+https://github.com/jejjohnson/pipekit.git@pipekit-array-v0.1.6#subdirectory=packages/pipekit-cycle",
+]
+
+[project.optional-dependencies]
+# The orbax checkpointer in ``sesmax_experiment.checkpoint``.
+checkpoint = [
+    "orbax-checkpoint>=0.11.37",
+]
+
+[project.urls]
+Repository = "https://github.com/jejjohnson/sesmax"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sesmax_experiment"]

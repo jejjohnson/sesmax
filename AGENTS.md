@@ -17,14 +17,15 @@ Each distribution lives in `packages/<dist>/` with its own `pyproject.toml`, `sr
 | — | `sesmax` | `sesmax` | code-free umbrella that installs the packages | scaffolded |
 | 2 | `sesmax-couple` | `sesmax_couple` | flux exchange, regridding, coupled runs | later |
 | 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, their resolution checks, metrics and forcing presets | moving from somax (#152) |
-| 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, monitors, I/O, test problems | moved from somax; first release 0.1.0 |
+| 1 | `sesmax-experiment` | `sesmax_experiment` | runs of models in chunks, their monitors and checkpoints; names no component | the run loop is moving from somax (#186) |
+| 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, I/O, test problems | moved from somax; first release 0.1.0 |
 
 The public API of each package is its top-level `__all__`, plus its public submodules.
 
 ### Boundaries
 
 - **Tiers.** A package imports only packages in a lower tier; `sesmax_core` imports no component and nothing from `somax` (`tests/test_workspace.py` reads the sources and fails otherwise). Only public names cross packages: an import of another package's `_src` fails the same test. Two components never import each other: what they share goes into the core, and what couples them goes into the coupler.
-- **Dependencies.** `sesmax-core`'s base install: JAX, jaxtyping, Equinox, diffrax, lineax, optimistix, einops, paramax, gridax, spectraldiffx, pipekit-ops (with pipekit-cycle and pipekit-jax), geonnax, functax and integrix; git dependencies are direct references in `packages/sesmax-core/pyproject.toml`, kept in step with the overrides in the root `pyproject.toml`. An optional dependency goes behind an extra (`[da]` for filterax and vardax, `[flows]`, `[xarray]`, `[checkpoint]`) and an import that raises an `ImportError` naming the extra.
+- **Dependencies.** `sesmax-core`'s base install: JAX, jaxtyping, Equinox, diffrax, lineax, optimistix, einops, paramax, gridax, spectraldiffx, pipekit-ops (with pipekit-cycle and pipekit-jax), geonnax, functax and integrix; git dependencies are direct references in `packages/sesmax-core/pyproject.toml`, kept in step with the overrides in the root `pyproject.toml`. An optional dependency goes behind an extra (`[da]` for filterax and vardax, `[flows]`, `[xarray]`) and an import that raises an `ImportError` naming the extra.
 - **Nobody imports sesmax yet.** When other projects build on it, list them here and keep their imports working: a rename or removal of a public name then goes through a deprecation (the old name keeps working with a `DeprecationWarning` that names the replacement for at least one release).
 
 ## What it is built on
@@ -73,7 +74,9 @@ find out whether it exists:
 | A vertical-mode transform | `ModalTransform` |
 | Element-wise maths on a state whose fields may be `CField`s | `each`, `map_fields`, `placed`, `values` (`sesmax_core.fields`) |
 | A check on a factory's arguments, or a Burger number from a Froude number | `sesmax_core.validation`; `resolve_burger`, `burger_to_g_prime` (`sesmax_core.gfd`) |
-| A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_core.monitor` |
+| A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_experiment.monitor` |
+| A loop over chunks of a run, a cadence, a retry around a write | `run_chunks`, `Timeline`, `every_chunks` and the other schedules (`sesmax_experiment.run`); pipekit's `Branch`, `Sink`, `Retry`, `Try` |
+| What a package of models offers to a run | `Component`, `BuiltRun` (`sesmax_core.component`) |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 | A check that the grid resolves a boundary layer or a deformation radius, or a metric of an ocean state | `sesmax_ocean.resolution`, `sesmax_ocean.eval` |
 
@@ -117,7 +120,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 - A monitor subclasses `BaseMonitor`, sets `name` and overrides what it needs of `on_run_start(model, state0, *, spec)`, `on_chunk_end(model, state, info)` and `on_run_end(model, final_state, *, ok)`.
 - Monitors run host-side between jitted chunks, so they may hold Python state and never run inside a trace. A halt that must happen at the offending step is a `guard_finite`, `guard_positive` or `guard_ceiling` in the tendency instead.
 - `on_chunk_end` returns a `MonitorVerdict`; `terminate=True` needs a `reason`.
-- Nothing in the core calls monitors yet: the run loop that does arrives with `sesmax_core.sim` (#28).
+- They live in `sesmax_experiment.monitor`, and `sesmax_experiment.run.run_chunks` calls them.
 
 ### Migrated code
 
@@ -158,7 +161,7 @@ Most rules here are tests, so CI tells you when one breaks. Read a test's docstr
 | `packages/sesmax-core/tests/core/test_model.py`, `test_paramax_integration.py` | The model contract; a model with wrapped parameters behaves like one with plain arrays, and gradients land on the stored values |
 | `packages/sesmax-core/tests/core/test_terms.py` | The term algebra, IMEX partitioning and the diffrax terms it builds |
 | `packages/sesmax-core/tests/core/test_forcing.py`, `core/test_basis.py` | Forcing fields, the reduced-order bases, and that a one-column `BasisForcing` reproduces a hand-written wind forcing |
-| `packages/sesmax-core/tests/test_monitor.py` | The monitor protocol and the built-in monitors, without an integration |
+| `packages/sesmax-experiment/tests/test_monitor.py` | The monitor protocol and the built-in monitors, without an integration |
 | `packages/sesmax-core/tests/da/test_filterax.py`, `da/test_vardax.py` | A twin experiment through each DA adapter improves on the background (skipped without `[da]`) |
 | `packages/sesmax-core/tests/testing/` | The test problems against analytic or published solutions, for example Ghia's cavity and Poiseuille flow in `test_navier_stokes.py` |
 | `tests/test_build_docs.py` | The two-tool docs pipeline: inventory parsing, anchor repair, link checking, the inventory port and the absolute nav URL in `docs/myst.yml`, the files copied to the site root (`ROOT_FILES`) |

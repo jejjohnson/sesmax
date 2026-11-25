@@ -6,10 +6,10 @@ the model base classes, the term algebra, non-dimensionalisation and
 standardisation (``Scales``, ``StateAffine``, ``ScaledModel``), the
 layered-fluid pieces (``ModalTransform``), and forcing
 with its reduced-order bases. The data-assimilation adapters, the flowjax
-bridge, monitors and rollouts are in their own submodules, some behind an
-extra (``[da]``, ``[flows]``); the I/O functions and the checkpointer are
-also top-level and import xarray or orbax only when called (``[xarray]``,
-``[checkpoint]``).
+bridge and rollouts are in their own submodules, some behind an extra
+(``[da]``, ``[flows]``); the I/O functions are also top-level and import xarray
+only when called (``[xarray]``). Monitors and checkpoints are in
+``sesmax_experiment``.
 
 A model is an :class:`equinox.Module` whose ``vector_field`` is a pure
 function of time, state and parameters, so ``jax.jit``, ``jax.grad`` and
@@ -35,7 +35,6 @@ from sesmax_core._src.basis import (
     add_vector_to,
     control_filter,
 )
-from sesmax_core._src.checkpoint import SimulationCheckpointer
 from sesmax_core._src.driver import solve_pde
 from sesmax_core._src.forcing import (
     ConstantForcing,
@@ -171,7 +170,6 @@ __all__ = [
     "ScaledModel",
     "Scales",
     "SeasonalWindForcing",
-    "SimulationCheckpointer",
     "SpatialBasis",
     "State",
     "StateAffine",

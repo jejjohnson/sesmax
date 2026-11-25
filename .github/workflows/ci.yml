@@ -51,6 +51,7 @@ jobs:
       matrix:
         package:
           - {dist: sesmax-core, module: sesmax_core}
+          - {dist: sesmax-experiment, module: sesmax_experiment}
           - {dist: sesmax-ocean, module: sesmax_ocean}
     steps:
       - uses: actions/checkout@v7

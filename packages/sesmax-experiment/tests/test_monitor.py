@@ -1,4 +1,4 @@
-"""Unit tests for the sesmax_core.monitor protocol and built-in monitors.
+"""Unit tests for the sesmax_experiment.monitor protocol and built-in monitors.
 
 These exercise the monitor objects directly with lightweight fakes — no
 diffrax integration — so they run in the fast PR lane.
@@ -9,7 +9,7 @@ from __future__ import annotations
 import equinox as eqx
 import jax.numpy as jnp
 
-from sesmax_core.monitor import (
+from sesmax_experiment.monitor import (
     BaseMonitor,
     ChunkInfo,
     ConservationDriftMonitor,

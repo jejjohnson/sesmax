@@ -90,7 +90,7 @@ class Diagnostics(eqx.Module):
         potential enstrophy, PV Casimirs, momentum, … — so a monitor can
         track the relative drift ``(I(t) - I(0)) / I(0)`` over a run without
         knowing model specifics (see
-        :class:`sesmax_core.monitor.ConservationDriftMonitor`).
+        :class:`sesmax_experiment.monitor.ConservationDriftMonitor`).
 
         The base implementation returns an empty dict; models override it to
         expose the invariants their ``Diagnostics`` subclass carries. Whether
