@@ -16,7 +16,7 @@ def _orbax() -> Any:
     except ImportError as exc:
         raise ImportError(
             "SimulationCheckpointer requires orbax-checkpoint, an optional "
-            "dependency. Install it with `pip install sesmax-core[checkpoint]` "
+            "dependency. Install it with `pip install sesmax-experiment[checkpoint]` "
             "(or `uv sync --extra checkpoint`)."
         ) from exc
     return orbax.checkpoint

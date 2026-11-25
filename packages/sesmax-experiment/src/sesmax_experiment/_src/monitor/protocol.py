@@ -1,6 +1,6 @@
 """Lifecycle protocol for in-process simulation monitors.
 
-A :class:`Monitor` observes a ``somax-sim`` run at three lifecycle points —
+A :class:`Monitor` observes a run at three lifecycle points —
 run start, each diagnostic-chunk boundary, and run end — and may *request
 termination*. It is the sesmax-side analog of an Oceananigans ``Callback`` /
 ``Diagnostic`` or a Keras callback, but JAX-aware: monitors run host-side
@@ -10,7 +10,7 @@ state and do arbitrary host work (logging, I/O, history).
 This decouples DURING-simulation observability from the runner: the
 non-finite abort and energy-growth warning that used to be inline ``if``
 blocks in the chunk step become pluggable monitors (see
-:mod:`sesmax_core._src.monitor.builtins`), and users can add their own without
+:mod:`sesmax_experiment._src.monitor.builtins`), and users can add their own without
 editing the runner.
 
 Severity is declared, not implicit: a monitor either returns a
@@ -38,7 +38,7 @@ class ChunkInfo:
         stats: Diffrax solver stats for this chunk (e.g.
             ``num_accepted_steps`` / ``num_rejected_steps`` / ``result``), or
             an empty dict if the solver did not expose them. Consumed by
-            :class:`sesmax_core.monitor.SolverHealthMonitor`.
+            :class:`sesmax_experiment.monitor.SolverHealthMonitor`.
     """
 
     index: int
@@ -75,7 +75,7 @@ class Monitor(Protocol):
     """Structural protocol for a simulation monitor.
 
     Implementations need a ``name`` and the three lifecycle hooks. Most
-    monitors only care about one hook, so :class:`sesmax_core.monitor.BaseMonitor`
+    monitors only care about one hook, so :class:`sesmax_experiment.monitor.BaseMonitor`
     supplies inert defaults — subclass it and override what you need rather
     than implementing this Protocol directly.
     """

@@ -38,7 +38,7 @@ in `AGENTS.md`.
    - a softplus or sigmoid on a parameter, or `stop_gradient` to freeze one → `positive`, `interval`, `frozen`;
    - hand-written non-dimensionalisation or standardisation of a state → `Scales`, `StateAffine`, `ScaledModel`;
    - a vertical-mode transform → `ModalTransform`;
-   - a finite check inside a tendency → `guard_finite`; between chunks → `sesmax_core.monitor`;
+   - a finite check inside a tendency → `guard_finite`; between chunks → `sesmax_experiment.monitor`;
    - a public name that duplicates another public name for a different object (`tests/test_capabilities.py` will fail on it).
 
 

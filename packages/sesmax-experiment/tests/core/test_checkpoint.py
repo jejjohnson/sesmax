@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import jax.numpy as jnp
 import pytest
 
 from sesmax_core import Params, State
-from sesmax_core._src.checkpoint import SimulationCheckpointer
+from sesmax_experiment.checkpoint import SimulationCheckpointer
 
 
 # ---------------------------------------------------------------------------
@@ -110,3 +113,21 @@ class TestSimulationCheckpointer:
         assert restored_step == 10
         assert jnp.allclose(restored_state.x, state.x)
         assert jnp.isclose(restored_params.alpha, params.alpha)
+
+
+def test_the_missing_extra_is_named() -> None:
+    """Without orbax the error says what to install."""
+    script = (
+        "import sys\n"
+        "sys.modules['orbax'] = None\n"
+        "from sesmax_experiment.checkpoint import SimulationCheckpointer\n"
+        "ckpt = SimulationCheckpointer(\n"
+        "    checkpoint_dir='unused', checkpoint_interval=1\n"
+        ")\n"
+        "try:\n"
+        "    ckpt.restore(0, None, None)\n"
+        "except ImportError as err:\n"
+        "    print(err)\n"
+    )
+    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True)
+    assert "sesmax-experiment[checkpoint]" in out.stdout, out.stderr[-800:]

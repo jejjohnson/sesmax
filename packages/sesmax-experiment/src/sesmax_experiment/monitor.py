@@ -1,6 +1,6 @@
-"""Public surface for sesmax-core's in-process simulation monitors.
+"""Public surface for sesmax-experiment's in-process simulation monitors.
 
-A :class:`Monitor` observes a ``somax-sim`` run at three lifecycle points —
+A :class:`Monitor` observes a run at three lifecycle points —
 run start, each diagnostic-chunk boundary, and run end — and may request a
 clean termination. This is the architectural unlock for DURING-simulation
 observability: the runner's non-finite abort and energy-growth warning are
@@ -15,14 +15,11 @@ fail-fast tripwires) for halts that must happen *at* the offending step.
 
 Example::
 
-    from sesmax_core.monitor import (
+    from sesmax_experiment.monitor import (
         BaseMonitor,
         MonitorVerdict,
         default_monitors,
     )
-
-    # the run loop that calls monitors arrives with the sesmax runner
-    from somax._src.cli._run import simulate
 
 
     class MaxSpeedMonitor(BaseMonitor):
@@ -42,17 +39,10 @@ Example::
             return MonitorVerdict(metrics={"u_max": umax})
 
 
-    simulate(
-        spec,
-        "runs/dg",
-        monitors=[*default_monitors(), MaxSpeedMonitor(ceiling=20.0)],
-    )
-
-Kept out of ``sesmax_core``'s top-level ``__init__`` to mirror the
-module-per-surface layout (cf. :mod:`sesmax_core.guards`).
+    monitors = [*default_monitors(), MaxSpeedMonitor(ceiling=20.0)]
 """
 
-from sesmax_core._src.monitor import (
+from sesmax_experiment._src.monitor import (
     BaseMonitor,
     ChunkInfo,
     ConservationDriftMonitor,
