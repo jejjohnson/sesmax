@@ -75,6 +75,9 @@ project:
         - file: design/shared_core.md
         - file: design/run_loop.md
         - file: design/workspace_packages.md
+        - file: design/sesmax_testing.md
+        - file: design/sesmax_param.md
+        - file: design/sesmax_experiment.md
         - file: design/ocean.md
         - file: design/numerics_wishlist.md
     - title: Project
