@@ -350,26 +350,26 @@ def partition(term: Term) -> tuple[Term | None, Term | None]:
     return explicit_part, implicit_part
 
 
-def _as_vector_field(
-    term: Term,
-    state_fn: Callable[[PyTree], PyTree] | None,
-) -> Callable[[float, PyTree, PyTree | None], PyTree]:
-    """Wrap a term as a diffrax-style ``f(t, y, args)`` vector field.
+class _TermVectorField(eqx.Module):
+    """A term as a diffrax-style ``f(t, y, args)`` vector field.
 
-    When ``state_fn`` is given it is applied to ``y`` before the term is
-    evaluated — used to enforce boundary conditions at every stage of
-    every (explicit / implicit) sub-term.
+    A pytree rather than a closure, so that a term tree built again for the next
+    call finds the compiled solve of the last one.
+
+    Args:
+        term: The term to evaluate.
+        state_fn: Applied to ``y`` before the term, to enforce boundary
+            conditions at every stage of every (explicit / implicit) sub-term,
+            or ``None``.
     """
-    if state_fn is None:
 
-        def _vf(t, y, args=None):
-            return term(t, y, args)
-    else:
+    term: Term
+    state_fn: Callable[[PyTree], PyTree] | None
 
-        def _vf(t, y, args=None):
-            return term(t, state_fn(y), args)
-
-    return _vf
+    def __call__(self, t: float, y: PyTree, args: PyTree | None = None) -> PyTree:
+        if self.state_fn is not None:
+            y = self.state_fn(y)
+        return self.term(t, y, args)
 
 
 def build_diffrax_terms(
@@ -404,13 +404,13 @@ def build_diffrax_terms(
 
     if explicit_part is not None and implicit_part is not None:
         return dfx.MultiTerm(
-            dfx.ODETerm(_as_vector_field(explicit_part, state_fn)),
-            dfx.ODETerm(_as_vector_field(implicit_part, state_fn)),
+            dfx.ODETerm(_TermVectorField(explicit_part, state_fn)),
+            dfx.ODETerm(_TermVectorField(implicit_part, state_fn)),
         )
     single = explicit_part if explicit_part is not None else implicit_part
     if single is None:
         raise ValueError("cannot build diffrax terms from an empty term")
-    return dfx.ODETerm(_as_vector_field(single, state_fn))
+    return dfx.ODETerm(_TermVectorField(single, state_fn))
 
 
 __all__ = [

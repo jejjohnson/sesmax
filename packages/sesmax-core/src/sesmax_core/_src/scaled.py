@@ -23,6 +23,7 @@ needs re-dimensionalising.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import Any
 
 import diffrax as dfx
@@ -220,6 +221,31 @@ class ScaledModel(Model):
         return cls(inner=inner, transform=transform, time_scale=1.0)
 
 
+class _RescaledVectorField(eqx.Module):
+    """A vector field in transformed coordinates, as a pytree.
+
+    A closure would be a new function in every call, and miss diffrax's compile
+    cache.
+
+    Args:
+        inner: The vector field in the inner model's coordinates.
+        transform: The affine state map.
+        time_scale: Inner time units per wrapped time unit.
+    """
+
+    inner: Callable[..., PyTree]
+    transform: StateAffine
+    time_scale: float
+
+    def __call__(self, t: float, y: PyTree, args: PyTree | None = None) -> PyTree:
+        tendency = self.inner(t * self.time_scale, self.transform.inverse(y), args)
+        return map_fields(
+            lambda d, scale: self.time_scale * d / scale,
+            tendency,
+            self.transform.scale,
+        )
+
+
 def _rescale_term(
     term: dfx.AbstractTerm,
     *,
@@ -253,15 +279,9 @@ def _rescale_term(
             )
         )
     if isinstance(term, dfx.ODETerm):
-        inner_vector_field = term.vector_field
-
-        def rescaled(t: float, y: PyTree, args: PyTree | None = None) -> PyTree:
-            tendency = inner_vector_field(t * time_scale, transform.inverse(y), args)
-            return map_fields(
-                lambda d, scale: time_scale * d / scale, tendency, transform.scale
-            )
-
-        return dfx.ODETerm(rescaled)
+        return dfx.ODETerm(
+            _RescaledVectorField(term.vector_field, transform, time_scale)
+        )
     raise TypeError(
         f"ScaledModel: cannot rescale a {type(term).__name__}. Only ODETerm "
         "and MultiTerm are supported; an affine change of variables is not a "
