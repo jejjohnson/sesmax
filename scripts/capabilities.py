@@ -116,6 +116,10 @@ ALLOWED_SHARED_NAMES: dict[str, str] = {
         "sesmax_core.testing.Diffusion2D is the test-problem model, "
         "gridax.Diffusion2D the stencil operator"
     ),
+    "kinetic_energy": (
+        "sesmax_ocean.eval.kinetic_energy is the domain integral of a state, "
+        "gridax.kinetic_energy the field at T"
+    ),
 }
 
 _AUTOREF = re.compile(r"\[([^\]]+)\]\[[^\]]*\]")

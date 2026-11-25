@@ -16,6 +16,7 @@ import pytest
 
 import sesmax
 import sesmax_core
+import sesmax_ocean
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,10 +25,11 @@ if not PACKAGES.is_dir():
     # A built distribution ships tests/ without the workspace.
     pytest.skip("packages/ is not present", allow_module_level=True)
 
-# Top-level imports each package must never make: anything above it in the
-# tiers, and somax, which sesmax replaces.
+# Top-level imports each package must never make: anything beside or above it
+# in the tiers, and somax and finitevolX, which sesmax and gridax replace.
 FORBIDDEN: dict[str, set[str]] = {
     "sesmax_core": {"sesmax", "sesmax_ocean", "sesmax_atmos", "somax"},
+    "sesmax_ocean": {"sesmax", "sesmax_atmos", "somax", "finitevolx"},
 }
 
 
@@ -92,7 +94,7 @@ def test_umbrella_holds_no_code() -> None:
     assert sesmax.__all__ == ["__version__"]
 
 
-@pytest.mark.parametrize("module", [sesmax, sesmax_core])
+@pytest.mark.parametrize("module", [sesmax, sesmax_core, sesmax_ocean])
 def test_version_matches_pyproject(module: object) -> None:
     """``__version__`` and ``pyproject.toml`` move together (release-please)."""
     name = module.__name__  # type: ignore[attr-defined]

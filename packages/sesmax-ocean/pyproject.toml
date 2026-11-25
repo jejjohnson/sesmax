@@ -1,0 +1,46 @@
+[project]
+name = "sesmax-ocean"
+version = "0.0.0"
+description = "Simple ocean models in JAX: quasi-geostrophic, shallow-water and spherical models on sesmax-core."
+authors = [
+    {name = "J. Emmanuel Johnson", email = "jemanjohnson34@gmail.com"},
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+keywords = ["jax", "equinox", "ocean", "quasi-geostrophic", "shallow water"]
+requires-python = ">=3.12"
+classifiers = [
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Natural Language :: English",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Development Status :: 2 - Pre-Alpha",
+]
+# The versions and git references are sesmax-core's, in the same form.
+dependencies = [
+    "sesmax-core",
+    "jax>=0.10.2",
+    "jaxtyping>=0.3.9",
+    "equinox>=0.13.8",
+    "paramax>=0.0.5",
+    "gridax[jax,pipekit] @ git+https://github.com/jejjohnson/gridax@gridax-v0.3.1#subdirectory=packages/gridax",
+]
+
+[project.urls]
+Repository = "https://github.com/jejjohnson/sesmax"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sesmax_ocean"]
+
+[tool.uv.sources]
+gridax = { git = "https://github.com/jejjohnson/gridax", tag = "gridax-v0.3.1", subdirectory = "packages/gridax" }

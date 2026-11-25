@@ -16,7 +16,7 @@ Each distribution lives in `packages/<dist>/` with its own `pyproject.toml`, `sr
 |---|---|---|---|---|
 | — | `sesmax` | `sesmax` | code-free umbrella that installs the packages | scaffolded |
 | 2 | `sesmax-couple` | `sesmax_couple` | flux exchange, regridding, coupled runs | later |
-| 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, ocean diagnostics, scenarios | phase C2 |
+| 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, their resolution checks, metrics and forcing presets | moving from somax (#152) |
 | 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, monitors, I/O, test problems | moved from somax; first release 0.1.0 |
 
 The public API of each package is its top-level `__all__`, plus its public submodules.
@@ -75,6 +75,7 @@ find out whether it exists:
 | A check on a factory's arguments, or a Burger number from a Froude number | `sesmax_core.validation`; `resolve_burger`, `burger_to_g_prime` (`sesmax_core.gfd`) |
 | A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_core.monitor` |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
+| A check that the grid resolves a boundary layer or a deformation radius, or a metric of an ocean state | `sesmax_ocean.resolution`, `sesmax_ocean.eval` |
 
 ## The contracts
 

@@ -4,6 +4,7 @@ Each workspace package is imported by its own name. Everything listed in a packa
 
 ```python
 import sesmax_core
+import sesmax_ocean
 ```
 
 The [capability index](capabilities.md) lists every public name on one page, with a one-line summary each.
@@ -31,6 +32,14 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Fields](fields.md) | `each`, `map_fields`, `placed`, `values`, `is_field` |
 | [Validation](validation.md) | `require_positive`, `require_non_negative`, `reject_derived_kwargs` |
 | [Test problems](testing.md) | `Lorenz63`, `Lorenz96`, `Lorenz96t`; `LinearConvection1D`, `NonlinearConvection1D`, `Diffusion1D`, `Burgers1D` and their 2D versions; `Burgers2DTermModel`, `Burgers2DOp`; `IncompressibleNS2D`; `PoissonSolver2D`, `LaplaceSolver2D`, `HelmholtzSolver2D`; `LinearShallowWater1D`, `NonlinearShallowWater1D`, `LinearShallowWater2D`, `LinearSWM2DTermModel` and its terms; `gravity_wave_1d`, `inertial_oscillation_1d`, `geostrophic_adjustment_2d`; and their state, parameter and diagnostic classes |
+
+### sesmax-ocean
+
+| Page | Contents |
+|---|---|
+| [Resolution checks](ocean_resolution.md) | `check_munk_width`, `check_stommel_width`, `check_deformation_radius`, `check_equatorial_deformation_radius`, `AssertionFailedError` |
+| [Metrics](ocean_eval.md) | `rms_divergence`, `total_enstrophy`, `kinetic_energy`, `geostrophic_imbalance`, `qg_balance_residual`, `compute_eval_metrics` |
+| [Forcing presets](ocean_forcing.md) | `ssh_geostrophic`, `sss_coastal`, `sst_frontal`, `geostrophic_currents` |
 
 ## Package overview
 

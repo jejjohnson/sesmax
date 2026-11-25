@@ -1,7 +1,7 @@
 """sesmax: simple Earth-system models in JAX.
 
 A code-free umbrella: installing ``sesmax`` installs the workspace's
-packages, which are imported by their own names (``sesmax_core``, and later
+packages, which are imported by their own names (``sesmax_core``,
 ``sesmax_ocean``).
 """
 

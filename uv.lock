@@ -17,6 +17,7 @@ resolution-markers = [
 members = [
     "sesmax",
     "sesmax-core",
+    "sesmax-ocean",
     "sesmax-workspace",
 ]
 overrides = [
@@ -2806,10 +2807,14 @@ version = "0.0.0"
 source = { editable = "packages/sesmax" }
 dependencies = [
     { name = "sesmax-core" },
+    { name = "sesmax-ocean" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "sesmax-core", editable = "packages/sesmax-core" }]
+requires-dist = [
+    { name = "sesmax-core", editable = "packages/sesmax-core" },
+    { name = "sesmax-ocean", editable = "packages/sesmax-ocean" },
+]
 
 [[package]]
 name = "sesmax-core"
@@ -2886,6 +2891,29 @@ requires-dist = [
 provides-extras = ["da", "flows", "xarray", "checkpoint"]
 
 [[package]]
+name = "sesmax-ocean"
+version = "0.0.0"
+source = { editable = "packages/sesmax-ocean" }
+dependencies = [
+    { name = "equinox" },
+    { name = "gridax", extra = ["jax", "pipekit"] },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "paramax" },
+    { name = "sesmax-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "equinox", specifier = ">=0.13.8" },
+    { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.1" },
+    { name = "jax", specifier = ">=0.10.2" },
+    { name = "jaxtyping", specifier = ">=0.3.9" },
+    { name = "paramax", specifier = ">=0.0.5" },
+    { name = "sesmax-core", editable = "packages/sesmax-core" },
+]
+
+[[package]]
 name = "sesmax-workspace"
 version = "0.0.0"
 source = { editable = "." }
@@ -2898,6 +2926,7 @@ dev = [
     { name = "pytest-xdist" },
     { name = "sesmax" },
     { name = "sesmax-core", extra = ["checkpoint", "da", "flows", "xarray"] },
+    { name = "sesmax-ocean" },
 ]
 docs = [
     { name = "ipykernel" },
@@ -2927,6 +2956,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "sesmax", editable = "packages/sesmax" },
     { name = "sesmax-core", extras = ["da", "flows", "xarray", "checkpoint"], editable = "packages/sesmax-core" },
+    { name = "sesmax-ocean", editable = "packages/sesmax-ocean" },
 ]
 docs = [
     { name = "ipykernel", specifier = ">=7.3.0" },

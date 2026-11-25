@@ -23,11 +23,11 @@ This package holds no code. It installs the packages of the [sesmax workspace](h
 | Package | Import | Holds | Status |
 |---|---|---|---|
 | [`sesmax-core`](../sesmax-core/README.md) | `sesmax_core` | states, terms, forcing, rescaling, rollouts and assimilation adapters | released |
-| `sesmax-ocean` | `sesmax_ocean` | shallow-water, QG and spherical ocean models | planned |
+| [`sesmax-ocean`](../sesmax-ocean/README.md) | `sesmax_ocean` | shallow-water, QG and spherical ocean models | moving from somax |
 
 ## 📥 Install
 
-The package is not on PyPI, and a plain `pip install` from git cannot see `sesmax-core` in the workspace beside it. So install it from a clone, with [uv](https://docs.astral.sh/uv/):
+The package is not on PyPI, and a plain `pip install` from git cannot see the packages in the workspace beside it. So install it from a clone, with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 git clone https://github.com/jejjohnson/sesmax.git
