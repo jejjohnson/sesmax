@@ -26,7 +26,16 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
 
-from somax_reference import CASES, N_STEPS, SHALLOW_WATER, SIZE, island
+from somax_reference import (
+    CASES,
+    HALF_CELL,
+    LAT_RANGE,
+    N_STEPS,
+    SHALLOW_WATER,
+    SIZE,
+    SPHERICAL,
+    island,
+)
 
 
 SHAPE = (SIZE["ny"] + 2, SIZE["nx"] + 2)
@@ -148,6 +157,41 @@ def shallow_water(family: str) -> Arrays:
     return out
 
 
+def spherical(family: str) -> Arrays:
+    """One of the models on the sphere, from random fields."""
+    from somax._src.models.spherical import (
+        SphericalQG,
+        SphericalQGState,
+        SphericalSWM,
+        SphericalSWMState,
+    )
+
+    kwargs, dt = CASES[family]
+    lat_range = tuple(lat + HALF_CELL for lat in LAT_RANGE)
+    out: Arrays = {}
+    for case, (scheme, has_island) in SPHERICAL[family].items():
+        rng = np.random.default_rng(0)
+        mask = masks()["island"] if has_island else None
+        wet_t, wet_u, wet_v = wet(mask)
+        if family == "spherical_qg":
+            model_class = SphericalQG
+            state = SphericalQGState(
+                q=jnp.asarray(1e-5 * rng.normal(size=SHAPE) * wet_t)
+            )
+        else:
+            model_class = SphericalSWM
+            state = SphericalSWMState(
+                h=jnp.asarray(1000.0 + rng.normal(size=SHAPE)),
+                u=jnp.asarray(0.1 * rng.normal(size=SHAPE) * wet_u),
+                v=jnp.asarray(0.1 * rng.normal(size=SHAPE) * wet_v),
+            )
+        model = model_class.create(
+            **SIZE, **kwargs, lat_range=lat_range, method=scheme, mask=mask
+        )
+        integrate(out, case, model, state, dt)
+    return out
+
+
 FAMILIES: dict[str, Callable[[], Arrays]] = {
     "eval": eval_metrics,
     "barotropic_qg": partial(quasi_geostrophic, "barotropic_qg"),
@@ -155,6 +199,8 @@ FAMILIES: dict[str, Callable[[], Arrays]] = {
     "nonlinear_sw": partial(shallow_water, "nonlinear_sw"),
     "multilayer_sw": partial(shallow_water, "multilayer_sw"),
     "reparameterized_qg": partial(shallow_water, "reparameterized_qg"),
+    "spherical_sw": partial(spherical, "spherical_sw"),
+    "spherical_qg": partial(spherical, "spherical_qg"),
 }
 
 

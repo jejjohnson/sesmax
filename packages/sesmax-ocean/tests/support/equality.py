@@ -7,6 +7,8 @@ environment, because this module imports sesmax.
 from __future__ import annotations
 
 import dataclasses
+from collections.abc import Mapping
+from types import MappingProxyType
 from typing import Any
 
 import diffrax as dfx
@@ -90,6 +92,7 @@ def assert_reproduces_somax(
     case: str,
     *,
     rtol: float = RTOL,
+    factors: Mapping[str, float] = MappingProxyType({}),
 ) -> None:
     """The boundary conditions, the tendency, the end state, the diagnostics agree.
 
@@ -100,6 +103,8 @@ def assert_reproduces_somax(
         family: A family of `CASES`.
         case: One of its cases.
         rtol: The relative difference allowed over the interior.
+        factors: What to multiply somax's value of a diagnostic by, where the two
+            differ by a known factor.
     """
     expected = load(family)[case]
     got = _run(model, given, state, CASES[family][1])
@@ -110,7 +115,7 @@ def assert_reproduces_somax(
         for field in dataclasses.fields(tree):
             assert_equal_to_somax(
                 values(getattr(tree, field.name)),
-                expected[kind][field.name],
+                expected[kind][field.name] * factors.get(field.name, 1.0),
                 f"{family}/{case}/{kind}/{field.name}",
                 rtol=rtol,
             )

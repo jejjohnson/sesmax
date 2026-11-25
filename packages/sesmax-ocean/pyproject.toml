@@ -27,7 +27,9 @@ dependencies = [
     "equinox>=0.13.8",
     "paramax>=0.0.5",
     "gridax[jax,pipekit] @ git+https://github.com/jejjohnson/gridax@gridax-v0.3.1#subdirectory=packages/gridax",
-    # The Coriolis parameter of the beta-plane.
+    # The elliptic inversion on the sphere.
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.8.1",
+    # The Coriolis parameter of the beta-plane, the radius of the Earth.
     "geophysix @ git+https://github.com/jejjohnson/geophysix@v0.0.7",
 ]
 

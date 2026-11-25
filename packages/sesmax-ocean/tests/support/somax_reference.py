@@ -8,6 +8,7 @@ nothing of sesmax.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -25,6 +26,18 @@ RTOL = 1e-12
 SIZE = {"nx": 16, "ny": 12}
 #: Steps of the Heun scheme from ``init`` to ``end``.
 N_STEPS = 20
+#: somax's radius (m) and rotation rate (1/s) of the Earth; sesmax-ocean takes
+#: geophysix's.
+RADIUS = 6_371_200.0
+OMEGA = 2.0 * math.pi / 86_164.0
+#: The band of the models on the sphere (degrees). finitevolX puts the T rows
+#: half a cell too far south (gridax#433), so somax runs half a cell further
+#: north.
+LAT_RANGE = (-60.0, 60.0)
+HALF_CELL = 0.5 * (LAT_RANGE[1] - LAT_RANGE[0]) / SIZE["ny"]
+#: finitevolX's cell areas are ``R² cos φ Δλ Δφ``; the exact ones that gridax has
+#: are smaller by this factor, everywhere.
+EXACT_AREA = math.sin(math.radians(HALF_CELL)) / math.radians(HALF_CELL)
 #: ``family -> (arguments of create, time step)``.
 CASES: dict[str, tuple[dict[str, Any], float]] = {
     "eval": ({"Lx": 1e6, "Ly": 8e5, "beta": 1e-11, "bc": "wall"}, 0.0),
@@ -79,6 +92,41 @@ CASES: dict[str, tuple[dict[str, Any], float]] = {
         },
         60.0,
     ),
+    "spherical_sw": (
+        {
+            "radius": RADIUS,
+            "omega": OMEGA,
+            "lateral_viscosity": 1e4,
+            "bottom_drag": 1e-6,
+            "wind_amplitude": 1e-6,
+        },
+        300.0,
+    ),
+    "spherical_qg": (
+        {
+            "radius": RADIUS,
+            "omega": OMEGA,
+            "lateral_viscosity": 1e4,
+            "bottom_drag": 1e-6,
+            "wind_amplitude": 1e-12,
+            "cg_tol": 1e-12,
+        },
+        600.0,
+    ),
+}
+
+#: ``family -> case -> (scheme, island)`` of the models on the sphere.
+SPHERICAL: dict[str, dict[str, tuple[str, bool]]] = {
+    "spherical_sw": {
+        "band-upwind1": ("upwind1", False),
+        "band-weno5": ("weno5", False),
+        "island-upwind1": ("upwind1", True),
+        "island-weno5": ("weno5", True),
+    },
+    "spherical_qg": {
+        "band-upwind1": ("upwind1", False),
+        "island-upwind1": ("upwind1", True),
+    },
 }
 
 #: ``family -> case -> (bc, scheme, island)`` of the shallow-water models; a
