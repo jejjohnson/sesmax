@@ -21,7 +21,8 @@ Proposed: one package, `sesmax-experiment`, is where a model is used. It has two
 Decided by the owner: the package covers simulation, parameter estimation, state estimation, bilevel problems and monitoring, and the monitors move to it.
 Recommended for what is open: the problem says what is unknown, and one verb, `estimate`, covers states, parameters and forcing.
 Alternative: one function per kind of estimation, which reads well until someone wants two unknowns at once.
-Status: proposed, for review. The numbers are from a scratch prototype. The work half is step W6 of [the workspace packages](workspace_packages.md) and waits for `sesmax-param`; the run half (W3) does not wait for anything here.
+Also decided, on 25 November: an experiment holds no default priors. Those of a parameterization sit in `sesmax-param`, and those of a model in its component.
+Status: proposed, for review. The numbers are from a scratch prototype. The run half (W3) is under way: the package, the monitors and the runs in chunks are merged (sesmax#197, sesmax#198). The work half is step W6 of [the workspace packages](workspace_packages.md) and waits for `sesmax-param`.
 
 ## Motivation
 
@@ -162,8 +163,8 @@ Until sesmax#196, `Model.integrate` compiled again on every call. A problem buil
 
 ```mermaid
 flowchart LR
-    param["sesmax-param<br/>terms with priors"] --> problem
-    model["model and state"] --> problem
+    param["sesmax-param<br/>terms with their priors"] --> problem
+    model["component<br/>model, state and their priors"] --> problem
     obs["observations and h"] --> problem
     problem["Problem<br/>unknowns, window, cost"] --> verb
     subgraph verb["verbs"]
@@ -218,8 +219,8 @@ class Problem(eqx.Module):
     𝒥(z; ν) = ½ ‖z − μ_z‖²_(Σ_z⁻¹) + ½ ∑ₜ ‖y_t − h(x_t(z))‖²_(Σ_ε⁻¹)
 
     ``unknowns`` maps a path to its prior: "state", "params.F", a path in the
-    terms of the model. What is not listed is fixed. The priors of
-    ``sesmax_param.priors(model)`` are used where ``unknowns`` is None.
+    terms of the model. What is not listed is fixed. Where ``unknowns`` is None,
+    it is ``priors(model, state)``, all that the packages below declare.
     """
 
     model: Model
@@ -241,6 +242,26 @@ class Problem(eqx.Module):
     # 𝒥(ω)
     def cost(self, white: Float[Array, " control"]) -> Float[Array, ""]: ...
 ```
+
+The default priors come from the packages that own them, and this function only merges them.
+
+```python
+# proposed (sesmax-core): one more field of Component, which is today (sesmax-core)
+# the priors of a model's state and of its own parameters, by path
+priors: Callable[[Model, PyTree], Mapping[str, Any]] | None = None
+
+
+# proposed (sesmax-ocean): what its Component registers
+# x_0 ~ 𝒩(μ_x, σ_x²) per field, and the layer depths
+def ocean_priors(model: Model, background: PyTree) -> dict[str, Gaussian]: ...
+
+
+# proposed (sesmax-experiment)
+# the component's priors, and those of the terms from sesmax_param.priors
+def priors(model: Model, state: PyTree) -> dict[str, Gaussian]: ...
+```
+
+An entry of `unknowns` replaces the default of the same path, for one run.
 
 The control of a `Problem` is a flat vector, and that is what every method in the stack takes. `unwhiten` gives it back as named pieces.
 
@@ -352,7 +373,7 @@ class TwinResult(eqx.Module):
 
 ### The run half
 
-[The run-loop design](run_loop.md) holds `run_chunks`, `RunSpec`, `simulate`, `spinup`, `restart`, checkpoints, the health record and the command line, with the monitors moved from the core. The package page adds two things for this half: `simulate` of a spec and `simulate` of a `Problem` are the same verb on different inputs, and a `Result` writes the same record as a run, so a cost history and a health record share a reader.
+[The run-loop design](run_loop.md) holds `run_chunks`, `RunSpec`, `simulate`, `spinup`, `restart`, checkpoints, the health record and the command line. The monitors, the checkpointer and `run_chunks` are merged. This page adds two things for this half: `simulate` of a spec and `simulate` of a `Problem` are the same verb on different inputs, and a `Result` writes the same record as a run, so a cost history and a health record share a reader.
 
 ### What it does not own
 
@@ -362,7 +383,8 @@ class TwinResult(eqx.Module):
 | Variational costs, their adjoints | vardax |
 | Filters, smoothers, ensemble processes | filterax |
 | Cycles, protocols | pipekit-cycle |
-| Priors and their terms | `sesmax-param` |
+| Priors of parameterizations, forcing, model error | `sesmax-param` |
+| Priors of a model's state and own parameters | the component |
 | Training an emulator or an amortised map | pipekit-train |
 | Scores against other methods | geobench |
 
@@ -458,10 +480,16 @@ print(report.rmse, report.prior_rmse)
 ### Watch a run
 
 ```python
-# today (sesmax-core); it moves to sesmax_experiment.monitor
+from sesmax_experiment.monitor import ConservationDriftMonitor, NonFiniteMonitor
+from sesmax_experiment.run import Timeline, run_chunks
+
+# today (sesmax-experiment)
 monitors = [NonFiniteMonitor(), ConservationDriftMonitor(rtol_fail=1e-6)]
-# proposed (sesmax-experiment, sesmax#189)
-final = sxe.run_chunks(model, state, chunks, monitors=monitors)
+# today (sesmax-experiment)
+# chunks of 0.25 to t = 1, a snapshot every 0.5
+timeline = Timeline.build(0.0, 1.0, chunk=0.25, snapshot=0.5)
+# today (sesmax-experiment)
+run = run_chunks(model, state, timeline, dt=0.01, monitors=monitors)
 ```
 
 ## The prototype
@@ -500,9 +528,9 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 
 | Step | Pull request | Gate |
 | --- | --- | --- |
-| E0 | the run half: epic sesmax#186 | [the run-loop design](run_loop.md) |
+| E0 | the rest of the run half: epic sesmax#186 | [the run-loop design](run_loop.md) |
 | E1 | `rollout` and `rollout_loss` take an `adjoint` | Levenberg–Marquardt and the implicit gradient run, as tests |
-| E2 | `Window`, `Observations`, `Problem`, `Result`, `simulate`, `estimate` with `Minimise` | the four-row table, as tests; the README quickstart of the core gives the same numbers |
+| E2 | `Component.priors`, `priors`, `Window`, `Observations`, `Problem`, `Result`, `simulate`, `estimate` with `Minimise` | the four-row table, as tests; the README quickstart of the core gives the same numbers |
 | E3 | `LeastSquares`, `Ensemble`, `Variational` | one problem, three methods, a documented difference |
 | E4 | `twin`, and the diagnostics of a `Result` | the truth lies within the stated spread on a seeded twin |
 | E5 | `bilevel` | the gradient against a finite difference, to 1 % |
@@ -541,4 +569,4 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 - Part of: [the workspace packages](workspace_packages.md), steps W3 (run) and W6 (work)
 - Depends on: [the run-loop design](run_loop.md), [sesmax-param](sesmax_param.md) for priors
 - Uses: the horizon of [sesmax-testing](sesmax_testing.md)
-- Issues: sesmax#186, sesmax#187, sesmax#15
+- Issues: sesmax#186, sesmax#15

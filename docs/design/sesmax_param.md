@@ -18,8 +18,9 @@ keywords:
 
 Proposed: one package, `sesmax-param`, holds every term of a right-hand side whose form is ours to choose: parameterizations, forcing and model error. Each is a `Term` of the core, and each can carry a prior on what is unknown in it.
 Decided by the owner on 25 November: the package exists, it is called "param", model error belongs in it as a forcing in tendency units, and it comes after the ocean models are ported.
-Recommended for what is open: the prior of a parameter sits on its leaf in the model (SP-4).
-Alternative: a dictionary of priors by path in each experiment, which keeps the model clean and repeats the paths.
+Also decided: the prior of a parameterization sits here, with the parameterization, and the prior of a model (its state, its own parameters) sits in the model's package. An experiment holds no default priors.
+Recommended for what is open: a prior here is attached to its leaf (SP-4).
+Alternative: a `priors()` method on each term, which leaves the leaves plain and writes each name twice.
 Status: proposed, for review. The numbers below are from a scratch prototype; the package is not started. It is step W5 of [the workspace packages](workspace_packages.md).
 
 ## Motivation
@@ -285,7 +286,19 @@ class LearnedViscosity(Parameterization):
 
 ### The priors
 
-A prior is stated where the parameter is made, and `priors` collects them.
+Each prior is owned by the package that owns what it describes.
+
+| Prior of | Owner | Example |
+| --- | --- | --- |
+| a parameterization's parameters | `sesmax-param` | a drag coefficient, a Smagorinsky constant, network weights |
+| a forcing's coefficients | `sesmax-param` | the wind modes |
+| a model error | `sesmax-param` | a bias pattern |
+| a model's state | the component | the background of sea-surface height and its spread |
+| a model's own parameters | the component | layer depths, stratification |
+
+An experiment reads both and may replace any of them for one run. The component's priors reach it through `Component`, the registration type in the core, so `sesmax-experiment` still names no component; [its page](sesmax_experiment.md) has the sketch. `Gaussian` is defined here, below the components, so that they can use it.
+
+A prior is stated where the parameter is made, and `priors` collects those of the terms.
 
 ```python
 # proposed (sesmax-param)
@@ -462,6 +475,7 @@ Not covered: an SDE, located fields, Leith and Gent–McWilliams, masks and coas
 | The slot for a term or a forcing | `sesmax-core` |
 | Bulk fluxes between components | `sesmax-couple` |
 | Turbulence closures of plumes | plumax |
+| The priors of a model's state and own parameters | the component, such as `sesmax-ocean` |
 | Fitting any of it | [`sesmax-experiment`](sesmax_experiment.md) |
 | Minimisers, filters | argminax, vardax, filterax |
 | Regridding a wind product | `sesmax-ocean`, and functax |
@@ -487,11 +501,11 @@ The core's readme names forcing as one of its five uses, its quickstart inverts 
 | SP-1 | Units of a model-error prior | a tendency, converted for vardax (agreed 25 November) | state increments, as vardax has them |
 | SP-2 | White-noise error in the package | no: a filter or an SDE draws it, `Q` is a field of the method | a `WhiteNoise` term with a diffrax SDE path |
 | SP-3 | Noise that scales with a parameterization | left out until a user needs it | a perturbed parameter or tendency scheme ([Berner et al., 2017](https://doi.org/10.1175/BAMS-D-15-00268.1)) |
-| SP-4 | Where does a prior live? | on the leaf, read by `priors` | in the problem of the experiment, by path |
+| SP-4 | How is a prior attached here? (the owner is settled) | to the leaf, read by `priors` | a `priors()` method on each term |
 | SP-5 | Basis class | ours, with an adapter | vardax's `ModelErrorBasis` for both |
 | SP-6 | A networks dependency | none: `LearnedViscosity` takes any callable | geonnax |
 
-SP-4 matters most. A prior on a leaf means a parameter and its uncertainty travel together in the model's pytree, and it has to survive `jit`, `tree_at` and an optimiser's partition. The alternative leaves the model clean and repeats the paths in each experiment. I would try the first in P3 and fall back to the second if it does not.
+SP-4 is about the mechanism only. A prior on a leaf means a parameter and its uncertainty travel together in the pytree, and it has to survive `jit`, `tree_at` and an optimiser's partition. I would try that in P3 and fall back to the method if it does not.
 
 ## References
 

@@ -2,7 +2,7 @@
 title: "sesmax-testing: is the model right?"
 subtitle: "Design · the toy models, and the checks that run on every model"
 short_title: sesmax-testing
-description: "Design of sesmax-testing: motivation, user stories, the maths and the numerics of seven checks on a dynamical model, a proposed API with examples, and a prototype that finds the two defects somax's own tests missed."
+description: "Design of sesmax-testing: motivation, user stories, the maths and the numerics of the checks on a dynamical model, a proposed API with examples, and a prototype that finds the two defects somax's own tests missed."
 date: 2026-11-25
 keywords:
   - sesmax
@@ -29,11 +29,18 @@ The tests missed them for an ordinary reason. The mass test started from a nearl
 
 The two tests which do find them are now in `sesmax-ocean` (`tests/swm/test_conservation.py` and `test_shift.py`). They are written for three models by name, they know the fields `h`, `u` and `v`, and the next component would write them again. The gradient check is an open issue (sesmax#105), and the adjoint identity is checked nowhere, although every assimilation method in the stack relies on it.
 
+Three more defects came out on 25 November, once the models were ported.
+
+- The Coriolis term was halved beside two of the four walls (sesmax#173).
+- A run between walls returned a state with a flow through two of them, up to 45 m/s where the flow inside was below 1 m/s (sesmax#183).
+- The equality tests with an island had no land, because the mask they built was all water (sesmax#180).
+
 So the checks exist as ideas, as copies and as issues, and what is missing is one place for them.
 
 ## User stories
 
 - As a **model author**, I want to hand my model and a random state to a list of checks, so that I learn within a minute whether the stencils near the edges are right.
+- As someone **reading a run from disk**, I want the state on disk to satisfy its own boundary conditions, so that a diagnostic near the wall means something.
 - As someone **running 4D-Var**, I want the adjoint identity and the Taylor test on my model over my window, so that I know the gradient means something before I blame the minimiser.
 - As someone **choosing a window length**, I want the horizon over which the gradient agrees with finite differences, so that I do not pick a window where it says nothing.
 - As a **reviewer** of a refactor, I want the numbers of a stored run as a check, so that "no change in behaviour" is a measurement.
@@ -63,6 +70,16 @@ f(\mathbf{S} \mathbf{x}) = \mathbf{S} f(\mathbf{x})
 ```
 
 A wrong ghost cell breaks this, because the edge of the box moves relative to the state. It is a metamorphic test, which needs no known solution ([Claessen and Hughes, 2000](https://doi.org/10.1145/351240.351266) is the general idea). The same form covers a reflection, a rotation by 90°, or a Galilean shift, with another $\mathbf{S}$.
+
+### Boundary
+
+Write $\mathcal{B}$ for the map that applies the boundary conditions, which is a projection. What a run returns must be a fixed point of it:
+
+```math
+\mathcal{B}[m(\mathbf{x})] = m(\mathbf{x})
+```
+
+On a C-grid this has two parts. The wall faces are part of the state, and the velocity through them is zero. The ghost ring is not part of the state, and it is filled from the interior. The check reports them apart.
 
 ### Gradient
 
@@ -126,7 +143,10 @@ A sum of $n$ terms of mixed sign leaves a relative error near $n^{1/2}$ times th
 The state has to be random in every field and in every cell. A smooth or balanced state hides a wrong stencil behind a small tendency, and a state at rest hides everything.
 
 **Ghost cells.**
-The comparison is on the interior. The ghost ring of a tendency is not defined, and the checks fill the ghosts of the state with `apply_boundary_conditions` first.
+The comparison is on the interior. The ghost ring of a tendency is not defined, and the checks fill the ghosts of the state with `apply_boundary_conditions` first. Only the boundary check reads the ghosts, since they are what it is about.
+
+**The mask.**
+A masked case needs land, and a Boolean field given to `Mask2D.from_center` has none, as that function looks for NaN. So a `Case` with a mask raises unless at least one interior cell is dry.
 
 **Two adjoints.**
 diffrax's default `RecursiveCheckpointAdjoint` supports reverse mode only, so the forward side of the adjoint check needs `adjoint=dfx.DirectAdjoint()`. The check therefore compares two differentiation paths, and both are used in the stack (strong 4D-Var takes the first, the incremental form takes the second).
@@ -155,7 +175,7 @@ flowchart LR
 | Rung | Name | Job |
 | --- | --- | --- |
 | structure | `Case`, `Report` | what is checked, what was found |
-| primitive | `conservation`, `translation`, `gradient`, `adjoint`, `convergence`, `reference`, `contract`, `horizon` | one property each |
+| primitive | `conservation`, `translation`, `boundary`, `gradient`, `adjoint`, `convergence`, `reference`, `contract`, `horizon` | one property each |
 | model | the toys | something to check, or to learn on |
 | recipe | `check_all` | every check that applies to a case |
 
@@ -179,6 +199,8 @@ class Case(eqx.Module):
     invariants: Mapping[str, Callable[[Model, PyTree], Float[Array, ""]]] = ...
     # the axes along which the box repeats, empty with walls
     periodic: tuple[str, ...] = eqx.field(static=True, default=())
+    # the land, which must hold at least one dry interior cell
+    mask: Mask2D | None = None
     # the order of the scheme in time, None to skip convergence
     order: int | None = eqx.field(static=True, default=None)
 ```
@@ -211,6 +233,11 @@ def conservation(case: Case, *, rtol: float = 1e-14) -> tuple[Report, ...]: ...
 # proposed (sesmax-testing)
 # max |f(S x) − S f(x)| / max |f(x)|
 def translation(case: Case, *, shift: int = 5, rtol: float = 1e-13) -> Report: ...
+
+
+# proposed (sesmax-testing)
+# max |m(x) − B m(x)| / max |B m(x)|, on the wall faces and on the ghost ring
+def boundary(case: Case, *, rtol: float = 1e-14) -> tuple[Report, Report]: ...
 
 
 # proposed (sesmax-testing)
@@ -347,6 +374,16 @@ Every number below is from a scratch run on 25 November 2026, in float64, at ses
 
 The bound of 1e-14 sits eleven orders of magnitude below the defect and three above round-off, so nothing has to be tuned. The same formula with the energy gives 6.2e-18 on the linear toy, and 4.5e-03 once it has bottom drag, so it says when a functional is not an invariant.
 
+**Boundary finds the wall defect, and one more.** The relative difference between the state a run returns and the same state with its boundary conditions, after 20 steps from a random state between walls (12 for the toy). The last column is sesmax `80a50fb`, where sesmax#184 is merged.
+
+| Model | Wall faces, `5c998e6` | Ghost ring, `5c998e6` | Wall faces, `80a50fb` |
+| --- | --- | --- | --- |
+| Nonlinear shallow water | 2.4e-02 | 1.2 | 0 |
+| Multilayer, 3 layers | 3.7e-02 | 0.83 | 0 |
+| Linear toy | 0.24 | 1.3 | 0.24 |
+
+The ghost ring is the open sesmax#185, and the same size today. The last row is new: `LinearShallowWater2D` with walls has the defect of sesmax#183, and nobody has reported it.
+
 **Adjoint and gradient.** Twelve steps of 600 s for shallow water on 16 × 16 cells, twenty of 0.01 for Lorenz-96 with 40 variables.
 
 | Model | Adjoint identity | Slopes of the Taylor test |
@@ -386,7 +423,7 @@ Not covered: float32, located fields, a masked domain in the adjoint check, manu
 | Step | Pull request | Gate |
 | --- | --- | --- |
 | T1 | the package, with the toys and their twelve test files | the moved tests and 22 notebooks change imports only |
-| T2 | `Case`, `Report`, `conservation`, `translation`, `contract`, `reference` | the table above, as tests; the copies in `sesmax-ocean` are deleted |
+| T2 | `Case`, `Report`, `conservation`, `translation`, `boundary`, `contract`, `reference` | the tables above, as tests; the copies in `sesmax-ocean` are deleted; the wall faces of the linear toy fixed |
 | T3 | `adjoint`, `gradient`, `convergence`, `horizon` (closes sesmax#105) | every public term and toy has a gradient check |
 | T4 | a guide page on choosing a window, from `horizon` | the table of horizons is printed by its notebook |
 
@@ -418,4 +455,4 @@ The core's own tests take `sesmax-testing` from the development group. 15 of its
 - Part of: [the workspace packages](workspace_packages.md), step W2
 - Uses the findings of: [the ocean plan](ocean.md)
 - Used by: [sesmax-param](sesmax_param.md), [sesmax-experiment](sesmax_experiment.md)
-- Issues: sesmax#105, sesmax#107, sesmax#145
+- Issues: sesmax#105, sesmax#107, sesmax#145, sesmax#173, sesmax#183, sesmax#185

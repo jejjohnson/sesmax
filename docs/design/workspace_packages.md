@@ -26,7 +26,7 @@ numbering:
 Proposed: give the workspace five kinds of package. `sesmax-core` holds the contracts, `sesmax-param` the parametric part of a model (parameterizations, forcing and model error), each component of the Earth system is a package of models, `sesmax-testing` says whether a model is right, and `sesmax-experiment` is where models are used: simulation, parameter estimation, state estimation, bilevel problems and monitoring.
 Benchmarks, which say whether a model is good, live in the planned geobench repository.
 Alternative: keep one core and add modules to it as needed (`sesmax_core.testing`, `sesmax_core.sim`), which is fewer releases, but the core then carries every toy and every workflow to anyone who only wants the model contract.
-Status: proposed, for review. The ocean models of W1 are merged (sesmax#152); the rest is not started. The owner has settled five points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, and the ocean models come before the split (25 November).
+Status: proposed, for review. The ocean models of W1 are merged (sesmax#152), and so is the start of W3 (sesmax#197, sesmax#198); the rest is not started. The owner has settled six points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, the ocean models come before the split, and a prior sits with what it describes, so those of parameterizations in param and those of models in their component (25 November).
 
 Each new package has its own design page, with the motivation, the maths, the numerics, the API, examples and a prototype: [sesmax-testing](sesmax_testing.md), [sesmax-param](sesmax_param.md) and [sesmax-experiment](sesmax_experiment.md). This page says what the packages are and how they depend on each other.
 
@@ -208,7 +208,7 @@ where the inner estimate is
 
 It owns no method. Every algorithm in the table above already has a home, and the package holds what is missing between them.
 
-- **The problem.** One object says which leaves of a model, a state and a forcing are unknown, and reads the priors that `sesmax-param` put on them. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
+- **The problem.** One object says which leaves of a model, a state and a forcing are unknown, and reads the priors that `sesmax-param` and the component put on them. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
 - **The work.** A thin function per row that takes a problem, hands it to a method and returns the estimate with a record.
 - **The run.** The chunk loop, checkpoints, restarts, run specs, artifacts and the command line of [the run-loop design](run_loop.md), which become the simulation part of this package.
 - **The monitoring.** The monitors of a run, and the statistics of an analysis (innovations, spread against skill) with the same verdict and the same record.
