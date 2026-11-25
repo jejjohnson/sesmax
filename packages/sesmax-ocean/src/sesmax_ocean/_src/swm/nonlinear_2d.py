@@ -35,7 +35,16 @@ from sesmax_core.validation import (
     require_non_negative,
     require_positive,
 )
-from sesmax_ocean._src.swm._shared import BCS, UPWIND, WRAPS, fill_box, wrap
+from sesmax_ocean._src.swm._shared import (
+    BCS,
+    UPWIND,
+    WALLS,
+    WRAPS,
+    FreeSlip,
+    fill_box,
+    velocity_laplacian,
+    wrap,
+)
 
 
 class NonlinearSW2DState(State):
@@ -135,6 +144,7 @@ class NonlinearShallowWater2D(Model):
         ops: gridax's operations on the grid and the mask.
         mask: Optional Arakawa C-grid mask (``None`` = all-ocean).
         f_field: Precomputed Coriolis field f(y).
+        free_slip: The potential vorticity on the walls and coasts.
         wind_stress_x: Precomputed x-wind stress pattern (normalised).
         wind_stress_y: Precomputed y-wind stress pattern (normalised).
         bc_type: Boundary condition type.
@@ -147,6 +157,7 @@ class NonlinearShallowWater2D(Model):
     ops: GridOps
     mask: Mask2D | None
     f_field: Float[Array, "Ny Nx"]
+    free_slip: FreeSlip
     wind_stress_x: Float[Array, "Ny Nx"]
     wind_stress_y: Float[Array, "Ny Nx"]
     bc_type: str = eqx.field(static=True, default="periodic")
@@ -156,9 +167,22 @@ class NonlinearShallowWater2D(Model):
         """``field`` with its ghosts filled on the periodic faces."""
         return wrap(field, self.grid, WRAPS[self.bc_type], at)
 
+    def _potential_vorticity(self, u: Any, v: Any, h: Any) -> Any:
+        """``(zeta + f) / h`` at X-points, with ``f / h`` on walls and coasts."""
+        q = self.ops.sw_potential_vorticity(u, v, h, placed(self.f_field, h, "T"))
+        q = each(lambda array: self.free_slip(array, values(h)), q)
+        return self._wrap(q, "X")
+
     def _laplacian(self, velocity: Any, at: str) -> Any:
-        """The Laplacian of a velocity component, at its own points."""
-        return self.ops.laplacian(velocity, at=at)
+        """The Laplacian of a velocity component, with free slip along coasts."""
+        return velocity_laplacian(
+            velocity,
+            self.grid,
+            self.mask,
+            at,
+            thickness_bc=BCS[self.bc_type]["h"],
+            wraps=WRAPS[self.bc_type],
+        )
 
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
@@ -178,8 +202,7 @@ class NonlinearShallowWater2D(Model):
         dh_dt = self._mass_tendency(h, u, v)
 
         # 2. Potential vorticity: q = (zeta + f) / h at X-points
-        f = placed(self.f_field, h, "T")
-        q = self.ops.sw_potential_vorticity(u, v, h, f)
+        q = self._potential_vorticity(u, v, h)
 
         # 3. Mass fluxes h_bar * u at U-points and h_bar * v at V-points, then
         #    the cross-velocity PV fluxes (vector-invariant form):
@@ -189,7 +212,6 @@ class NonlinearShallowWater2D(Model):
         vh = each(operator.mul, self.ops.interpolate(h, src="T", dst="V"), v)
         # The next averages read the ghosts of these, which the operators leave
         # at zero.
-        q = self._wrap(q, "X")
         uh, vh = self._wrap(uh, "U"), self._wrap(vh, "V")
         q_on_U = self.ops.interpolate(q, src="X", dst="U")
         q_on_V = self.ops.interpolate(q, src="X", dst="V")
@@ -443,6 +465,13 @@ class NonlinearShallowWater2D(Model):
             ops=GridOps(grid, mask),
             mask=mask,
             f_field=f_field,
+            free_slip=FreeSlip.build(
+                grid,
+                mask,
+                BCS[bc]["h"],
+                f_field,
+                walls=WALLS[bc],
+            ),
             wind_stress_x=wind_stress_x,
             wind_stress_y=wind_stress_y,
             bc_type=bc,
