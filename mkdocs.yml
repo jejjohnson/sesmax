@@ -100,6 +100,7 @@ nav:
   - Test problems: testing.md
   - Ocean QG models: ocean_qg.md
   - Ocean shallow-water models: ocean_swm.md
+  - Ocean models on the sphere: ocean_spherical.md
   - Ocean resolution checks: ocean_resolution.md
   - Ocean metrics: ocean_eval.md
   - Ocean forcing presets: ocean_forcing.md
