@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import diffrax as dfx
 import equinox as eqx
+import jax.numpy as jnp
 import jax.tree_util as jtu
 import paramax
 from integrix.march import DiffraxForwardModel
@@ -41,7 +42,8 @@ def _unwrapping(implementation: Callable[..., Any]) -> Callable[..., Any]:
 class _ModelVectorField(eqx.Module):
     """A model's right-hand side, as a pytree the transforms can see through.
 
-    A closure would hide the model's leaves from ``eqx.filter_grad``.
+    A closure would hide the model's leaves from ``eqx.filter_grad``, and as a
+    new function in every call it would miss diffrax's compile cache.
     """
 
     model: Any
@@ -50,6 +52,16 @@ class _ModelVectorField(eqx.Module):
         model = paramax.unwrap(self.model)
         state = model.apply_boundary_conditions(state)
         return model.vector_field(t, state, args)
+
+
+def _as_time(t: Any) -> Any:
+    """A time as an array, so that a new one does not compile again.
+
+    diffrax holds a Python number static, and compiles once per value.
+    """
+    if t is None or eqx.is_array(t):
+        return t
+    return jnp.asarray(t, dtype=jnp.result_type(float))
 
 
 class Model(eqx.Module):
@@ -109,13 +121,7 @@ class Model(eqx.Module):
         Constrained parameters are reconstituted per evaluation — see
         the class docstring.
         """
-
-        def _rhs(t, state, args=None):
-            model = paramax.unwrap(self)
-            state = model.apply_boundary_conditions(state)
-            return model.vector_field(t, state, args)
-
-        return dfx.ODETerm(_rhs)
+        return dfx.ODETerm(_ModelVectorField(self))
 
     def integrate(
         self,
@@ -129,6 +135,10 @@ class Model(eqx.Module):
 
         Boundary conditions are applied to ``state0`` before starting
         and enforced at every RHS evaluation via ``build_terms``.
+
+        Repeated calls compile once: with the same model structure, state
+        shapes, solver and controller, a call at other times or with other
+        values of the parameters reuses the compiled solve.
 
         Args:
             state0: Initial state.
@@ -145,9 +155,9 @@ class Model(eqx.Module):
         return dfx.diffeqsolve(
             terms=self.build_terms(),
             solver=solver,
-            t0=t0,
-            t1=t1,
-            dt0=dt,
+            t0=_as_time(t0),
+            t1=_as_time(t1),
+            dt0=_as_time(dt),
             y0=state0,
             saveat=saveat,
             stepsize_controller=stepsize_controller,
