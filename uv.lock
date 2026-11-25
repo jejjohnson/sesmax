@@ -24,11 +24,11 @@ overrides = [
     { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.13" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.8.1" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.10" },
-    { name = "pipekit-array", extras = ["numpy", "compat"], git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-array-v0.1.4" },
-    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.4" },
-    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-array-v0.1.4" },
-    { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-array-v0.1.4" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.11" },
+    { name = "pipekit-array", extras = ["numpy", "compat"], git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-array-v0.1.6" },
+    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.6" },
+    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-array-v0.1.6" },
+    { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-array-v0.1.6" },
     { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?rev=0.1.2" },
 ]
 
@@ -784,8 +784,8 @@ dependencies = [
 
 [[package]]
 name = "geophysix"
-version = "0.0.7"
-source = { git = "https://github.com/jejjohnson/geophysix?tag=v0.0.7#dbdd72e013bc540e2d4fb1aea14c78d716f9329b" }
+version = "0.0.8"
+source = { git = "https://github.com/jejjohnson/geophysix?tag=v0.0.8#4ebae12a21eb32386aae049084c0f7c22196a219" }
 dependencies = [
     { name = "numpy" },
     { name = "pipekit-array", extra = ["compat", "numpy"] },
@@ -833,8 +833,8 @@ wheels = [
 
 [[package]]
 name = "gridax"
-version = "0.3.1"
-source = { git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.1#7c266f4d0ce192e1e732b09b95781f937fbedea5" }
+version = "0.3.2"
+source = { git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.2#b9af2ab4fe2484f4be787a0d0ae953c10085b215" }
 dependencies = [
     { name = "geophysix" },
     { name = "jaxtyping" },
@@ -923,8 +923,8 @@ wheels = [
 
 [[package]]
 name = "integrix"
-version = "0.0.10"
-source = { git = "https://github.com/jejjohnson/integrix?rev=v0.0.10#463ad778f7280f1b14189e941d89f8c34bd69c82" }
+version = "0.0.11"
+source = { git = "https://github.com/jejjohnson/integrix?rev=v0.0.11#a3a354351d2d01184cbadc7ca4d6d39711eecd1c" }
 dependencies = [
     { name = "diffrax" },
     { name = "einx" },
@@ -2232,8 +2232,8 @@ wheels = [
 
 [[package]]
 name = "pipekit-array"
-version = "0.1.4"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-array-v0.1.4#30a6c197a3d70e9d23029501bdf0202bca728f35" }
+version = "0.1.6"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-array-v0.1.6#41864be1079c44937d2eb56f58a1122895e1dc7d" }
 dependencies = [
     { name = "pipekit-ops" },
 ]
@@ -2248,16 +2248,16 @@ numpy = [
 
 [[package]]
 name = "pipekit-cycle"
-version = "0.1.0"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.4#30a6c197a3d70e9d23029501bdf0202bca728f35" }
+version = "0.2.0"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.6#41864be1079c44937d2eb56f58a1122895e1dc7d" }
 dependencies = [
     { name = "pipekit-ops" },
 ]
 
 [[package]]
 name = "pipekit-jax"
-version = "0.1.0"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-array-v0.1.4#30a6c197a3d70e9d23029501bdf0202bca728f35" }
+version = "0.2.0"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-array-v0.1.6#41864be1079c44937d2eb56f58a1122895e1dc7d" }
 dependencies = [
     { name = "equinox" },
     { name = "jax" },
@@ -2268,8 +2268,8 @@ dependencies = [
 
 [[package]]
 name = "pipekit-ops"
-version = "0.2.3"
-source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-array-v0.1.4#30a6c197a3d70e9d23029501bdf0202bca728f35" }
+version = "0.2.4"
+source = { git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-array-v0.1.6#41864be1079c44937d2eb56f58a1122895e1dc7d" }
 
 [[package]]
 name = "platformdirs"
@@ -2869,9 +2869,9 @@ requires-dist = [
     { name = "functax", extras = ["jax"], git = "https://github.com/jejjohnson/functax?rev=v0.0.13" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.8.1" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax.git?rev=v0.0.11" },
-    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.7" },
-    { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.1" },
-    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.10" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.8" },
+    { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.2" },
+    { name = "integrix", git = "https://github.com/jejjohnson/integrix?rev=v0.0.11" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxlib", specifier = ">=0.11.1" },
     { name = "jaxtyping", specifier = ">=0.3.9" },
@@ -2879,10 +2879,10 @@ requires-dist = [
     { name = "optimistix", specifier = ">=0.1" },
     { name = "orbax-checkpoint", marker = "extra == 'checkpoint'", specifier = ">=0.11.37" },
     { name = "paramax", specifier = ">=0.0.5" },
-    { name = "pipekit-array", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-array-v0.1.4" },
-    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.4" },
-    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-array-v0.1.4" },
-    { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-array-v0.1.4" },
+    { name = "pipekit-array", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-array-v0.1.6" },
+    { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.6" },
+    { name = "pipekit-jax", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-jax&rev=pipekit-array-v0.1.6" },
+    { name = "pipekit-ops", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-ops&rev=pipekit-array-v0.1.6" },
     { name = "spectraldiffx", git = "https://github.com/jejjohnson/spectraldiffx.git?tag=0.1.2" },
     { name = "vardax", marker = "extra == 'da'", git = "https://github.com/jejjohnson/vardax?rev=v0.3.5" },
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2026.4.0" },
@@ -2909,8 +2909,8 @@ dependencies = [
 requires-dist = [
     { name = "equinox", specifier = ">=0.13.8" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.8.1" },
-    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.7" },
-    { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.1" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.8" },
+    { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.2" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxtyping", specifier = ">=0.3.9" },
     { name = "paramax", specifier = ">=0.0.5" },
