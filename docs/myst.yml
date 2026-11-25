@@ -62,6 +62,7 @@ project:
         - file: notebooks/step14_gravity_waves_1d.ipynb
         - file: notebooks/step15_shallow_water_1d.ipynb
         - file: notebooks/step16_geostrophic_adjustment.ipynb
+        - file: notebooks/step17_shallow_water_2d.ipynb
     - title: Composing models
       children:
         - file: notebooks/composable_models.ipynb
