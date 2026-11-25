@@ -46,7 +46,7 @@ def masks() -> dict[str, object]:
     """The two domains every case runs on."""
     from finitevolx import Mask2D
 
-    return {"nomask": None, "island": Mask2D.from_center(jnp.asarray(island()))}
+    return {"nomask": None, "island": Mask2D.from_mask(jnp.asarray(island()))}
 
 
 def wet(mask: object) -> tuple[object, object, object]:

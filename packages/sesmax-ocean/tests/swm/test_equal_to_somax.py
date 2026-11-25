@@ -16,9 +16,9 @@ from equality import (
     assert_reproduces_somax,
     float64,
     initial_state,
-    island,
+    island_mask,
 )
-from gridax import CField, Mask2D, StaggerMismatchError
+from gridax import CField, StaggerMismatchError
 from gridax.schemes import WENO, Upwind
 from somax_reference import SHALLOW_WATER
 
@@ -62,7 +62,7 @@ def test_equal_to_somax(family: str, case: str, located: bool) -> None:
             **CASES[family][0],
             bc=bc,
             scheme=SCHEMES[scheme],
-            mask=Mask2D.from_center(island()) if has_island else None,
+            mask=island_mask() if has_island else None,
         )
         given, state = (
             initial_state(

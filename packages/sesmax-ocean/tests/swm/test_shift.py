@@ -57,7 +57,7 @@ def _padded(interior: np.ndarray) -> np.ndarray:
 
 def _tendency(name: str, scheme: Any, interiors: dict[str, np.ndarray], wet: Any):
     model_class, state_class, _, kwargs, _ = MODELS[name]
-    mask = None if wet is None else Mask2D.from_center(_padded(wet))
+    mask = None if wet is None else Mask2D.from_mask(_padded(wet))
     model = model_class.create(nx=NX, ny=NY, scheme=scheme, mask=mask, **kwargs)
     state = state_class(**{k: jnp.asarray(_padded(x)) for k, x in interiors.items()})
     tendency = model.vector_field(0.0, model.apply_boundary_conditions(state))
@@ -81,6 +81,9 @@ def test_a_shifted_state_has_the_shifted_tendency(name, scheme, has_island) -> N
     if has_island:
         wet = np.ones((NY, NX), dtype=bool)
         wet[4:7, 5:8] = False
+        # No flow on the dry faces.
+        interiors["u"] *= wet & np.roll(wet, -1, axis=1)
+        interiors["v"] *= wet & np.roll(wet, -1, axis=0)
     if name == "spherical":
         # The walls of the band: no flow through the northern one.
         interiors["v"][-1] = 0.0

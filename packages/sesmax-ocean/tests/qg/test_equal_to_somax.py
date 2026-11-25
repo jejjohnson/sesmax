@@ -15,9 +15,9 @@ from equality import (
     assert_reproduces_somax,
     float64,
     initial_state,
-    island,
+    island_mask,
 )
-from gridax import CField, Mask2D, StaggerMismatchError
+from gridax import CField, StaggerMismatchError
 
 from sesmax_ocean.qg import (
     BaroclinicQG,
@@ -39,7 +39,7 @@ MODELS = {
 def test_equal_to_somax(family: str, case: str, located: bool) -> None:
     model_class, state_class, dims = MODELS[family]
     with float64():
-        mask = Mask2D.from_center(island()) if case == "island" else None
+        mask = island_mask() if case == "island" else None
         model = model_class.create(**SIZE, **CASES[family][0], mask=mask)
         given, state = (
             initial_state(

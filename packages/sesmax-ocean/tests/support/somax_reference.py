@@ -166,7 +166,8 @@ def load(family: str) -> dict[str, dict[str, dict[str, np.ndarray]]]:
 def island(shape: tuple[int, int] = (14, 18)) -> np.ndarray:
     """The wet cells of the cases named ``island``, with the ghost ring.
 
-    For ``Mask2D.from_center``, which the reference uses too.
+    For ``Mask2D.from_mask``, in gridax and in finitevolX. Not ``from_center``, which
+    takes a field with NaN on land: every cell of a Boolean array is wet to it.
     """
     wet = np.zeros(shape, dtype=bool)
     wet[1:-1, 1:-1] = True

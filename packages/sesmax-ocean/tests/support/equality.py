@@ -15,7 +15,7 @@ import diffrax as dfx
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from gridax import CField
+from gridax import CField, Mask2D
 from somax_numerics import with_somax_numerics
 from somax_reference import (
     CASES,
@@ -38,9 +38,17 @@ __all__ = [
     "assert_reproduces_somax",
     "float64",
     "initial_state",
-    "island",
+    "island_mask",
     "load",
 ]
+
+
+def island_mask() -> Mask2D:
+    """The mask of the cases named ``island``, which does have land."""
+    mask = Mask2D.from_mask(island())
+    wet = int(mask.wet(at="T").sum())
+    assert wet == int(island().sum()) < SIZE["nx"] * SIZE["ny"]
+    return mask
 
 
 def initial_state(
