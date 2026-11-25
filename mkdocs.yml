@@ -95,4 +95,6 @@ nav:
   - I/O: io.md
   - Checkpointing: checkpoint.md
   - Guards: guards.md
+  - Fields: fields.md
+  - Validation: validation.md
   - Test problems: testing.md

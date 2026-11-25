@@ -54,6 +54,40 @@ def test_package_imports_only_down_the_tiers(package: str) -> None:
     assert not offending, f"{package} imports above its tier: {offending}"
 
 
+def _imported_modules(source: Path) -> set[str]:
+    tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            modules.add(node.module)
+            modules.update(f"{node.module}.{alias.name}" for alias in node.names)
+    return modules
+
+
+@pytest.mark.parametrize(
+    "package",
+    sorted(path.name for path in PACKAGES.glob("*/src/*") if path.is_dir()),
+)
+def test_only_public_names_cross_packages(package: str) -> None:
+    """A package imports another's public modules, never its ``_src``."""
+    offending = {
+        str(path.relative_to(ROOT)): sorted(private)
+        for path in sorted(PACKAGES.glob(f"*/src/{package}/**/*.py"))
+        if (
+            private := {
+                module
+                for module in _imported_modules(path)
+                if module.startswith("sesmax")
+                and "_src" in module.split(".")
+                and module.split(".")[0] != package
+            }
+        )
+    }
+    assert not offending, f"{package} imports private modules: {offending}"
+
+
 def test_umbrella_holds_no_code() -> None:
     assert sesmax.__all__ == ["__version__"]
 
