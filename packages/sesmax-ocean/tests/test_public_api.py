@@ -22,6 +22,7 @@ SUBMODULES: list[str] = [
     "forcing",
     "qg",
     "resolution",
+    "swm",
 ]
 
 

@@ -2896,6 +2896,7 @@ version = "0.0.0"
 source = { editable = "packages/sesmax-ocean" }
 dependencies = [
     { name = "equinox" },
+    { name = "geophysix" },
     { name = "gridax", extra = ["jax", "pipekit"] },
     { name = "jax" },
     { name = "jaxtyping" },
@@ -2906,6 +2907,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "equinox", specifier = ">=0.13.8" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.7" },
     { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.1" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxtyping", specifier = ">=0.3.9" },

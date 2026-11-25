@@ -48,6 +48,60 @@ CASES: dict[str, tuple[dict[str, Any], float]] = {
         },
         600.0,
     ),
+    "nonlinear_sw": (
+        {
+            "Lx": 1e6,
+            "Ly": 8e5,
+            "beta": 1e-11,
+            "lateral_viscosity": 500.0,
+            "bottom_drag": 1e-6,
+            "wind_amplitude": 1e-6,
+        },
+        300.0,
+    ),
+    "multilayer_sw": (
+        {
+            "Lx": 1e6,
+            "Ly": 8e5,
+            "lateral_viscosity": 500.0,
+            "bottom_drag": 1e-6,
+            "wind_amplitude": 1e-3,
+        },
+        60.0,
+    ),
+    "reparameterized_qg": (
+        {
+            "Lx": 1e6,
+            "Ly": 8e5,
+            "lateral_viscosity": 500.0,
+            "bottom_drag": 1e-6,
+            "wind_amplitude": 1e-3,
+        },
+        60.0,
+    ),
+}
+
+#: ``family -> case -> (bc, scheme, island)`` of the shallow-water models; a
+#: scheme is the name somax gives it.
+SHALLOW_WATER: dict[str, dict[str, tuple[str, str, bool]]] = {
+    "nonlinear_sw": {
+        "periodic-upwind1": ("periodic", "upwind1", False),
+        "periodic-weno5": ("periodic", "weno5", False),
+        "wall-upwind1": ("wall", "upwind1", False),
+        "wall-weno5": ("wall", "weno5", False),
+        "island-upwind1": ("wall", "upwind1", True),
+        "island-weno5": ("wall", "weno5", True),
+    },
+    "multilayer_sw": {
+        "periodic-upwind1": ("periodic", "upwind1", False),
+        "wall-weno5": ("wall", "weno5", False),
+        "island-upwind1": ("wall", "upwind1", True),
+        "island-weno5": ("wall", "weno5", True),
+    },
+    "reparameterized_qg": {
+        "wall-upwind1": ("wall", "upwind1", False),
+        "island-upwind1": ("wall", "upwind1", True),
+    },
 }
 
 

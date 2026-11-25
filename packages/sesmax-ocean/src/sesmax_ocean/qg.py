@@ -1,8 +1,10 @@
 """Public surface for sesmax-ocean's quasi-geostrophic models.
 
-Both step a potential vorticity on T-points and invert it for the
-streamfunction: :class:`BarotropicQG` one layer, ∇²ψ = q, and
-:class:`BaroclinicQG` several, mode by mode.
+:class:`BarotropicQG` and :class:`BaroclinicQG` step a potential vorticity on
+T-points and invert it for the streamfunction, ∇²ψ = q for one layer and mode by
+mode for several. :class:`ReparameterizedQG` steps the thickness and the velocity
+of :class:`sesmax_ocean.swm.MultilayerShallowWater2D` and projects them onto
+geostrophic balance.
 """
 
 from __future__ import annotations
@@ -21,6 +23,10 @@ from sesmax_ocean._src.qg.barotropic import (
     BarotropicQGPhysConsts,
     BarotropicQGState,
 )
+from sesmax_ocean._src.qg.reparameterized import (
+    ReparameterizedQG,
+    ReparamQGDiagnostics,
+)
 
 
 __all__ = [
@@ -34,4 +40,6 @@ __all__ = [
     "BarotropicQGParams",
     "BarotropicQGPhysConsts",
     "BarotropicQGState",
+    "ReparamQGDiagnostics",
+    "ReparameterizedQG",
 ]

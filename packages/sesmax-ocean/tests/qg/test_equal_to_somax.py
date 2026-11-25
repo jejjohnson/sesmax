@@ -7,24 +7,18 @@ an island.
 
 from __future__ import annotations
 
-import dataclasses
-
-import diffrax as dfx
-import jax
 import jax.numpy as jnp
 import pytest
-from gridax import CField, Mask2D, StaggerMismatchError
-from somax_reference import (
+from equality import (
     CASES,
-    N_STEPS,
     SIZE,
-    assert_equal_to_somax,
+    assert_reproduces_somax,
     float64,
+    initial_state,
     island,
-    load,
 )
+from gridax import CField, Mask2D, StaggerMismatchError
 
-from sesmax_core.fields import values
 from sesmax_ocean.qg import (
     BaroclinicQG,
     BaroclinicQGState,
@@ -39,42 +33,26 @@ MODELS = {
 }
 
 
-def _model_and_state(family: str, case: str, located: bool):
-    model_class, state_class, dims = MODELS[family]
-    mask = Mask2D.from_center(island()) if case == "island" else None
-    model = model_class.create(**SIZE, **CASES[family][0], mask=mask)
-    q = jnp.asarray(load(family)[case]["init"]["q"])
-    return model, state_class(q=CField(q, dims, loc="T") if located else q)
-
-
 @pytest.mark.parametrize("located", [False, True], ids=["arrays", "cfields"])
 @pytest.mark.parametrize("case", ["nomask", "island"])
 @pytest.mark.parametrize("family", list(MODELS))
 def test_equal_to_somax(family: str, case: str, located: bool) -> None:
+    model_class, state_class, dims = MODELS[family]
     with float64():
-        model, state = _model_and_state(family, case, located)
-        expected = load(family)[case]
-        dt = CASES[family][1]
-
-        tendency = model.vector_field(0.0, state)
-        solution = model.integrate(
-            state, t0=0.0, t1=N_STEPS * dt, dt=dt, solver=dfx.Heun()
+        mask = Mask2D.from_center(island()) if case == "island" else None
+        model = model_class.create(**SIZE, **CASES[family][0], mask=mask)
+        given, state = (
+            initial_state(
+                state_class,
+                family,
+                case,
+                {"q": "T"},
+                dims if located else None,
+                kind=kind,
+            )
+            for kind in ("given", "init")
         )
-        end = jax.tree.map(lambda x: x[-1], solution.ys)
-        assert isinstance(tendency.q, CField) == located
-        got = {
-            "init": model.apply_boundary_conditions(state),
-            "tendency": tendency,
-            "end": end,
-            "diagnostics": model.diagnose(state),
-        }
-        for kind, tree in got.items():
-            for field in dataclasses.fields(tree):
-                assert_equal_to_somax(
-                    values(getattr(tree, field.name)),
-                    expected[kind][field.name],
-                    f"{family}/{case}/{kind}/{field.name}",
-                )
+        assert_reproduces_somax(model, given, state, family, case)
 
 
 @pytest.mark.parametrize("family", list(MODELS))

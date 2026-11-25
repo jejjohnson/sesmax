@@ -26,7 +26,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "support"))
 
-from somax_reference import CASES, N_STEPS, SIZE, island
+from somax_reference import CASES, N_STEPS, SHALLOW_WATER, SIZE, island
 
 
 SHAPE = (SIZE["ny"] + 2, SIZE["nx"] + 2)
@@ -79,6 +79,7 @@ def integrate(out: Arrays, case: str, model: object, state: object, dt: float) -
     """The tendency, the end state and the diagnostics from one initial state."""
     import diffrax as dfx
 
+    record(out, case, "given", state)
     state = model.apply_boundary_conditions(state)
     solution = model.integrate(state, t0=0.0, t1=N_STEPS * dt, dt=dt, solver=dfx.Heun())
     end = jax.tree.map(lambda x: x[-1], solution.ys)
@@ -107,10 +108,53 @@ def quasi_geostrophic(family: str) -> Arrays:
     return out
 
 
+def shallow_water(family: str) -> Arrays:
+    """One of the models with a thickness and a velocity, from random fields."""
+    from somax._src.models.qg.reparameterized import ReparameterizedQG
+    from somax._src.models.swm import multilayer, nonlinear_2d
+
+    model_class, state_class, depth = {
+        "nonlinear_sw": (
+            nonlinear_2d.NonlinearShallowWater2D,
+            nonlinear_2d.NonlinearSW2DState,
+            np.asarray(100.0),
+        ),
+        "multilayer_sw": (
+            multilayer.MultilayerShallowWater2D,
+            multilayer.MultilayerSW2DState,
+            np.array([400.0, 1100.0, 2600.0])[:, None, None],
+        ),
+        "reparameterized_qg": (
+            ReparameterizedQG,
+            multilayer.MultilayerSW2DState,
+            np.array([400.0, 1100.0, 2600.0])[:, None, None],
+        ),
+    }[family]
+    kwargs, dt = CASES[family]
+    shape = (*depth.shape[:1], *SHAPE)
+    out: Arrays = {}
+    for case, (bc, scheme, has_island) in SHALLOW_WATER[family].items():
+        rng = np.random.default_rng(0)
+        mask = masks()["island"] if has_island else None
+        _, wet_u, wet_v = wet(mask)
+        state = state_class(
+            # A thickness on land too: the PV divides by it.
+            h=jnp.asarray(depth + rng.normal(size=shape)),
+            u=jnp.asarray(0.1 * rng.normal(size=shape) * wet_u),
+            v=jnp.asarray(0.1 * rng.normal(size=shape) * wet_v),
+        )
+        model = model_class.create(**SIZE, **kwargs, bc=bc, method=scheme, mask=mask)
+        integrate(out, case, model, state, dt)
+    return out
+
+
 FAMILIES: dict[str, Callable[[], Arrays]] = {
     "eval": eval_metrics,
     "barotropic_qg": partial(quasi_geostrophic, "barotropic_qg"),
     "baroclinic_qg": partial(quasi_geostrophic, "baroclinic_qg"),
+    "nonlinear_sw": partial(shallow_water, "nonlinear_sw"),
+    "multilayer_sw": partial(shallow_water, "multilayer_sw"),
+    "reparameterized_qg": partial(shallow_water, "reparameterized_qg"),
 }
 
 

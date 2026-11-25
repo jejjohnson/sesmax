@@ -12,6 +12,7 @@ import jax.numpy as jnp
 
 from sesmax_ocean.eval import compute_eval_metrics, qg_balance_residual
 from sesmax_ocean.qg import BarotropicQG, BarotropicQGState
+from sesmax_ocean.swm import MultilayerShallowWater2D, MultilayerSW2DState
 
 
 def _barotropic():
@@ -44,4 +45,19 @@ class TestComputeEvalMetricsQG:
         assert "invariant_kinetic_energy" in metrics
         assert "invariant_enstrophy" in metrics
         # QG models do NOT report the velocity-divergence metrics.
+        assert "rms_divergence" not in metrics
+
+    def test_swm_model_reports_invariants(self) -> None:
+        model = MultilayerShallowWater2D.create(
+            nx=16, ny=16, n_layers=2, H=(500.0, 1500.0), g_prime=(9.81, 0.02)
+        )
+        sh = (2, model.grid.Ny, model.grid.Nx)
+        h = model.strat.H[:, None, None] * jnp.ones(sh)
+        state = model.apply_boundary_conditions(
+            MultilayerSW2DState(h=h, u=jnp.zeros(sh), v=jnp.zeros(sh))
+        )
+        metrics = compute_eval_metrics(model, state)
+        assert "invariant_mass" in metrics
+        assert "invariant_total_energy" in metrics
+        # 3D multilayer state -> velocity-divergence metrics do not apply.
         assert "rms_divergence" not in metrics
