@@ -22,11 +22,13 @@ except ImportError as exc:
 
 from sesmax_experiment._src.sim.app import app, main
 from sesmax_experiment._src.sim.checkpoints import Checkpointing, CheckpointStore
+from sesmax_experiment._src.sim.checks import check_bounded_metric, check_cfl
 from sesmax_experiment._src.sim.record import JsonLinesWriter, MetricWriter
 from sesmax_experiment._src.sim.runner import (
     IntegrationDivergedError,
     SimulationResult,
     build_run,
+    model_op,
     restart,
     simulate,
     spinup,
@@ -59,9 +61,12 @@ __all__ = [
     "TimesteppingSpec",
     "app",
     "build_run",
+    "check_bounded_metric",
+    "check_cfl",
     "dump_yaml",
     "load_yaml",
     "main",
+    "model_op",
     "restart",
     "simulate",
     "spinup",

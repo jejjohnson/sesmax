@@ -19,6 +19,7 @@ from pipekit_ops import Operator, Tap
 from sesmax_core import Model, io
 from sesmax_core.component import BuiltRun, Component
 from sesmax_core.fields import values
+from sesmax_core.operators import ModelOp
 from sesmax_experiment._src.components import find_model
 from sesmax_experiment._src.monitor import Monitor, default_monitors
 from sesmax_experiment._src.run.chunks import run_chunks
@@ -40,7 +41,11 @@ from sesmax_experiment._src.sim.checkpoints import (
     remove_stale,
     resolve,
 )
-from sesmax_experiment._src.sim.checks import preflight
+from sesmax_experiment._src.sim.checks import (
+    asks_for_metrics,
+    postflight,
+    preflight,
+)
 from sesmax_experiment._src.sim.progress import (
     start_run_log,
     stop_run_log,
@@ -109,6 +114,28 @@ def build_run(
     component, build = find_model(spec.model.name, among)
     data = spec.to_dict()
     return component, build({key: data[key] for key in ("scenario", "model")})
+
+
+def model_op(
+    spec: RunSpec,
+    *,
+    dt: float | None = None,
+    among: Mapping[str, Component] | None = None,
+) -> tuple[ModelOp, Any]:
+    """The model of a spec as a pipekit operator, and its initial state.
+
+    Args:
+        spec: The spec.
+        dt: The step of the operator; the spec's by default.
+        among: The components to look in; the installed ones by default.
+
+    Returns:
+        The operator, which advances a state by one step and drives a
+        ``pipekit_cycle.Cycle``, and the state.
+    """
+    _, built = build_run(spec, among)
+    step = spec.timestepping.dt if dt is None else dt
+    return ModelOp(built.model, step), built.state0
 
 
 def timeline_of(
@@ -345,7 +372,8 @@ def _run(
             logger.warning(message)
 
         metrics_path = final_state_path = None
-        if writes_metrics and stop is None:
+        wants_metrics = writes_metrics or (asks_for_metrics(spec) and not only_final)
+        if wants_metrics and stop is None:
             run = {
                 "wallclock_seconds": wall_seconds,
                 "n_steps": seen.steps,
@@ -354,9 +382,10 @@ def _run(
                 "save_interval": spec.timestepping.save_interval,
                 "mode": mode,
             }
-            metrics_path = write_json(
-                output_dir / "metrics.json", _metrics(component, built, state, run)
-            )
+            metrics = _metrics(component, built, state, run)
+            postflight(spec, metrics)
+            if writes_metrics:
+                metrics_path = write_json(output_dir / "metrics.json", metrics)
         snapshots_path = snapshots.finish() if writes_snapshots else None
         if stop is None:
             final_state_path = output_dir / "final_state.zarr"
@@ -432,6 +461,7 @@ def simulate(
         What was written.
 
     Raises:
+        AssertionFailedError: If the run fails a check of ``spec.assertions``.
         IntegrationDivergedError: If a monitor or a guard halted the run.
     """
     component, built = build_run(spec, among)
@@ -477,6 +507,7 @@ def spinup(
         What was written: no snapshots and no metrics.
 
     Raises:
+        AssertionFailedError: If the run fails a check of ``spec.assertions``.
         IntegrationDivergedError: If a monitor or a guard halted the run.
     """
     component, built = build_run(spec, among)
@@ -584,6 +615,7 @@ def restart(
         TypeError: If the store holds another kind of state than the model's.
         ValueError: If its units or its grid are not the run's, there is nothing
             left to run, or the store is inside ``output_dir``.
+        AssertionFailedError: If the run fails a check of ``spec.assertions``.
         IntegrationDivergedError: If a monitor or a guard halted the run.
     """
     path = resolve(Path(restart_from))

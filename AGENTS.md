@@ -129,6 +129,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 - A model's name belongs to one component. Two components with one name, or one model name in two, raise.
 - `sesmax_experiment.sim` needs `[sim]`, stays out of the top-level `__init__` and raises an `ImportError` naming the extra. A run that fails leaves no `snapshots.zarr`, `final_state.zarr`, `metrics.json` or `manifest.json`.
 - A checkpoint is written under a partial name and renamed to a new one; nothing is renamed onto a store, because the data mount refuses it. A chunk starts its stepper afresh from the state, so a checkpoint is the state and its time.
+- A check raises `AssertionFailedError` (`sesmax_core.component`). Those of any component, `cfl` before a run and `bounded_metric` after it, are in `sesmax_experiment.sim`; a component's own run before and may not take their names.
 - A verdict with `terminate=True` and `resumable=True` stops a run whose state is good. The runner writes a checkpoint and a manifest with `status: "stopped"`, and no final state.
 - Attributes of a store are written as `sesmax_*`, and those of somax (`somax_*`) are read.
 

@@ -18,7 +18,7 @@ from jaxtyping import PyTree
 from run_specs import lorenz96, shallow_water
 
 from sesmax_core import Model, io
-from sesmax_core.component import BuiltRun, Component
+from sesmax_core.component import AssertionFailedError, BuiltRun, Component
 from sesmax_core.testing import L96State, Lorenz96
 from sesmax_experiment.monitor import BaseMonitor, MonitorVerdict
 from sesmax_experiment.sim import (
@@ -253,19 +253,19 @@ class TestRunLog:
 class TestChecks:
     def test_a_check_runs_before_the_run(self, tmp_path: Path) -> None:
         spec = shallow_water(dt=2000.0, t1=4000.0, assertions={"gravity_wave_cfl": {}})
-        with pytest.raises(ValueError, match="Courant number"):
+        with pytest.raises(AssertionFailedError, match="Courant number"):
             simulate(spec, tmp_path)
         assert not (tmp_path / "run.log").exists()
 
     def test_its_parameters_are_the_spec_s(self, tmp_path: Path) -> None:
         spec = shallow_water(assertions={"gravity_wave_cfl": {"limit": 1e-6}})
-        with pytest.raises(ValueError, match="not below 1e-06"):
+        with pytest.raises(AssertionFailedError, match="not below 1e-06"):
             simulate(spec, tmp_path)
         spec = shallow_water(assertions={"gravity_wave_cfl": {"limit": 0.5}})
         simulate(spec, tmp_path)
 
     def test_an_unknown_check_is_an_error(self, tmp_path: Path) -> None:
-        with pytest.raises(KeyError, match="has no check"):
+        with pytest.raises(AssertionFailedError, match="unknown assertion"):
             simulate(shallow_water(assertions={"no_such_check": {}}), tmp_path)
 
 

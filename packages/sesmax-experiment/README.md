@@ -89,6 +89,8 @@ uv run sesmax-experiment restart --config adjustment.yaml --from runs/adjustment
 
 A run that succeeds leaves `snapshots.zarr`, `final_state.zarr`, `metrics.json`, `resolved.yaml`, `manifest.json`, `run.log` and `metrics.jsonl`, a line of numbers per chunk. One that fails leaves its two logs and the snapshots it had taken, as `snapshots.partial.zarr`.
 
+`assertions` in the file asks for checks, which fail the run: `cfl: {wave_speed_m_per_s: 31.3, max_cfl: 0.5}` before it starts, `bounded_metric: {name: energy, min: 0.0}` before its metrics are written, and those of the model's component.
+
 A long run writes checkpoints, each a store of its own that is finished by a rename, so a crash leaves the older ones. A run whose wall time is up stops with a checkpoint and exit code 75, and the rest of it takes the steps the whole run would have taken:
 
 ```bash
