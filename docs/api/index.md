@@ -4,6 +4,7 @@ Each workspace package is imported by its own name. Everything listed in a packa
 
 ```python
 import sesmax_core
+import sesmax_experiment
 import sesmax_ocean
 ```
 
@@ -22,16 +23,22 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Domains](domain.md) | `Domain`, `TimeDomain` |
 | [Solvers](solvers.md) | `imex_solver`, `imex_stepsize_controller`, `stable_step` |
 | [Training rollouts](train.md) | `rollout`, `rollout_loss`, `state_mse`, `ModelStep` |
-| [Monitors](monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
 | [Operators](operators.md) | `ModelOp`, `OperatorTerm` |
 | [Data assimilation](da.md) (`[da]`) | `FilteraxDynamics`, `VardaxForwardModel`, `WindowOperator`, `SubsampleObs`, `state_to_vector`, `make_ensemble` |
 | [Flows](flows.md) (`[flows]`) | `StateAffineBijection`, `to_flowjax`, `learned_prior` |
 | [I/O](io.md) (`[xarray]`) | `state_to_dataset`, `dataset_to_state`, `snapshots_to_dataset`, `append_to_dataset`, `save_dataset`, `load_dataset`, `scales_attrs`, `transform_attrs`, `apply_scale_metadata` |
-| [Checkpointing](checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
 | [Guards](guards.md) | `guard_finite`, `guard_positive`, `guard_ceiling` |
 | [Fields](fields.md) | `each`, `map_fields`, `placed`, `values`, `is_field` |
 | [Validation](validation.md) | `require_positive`, `require_non_negative`, `reject_derived_kwargs` |
+| [Components](component.md) | `Component`, `BuiltRun`, `Builder`, `Check` |
 | [Test problems](testing.md) | `Lorenz63`, `Lorenz96`, `Lorenz96t`; `LinearConvection1D`, `NonlinearConvection1D`, `Diffusion1D`, `Burgers1D` and their 2D versions; `Burgers2DTermModel`, `Burgers2DOp`; `IncompressibleNS2D`; `PoissonSolver2D`, `LaplaceSolver2D`, `HelmholtzSolver2D`; `LinearShallowWater1D`, `NonlinearShallowWater1D`, `LinearShallowWater2D`, `LinearSWM2DTermModel` and its terms; `gravity_wave_1d`, `inertial_oscillation_1d`, `geostrophic_adjustment_2d`; and their state, parameter and diagnostic classes |
+
+### sesmax-experiment
+
+| Page | Contents |
+|---|---|
+| [Monitors](experiment_monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
+| [Checkpointing](experiment_checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
 
 ### sesmax-ocean
 

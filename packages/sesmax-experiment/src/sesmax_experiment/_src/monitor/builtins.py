@@ -1,4 +1,4 @@
-"""Built-in monitors shipped with the :mod:`sesmax_core.monitor` protocol.
+"""Built-in monitors shipped with the :mod:`sesmax_experiment.monitor` protocol.
 
 These reproduce the observability that used to be inline in the runner's
 chunk step (the non-finite abort and the energy-growth warning) as pluggable
@@ -28,8 +28,8 @@ from typing import Any
 import numpy as np
 import paramax
 
-from sesmax_core._src.monitor.base import BaseMonitor
-from sesmax_core._src.monitor.protocol import ChunkInfo, MonitorVerdict
+from sesmax_experiment._src.monitor.base import BaseMonitor
+from sesmax_experiment._src.monitor.protocol import ChunkInfo, MonitorVerdict
 
 
 def _state_field_arrays(state: Any) -> dict[str, np.ndarray]:

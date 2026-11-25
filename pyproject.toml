@@ -43,6 +43,7 @@ override-dependencies = [
 [tool.uv.sources]
 sesmax = { workspace = true }
 sesmax-core = { workspace = true }
+sesmax-experiment = { workspace = true }
 sesmax-ocean = { workspace = true }
 
 [dependency-groups]
@@ -50,7 +51,8 @@ dev = [
     # Workspace members are dev-installed so the tests can import them, with
     # every optional extra so the tests of the optional modules run.
     "sesmax",
-    "sesmax-core[da,flows,xarray,checkpoint]",
+    "sesmax-core[da,flows,xarray]",
+    "sesmax-experiment[checkpoint]",
     "sesmax-ocean",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
@@ -146,7 +148,9 @@ testpaths = [
     "tests",
     "packages/sesmax-core/tests",
     "packages/sesmax-core/src/sesmax_core",
+    "packages/sesmax-experiment/tests",
     "packages/sesmax-ocean/tests",
+    "packages/sesmax-experiment/src/sesmax_experiment",
     "packages/sesmax-ocean/src/sesmax_ocean",
 ]
 # Test tiers (see "Test tiers" in AGENTS.md). CI runs every tier.
@@ -169,6 +173,7 @@ addopts = """\
     --import-mode=importlib \
     --doctest-modules \
     --cov=sesmax_core \
+    --cov=sesmax_experiment \
     --cov=sesmax_ocean \
     --cov=sesmax \
     --cov-report=term-missing \

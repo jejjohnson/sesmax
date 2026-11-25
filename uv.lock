@@ -17,6 +17,7 @@ resolution-markers = [
 members = [
     "sesmax",
     "sesmax-core",
+    "sesmax-experiment",
     "sesmax-ocean",
     "sesmax-workspace",
 ]
@@ -2807,12 +2808,14 @@ version = "0.0.0"
 source = { editable = "packages/sesmax" }
 dependencies = [
     { name = "sesmax-core" },
+    { name = "sesmax-experiment" },
     { name = "sesmax-ocean" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "sesmax-core", editable = "packages/sesmax-core" },
+    { name = "sesmax-experiment", editable = "packages/sesmax-experiment" },
     { name = "sesmax-ocean", editable = "packages/sesmax-ocean" },
 ]
 
@@ -2844,9 +2847,6 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-checkpoint = [
-    { name = "orbax-checkpoint" },
-]
 da = [
     { name = "filterax" },
     { name = "vardax" },
@@ -2877,7 +2877,6 @@ requires-dist = [
     { name = "jaxtyping", specifier = ">=0.3.9" },
     { name = "lineax", specifier = ">=0.1.1" },
     { name = "optimistix", specifier = ">=0.1" },
-    { name = "orbax-checkpoint", marker = "extra == 'checkpoint'", specifier = ">=0.11.37" },
     { name = "paramax", specifier = ">=0.0.5" },
     { name = "pipekit-array", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-array&rev=pipekit-array-v0.1.6" },
     { name = "pipekit-cycle", git = "https://github.com/jejjohnson/pipekit.git?subdirectory=packages%2Fpipekit-cycle&rev=pipekit-array-v0.1.6" },
@@ -2888,7 +2887,37 @@ requires-dist = [
     { name = "xarray", marker = "extra == 'xarray'", specifier = ">=2026.4.0" },
     { name = "zarr", marker = "extra == 'xarray'", specifier = ">=3.1.6" },
 ]
-provides-extras = ["da", "flows", "xarray", "checkpoint"]
+provides-extras = ["da", "flows", "xarray"]
+
+[[package]]
+name = "sesmax-experiment"
+version = "0.0.0"
+source = { editable = "packages/sesmax-experiment" }
+dependencies = [
+    { name = "equinox" },
+    { name = "jax" },
+    { name = "jaxtyping" },
+    { name = "numpy" },
+    { name = "paramax" },
+    { name = "sesmax-core" },
+]
+
+[package.optional-dependencies]
+checkpoint = [
+    { name = "orbax-checkpoint" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "equinox", specifier = ">=0.13.8" },
+    { name = "jax", specifier = ">=0.10.2" },
+    { name = "jaxtyping", specifier = ">=0.3.9" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "orbax-checkpoint", marker = "extra == 'checkpoint'", specifier = ">=0.11.37" },
+    { name = "paramax", specifier = ">=0.0.5" },
+    { name = "sesmax-core", editable = "packages/sesmax-core" },
+]
+provides-extras = ["checkpoint"]
 
 [[package]]
 name = "sesmax-ocean"
@@ -2929,7 +2958,8 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
     { name = "sesmax" },
-    { name = "sesmax-core", extra = ["checkpoint", "da", "flows", "xarray"] },
+    { name = "sesmax-core", extra = ["da", "flows", "xarray"] },
+    { name = "sesmax-experiment", extra = ["checkpoint"] },
     { name = "sesmax-ocean" },
 ]
 docs = [
@@ -2959,7 +2989,8 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "sesmax", editable = "packages/sesmax" },
-    { name = "sesmax-core", extras = ["da", "flows", "xarray", "checkpoint"], editable = "packages/sesmax-core" },
+    { name = "sesmax-core", extras = ["da", "flows", "xarray"], editable = "packages/sesmax-core" },
+    { name = "sesmax-experiment", extras = ["checkpoint"], editable = "packages/sesmax-experiment" },
     { name = "sesmax-ocean", editable = "packages/sesmax-ocean" },
 ]
 docs = [

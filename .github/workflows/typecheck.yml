@@ -20,4 +20,4 @@ jobs:
         # The packages are installed so ty resolves imports between them.
         run: uv sync --all-packages --group typecheck
       - name: Run ty check
-        run: uv run --group typecheck ty check packages/sesmax-core/src packages/sesmax-ocean/src packages/sesmax/src scripts
+        run: uv run --group typecheck ty check packages/sesmax-core/src packages/sesmax-experiment/src packages/sesmax-ocean/src packages/sesmax/src scripts

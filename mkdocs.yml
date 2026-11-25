@@ -50,7 +50,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [packages/sesmax-core/src, packages/sesmax-ocean/src]
+          paths: [packages/sesmax-core/src, packages/sesmax-experiment/src, packages/sesmax-ocean/src]
           options:
             docstring_style: google
             # Docstrings moved from somax document **kwargs without a type and
@@ -88,16 +88,17 @@ nav:
   - Domains: domain.md
   - Solvers: solvers.md
   - Training rollouts: train.md
-  - Monitors: monitor.md
   - Operators: operators.md
   - Data assimilation: da.md
   - Flows: flows.md
   - I/O: io.md
-  - Checkpointing: checkpoint.md
   - Guards: guards.md
   - Fields: fields.md
   - Validation: validation.md
   - Test problems: testing.md
+  - Components: component.md
+  - Experiment monitors: experiment_monitor.md
+  - Experiment checkpoints: experiment_checkpoint.md
   - Ocean QG models: ocean_qg.md
   - Ocean shallow-water models: ocean_swm.md
   - Ocean models on the sphere: ocean_spherical.md

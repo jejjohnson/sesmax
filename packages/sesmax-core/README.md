@@ -99,7 +99,7 @@ override-dependencies = [
 sesmax-core = { git = "https://github.com/jejjohnson/sesmax.git", subdirectory = "packages/sesmax-core" }
 ```
 
-Four extras add the optional parts: `da` (filterax and vardax, for `sesmax_core.da`), `flows` (flowjax, for `sesmax_core.flows`), `xarray` (xarray and zarr, for `sesmax_core.io`) and `checkpoint` (orbax, for `SimulationCheckpointer`). An optional module used without its extra raises an `ImportError` that names it. For the assimilation adapters, write `sesmax-core[da]` in the dependencies above.
+Three extras add the optional parts: `da` (filterax and vardax, for `sesmax_core.da`), `flows` (flowjax, for `sesmax_core.flows`) and `xarray` (xarray and zarr, for `sesmax_core.io`). An optional module used without its extra raises an `ImportError` that names it. For the assimilation adapters, write `sesmax-core[da]` in the dependencies above.
 
 To work on the package itself, a clone needs no overrides (see Development).
 
@@ -222,11 +222,11 @@ Every name below is public in the module named beside it. The [capability index]
 | `sesmax_core.train` | `rollout`, `rollout_loss`, `state_mse`, `ModelStep` | One scan over a window, with checkpointing |
 | `sesmax_core.da` | `FilteraxDynamics`, `VardaxForwardModel`, `WindowOperator`, `make_ensemble`, `state_to_vector`, `SubsampleObs` | Needs `[da]`; `VardaxForwardModel` is exact only for autonomous models |
 | `sesmax_core.gfd`, `sesmax_core.vertical` | `ModalTransform`, `StratificationProfile`, `pv_inversion`, `streamfunction_from_vorticity`, `pressure_from_divergence`, `barotropic_filter` | Layered fluids: vertical modes and the elliptic inversions |
-| `sesmax_core.guards`, `sesmax_core.monitor` | `guard_finite`, `guard_positive`, `guard_ceiling`; `BaseMonitor`, `default_monitors` and the built-in monitors | Guards stop inside a step; the run loop that calls the monitors is not in the package yet |
+| `sesmax_core.guards`, `sesmax_core.component` | `guard_finite`, `guard_positive`, `guard_ceiling`; `Component`, `BuiltRun` | Guards stop inside a step; a component registers its models for a run |
 | `sesmax_core.fields`, `sesmax_core.validation` | `each`, `map_fields`, `placed`, `values`; `require_positive`, `require_non_negative`, `reject_derived_kwargs` | For writing a model once for arrays and located fields, and for checking a factory's arguments |
 | `sesmax_core.operators` | `ModelOp`, `OperatorTerm` | pipekit operators in and out of a model |
 | `sesmax_core.domain` | `Domain`, `TimeDomain` | Spatial and time domains |
-| `sesmax_core.io`, `sesmax_core.checkpoint`, `sesmax_core.flows` | `state_to_dataset`, `save_dataset`; `SimulationCheckpointer`; `to_flowjax`, `learned_prior` | Need `[xarray]`, `[checkpoint]` and `[flows]` |
+| `sesmax_core.io`, `sesmax_core.flows` | `state_to_dataset`, `save_dataset`; `to_flowjax`, `learned_prior` | Need `[xarray]` and `[flows]` |
 | `sesmax_core.testing` | `Lorenz63`, `Lorenz96`, `Burgers2D`, `IncompressibleNS2D`, `LinearSWM2DTermModel`, `NonlinearShallowWater1D` and the rest | Toy models for tests, tutorials and examples |
 
 ## 📓 Tutorials

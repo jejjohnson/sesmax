@@ -12,8 +12,9 @@ sesmax is a workspace of packages: a shared core, one package per Earth-system c
 
 | Distribution | Import | Holds | Status |
 | --- | --- | --- | --- |
-| `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, monitors, I/O, test problems | moved from somax; first release 0.1.0 |
+| `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, I/O, test problems | moved from somax; first release 0.1.0 |
 | `sesmax-ocean` | `sesmax_ocean` | shallow-water, QG and spherical ocean models, ocean diagnostics, the double-gyre scenarios | moving from somax (sesmax#152) |
+| `sesmax-experiment` | `sesmax_experiment` | runs of models in chunks, their monitors and checkpoints | the run loop is moving from somax (sesmax#186) |
 | `sesmax` | — | code-free umbrella that installs the packages | scaffolded (C0) |
 
 ## The core in use

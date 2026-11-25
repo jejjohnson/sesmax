@@ -37,7 +37,7 @@ PKG_VERSION := $(shell grep -E '^version\s*=' packages/sesmax-core/pyproject.tom
 # Paths (override via .env or command line)
 # ---------------------------------------------------------------------------
 # Every package's sources, type-checked together.
-PKGROOT ?= packages/sesmax-core/src packages/sesmax-ocean/src packages/sesmax/src
+PKGROOT ?= packages/sesmax-core/src packages/sesmax-experiment/src packages/sesmax-ocean/src packages/sesmax/src
 # Additional paths to type-check alongside the package.
 TYPECHECK_EXTRA ?= scripts
 

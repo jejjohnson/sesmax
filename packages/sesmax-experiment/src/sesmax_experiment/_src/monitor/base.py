@@ -2,14 +2,14 @@
 
 :class:`BaseMonitor` supplies inert defaults for all three lifecycle hooks so
 a concrete monitor overrides only what it needs. It satisfies the
-:class:`sesmax_core._src.monitor.protocol.Monitor` structural protocol.
+:class:`sesmax_experiment._src.monitor.protocol.Monitor` structural protocol.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from sesmax_core._src.monitor.protocol import ChunkInfo, MonitorVerdict
+from sesmax_experiment._src.monitor.protocol import ChunkInfo, MonitorVerdict
 
 
 class BaseMonitor:
