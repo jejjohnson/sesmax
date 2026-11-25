@@ -44,6 +44,9 @@ def test_no_flow_through_the_walls(name: str, located: bool) -> None:
     end = model.integrate(state_class(**fields), t0=0.0, t1=3600.0, dt=60.0).ys
     u, v = (np.asarray(x.data if located else x)[-1] for x in (end.u, end.v))
     assert np.abs(u).max() > 0.0
-    for face in (0, -2, -1):
+    for face in (0, -2):
         np.testing.assert_array_equal(u[..., face], 0.0)
         np.testing.assert_array_equal(v[..., face, :], 0.0)
+    # The face beyond the wall is a ghost, the odd image of the one inside.
+    np.testing.assert_array_equal(u[..., -1], -u[..., -3])
+    np.testing.assert_array_equal(v[..., -1, :], -v[..., -3, :])
