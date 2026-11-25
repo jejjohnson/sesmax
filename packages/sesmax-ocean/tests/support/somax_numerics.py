@@ -11,6 +11,7 @@ import dataclasses
 from typing import Any
 
 import equinox as eqx
+import jax.numpy as jnp
 
 from sesmax_core import Model
 from sesmax_core.fields import placed, values
@@ -62,4 +63,9 @@ def with_somax_numerics(model: Model) -> Model:
     if type(model) not in _CLASSES:
         return model
     fields = {f.name: getattr(model, f.name) for f in dataclasses.fields(model)}
+    if isinstance(model, SphericalSWM):
+        # f at the corners, which the PV averages to the corners again.
+        lat = jnp.asarray(model.grid.coords("y"))[:, None]
+        f = 2.0 * model.consts.omega * jnp.sin(lat + 0.5 * model.grid.dlat)
+        fields["f_field"] = jnp.broadcast_to(f, model.grid.shape)
     return _CLASSES[type(model)](**fields)
