@@ -106,18 +106,10 @@ def test_a_somax_state_with_no_sesmax_home_says_so():
             "state_to_dataset(L96State(x=jnp.zeros(2)))\n",
             "sesmax-core[xarray]",
         ),
-        (
-            "from sesmax_core import SimulationCheckpointer\n"
-            "ckpt = SimulationCheckpointer(\n"
-            "    checkpoint_dir='unused', checkpoint_interval=1\n"
-            ")\n"
-            "ckpt.restore(0, None, None)\n",
-            "sesmax-core[checkpoint]",
-        ),
     ],
 )
 def test_missing_extra_is_named(code, extra):
-    blocked = "xarray" if "xarray" in extra else "orbax"
+    blocked = "xarray"
     script = (
         "import sys\n"
         f"sys.modules[{blocked!r}] = None\n"

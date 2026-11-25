@@ -143,6 +143,8 @@ def test_scan_traces_the_step_a_fixed_number_of_times():
     m = eqx.tree_at(lambda m: m.terms, model, model.terms + TermFn(counting))
 
     def traces(n):
+        # The second rollout would reuse the solve the first one traced.
+        jax.clear_caches()
         calls.clear()
         jax.jit(lambda s: rollout(m, s, dt=DT, n_steps=n))(s0)
         return len(calls)

@@ -72,7 +72,8 @@ gridax places the T rows of a spherical grid at cell centres (gridax#433). finit
 ## The trial port
 
 We ran all seven models of somax `9cb19b3` through a thin adapter from the old class names onto gridax v0.3.1 and sesmax-core `566b3c7`, with array states, and compared them with somax on finitevolX `c6f3d99`.
-Each case is a 32 × 24 grid with random initial fields, in float64, with and without an island, and 20 Heun steps (5 for the spherical QG model).
+Each case is a 32 × 24 grid with random initial fields, in float64, with and without a mask, and 20 Heun steps (5 for the spherical QG model).
+The masks were all water by a mistake in the script; the equality tests of the package have land.
 The numbers are the largest difference over the interior cells divided by the largest value of somax's array, over every case of a model.
 
 | Model | Tendency | End state | Diagnostics |

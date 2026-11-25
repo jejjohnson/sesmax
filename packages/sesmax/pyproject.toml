@@ -21,6 +21,7 @@ classifiers = [
 # Code-free umbrella (SX-1): it only installs the components.
 dependencies = [
     "sesmax-core",
+    "sesmax-experiment",
     "sesmax-ocean",
 ]
 

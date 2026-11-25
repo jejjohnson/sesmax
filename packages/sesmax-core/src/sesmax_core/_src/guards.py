@@ -18,7 +18,7 @@ The runtime cost of the check, and what happens on failure, is governed by the
 docs for ``equinox.error_if`` and ``equinox.debug``.
 
 These guards are the *in-JIT* counterpart to the host-side checks in the
-``somax-sim`` runner (``_assert_finite_state``) and the :mod:`sesmax_core.monitor`
+``somax-sim`` runner (``_assert_finite_state``) and the :mod:`sesmax_experiment.monitor`
 chunk-boundary monitors: a guard halts **at** the offending step, before the
 rest of a multi-thousand-step chunk runs.
 """

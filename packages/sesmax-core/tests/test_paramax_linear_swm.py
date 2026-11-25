@@ -4,9 +4,9 @@ somax's ``tests/test_paramax_integration.py`` (at 9cb19b3) checks part of the
 paramax contract through a barotropic QG model, which is not in the core:
 unwrapping is transparent, gradients land on the stored unconstrained value,
 the wrapped model runs under ``jit``, factories accept wrapped values, the
-trainable mask works, a checkpoint round-trips, and boundary conditions see
-unwrapped parameters. These are those tests, re-based on
-``LinearShallowWater2D``, which takes the same ``lateral_viscosity`` and
+trainable mask works, and boundary conditions see unwrapped parameters (the
+checkpoint round trip is in sesmax-experiment's tests). These are those tests,
+re-based on ``LinearShallowWater2D``, which takes the same ``lateral_viscosity`` and
 ``bottom_drag`` parameters: the QG model became the linear shallow-water one,
 its state ``q`` a ``(h, u, v)`` state, and the field the tests read ``q``
 became ``u``, the velocity both parameters act on. The rest of somax's file
@@ -498,59 +498,6 @@ class TestTrainableMaskCoversOnlyArrays:
     def test_a_plain_array_parameter_is_still_trainable(self):
         mask = trainable_mask(LinearShallowWater2D.create(nx=8, ny=8))
         assert mask.params.lateral_viscosity is True
-
-
-class TestConstrainedModelsRoundTripThroughACheckpoint:
-    """Orbax has no handler for the transform callable in ``Parameterize``."""
-
-    @staticmethod
-    def _constrained_model():
-        model = LinearShallowWater2D.create(nx=8, ny=8)
-        return eqx.tree_at(lambda m: m.params.lateral_viscosity, model, positive(100.0))
-
-    def test_it_saves_and_restores(self, tmp_path):
-        from sesmax_core._src.checkpoint import SimulationCheckpointer
-
-        model = self._constrained_model()
-        state = _sw_state(jnp.zeros((10, 10)))
-        ckpt = SimulationCheckpointer(
-            checkpoint_dir=str(tmp_path), checkpoint_interval=1
-        )
-        ckpt.save(1, state, model)
-        _, params, step = ckpt.restore(1, state, model)
-
-        assert step == 1
-        assert float(paramax.unwrap(params).lateral_viscosity) == pytest.approx(
-            100.0, rel=1e-5
-        )
-
-    def test_the_restored_parameter_is_still_a_wrapper(self, tmp_path):
-        from sesmax_core._src.checkpoint import SimulationCheckpointer
-
-        model = self._constrained_model()
-        state = _sw_state(jnp.zeros((10, 10)))
-        ckpt = SimulationCheckpointer(
-            checkpoint_dir=str(tmp_path), checkpoint_interval=1
-        )
-        ckpt.save(1, state, model)
-        _, params, _ = ckpt.restore(1, state, model)
-        assert isinstance(params.lateral_viscosity, paramax.Parameterize)
-
-    def test_a_plain_model_still_round_trips(self, tmp_path):
-        from sesmax_core._src.checkpoint import SimulationCheckpointer
-
-        model = LinearShallowWater2D.create(nx=8, ny=8)
-        state = _sw_state(jnp.zeros((10, 10)))
-        ckpt = SimulationCheckpointer(
-            checkpoint_dir=str(tmp_path), checkpoint_interval=1
-        )
-        ckpt.save(2, state, model)
-        _, params, step = ckpt.restore(2, state, model)
-        assert step == 2
-        np.testing.assert_allclose(
-            np.asarray(params.lateral_viscosity),
-            np.asarray(model.params.lateral_viscosity),
-        )
 
 
 class _DragBoundarySW(LinearShallowWater2D):

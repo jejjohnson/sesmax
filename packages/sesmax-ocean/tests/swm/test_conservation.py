@@ -36,7 +36,7 @@ def _mask(periodic: bool) -> Mask2D:
     wet = np.full(SHAPE, periodic)
     wet[1:-1, 1:-1] = True
     wet[8:13, 14:20] = False
-    return Mask2D.from_center(wet)
+    return Mask2D.from_mask(wet)
 
 
 @pytest.mark.parametrize("masked", [False, True], ids=["nomask", "island"])

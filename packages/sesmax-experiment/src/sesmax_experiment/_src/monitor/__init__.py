@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from sesmax_core._src.monitor.base import BaseMonitor
-from sesmax_core._src.monitor.builtins import (
+from sesmax_experiment._src.monitor.base import BaseMonitor
+from sesmax_experiment._src.monitor.builtins import (
     ConservationDriftMonitor,
     EnergyGrowthMonitor,
     NonFiniteMonitor,
@@ -12,7 +12,7 @@ from sesmax_core._src.monitor.builtins import (
     WatchdogMonitor,
     default_monitors,
 )
-from sesmax_core._src.monitor.protocol import ChunkInfo, Monitor, MonitorVerdict
+from sesmax_experiment._src.monitor.protocol import ChunkInfo, Monitor, MonitorVerdict
 
 
 __all__ = [

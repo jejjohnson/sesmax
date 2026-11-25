@@ -80,11 +80,6 @@ xarray = [
     "xarray>=2026.4.0",
     "zarr>=3.1.6",
 ]
-# The orbax checkpointer in ``sesmax_core.checkpoint``.
-checkpoint = [
-    "orbax-checkpoint>=0.11.37",
-]
-
 [project.urls]
 Repository = "https://github.com/jejjohnson/sesmax"
 

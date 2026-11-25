@@ -43,7 +43,13 @@ from sesmax_ocean._src.spherical._geometry import (
     require_global_longitude,
     require_open_poles,
 )
-from sesmax_ocean._src.swm._shared import POINTS, UPWIND, wrap
+from sesmax_ocean._src.swm._shared import (
+    POINTS,
+    UPWIND,
+    FreeSlip,
+    velocity_laplacian,
+    wrap,
+)
 
 
 # Periodic in longitude, solid walls with free slip in latitude.
@@ -169,6 +175,7 @@ class SphericalSWM(Model):
         mask: Optional land/ocean mask (``None`` = all-ocean).
         f_field: Precomputed Coriolis field at T-points, which the PV averages
             to its corners.
+        free_slip: The potential vorticity on the walls and coasts.
         wind_stress_x: Normalised zonal wind-stress pattern.
         wind_stress_y: Normalised meridional wind-stress pattern.
         scheme: Scheme of the face values in the mass equation.
@@ -180,6 +187,7 @@ class SphericalSWM(Model):
     ops: GridOps
     mask: Mask2D | None
     f_field: Float[Array, "Ny Nx"]
+    free_slip: FreeSlip
     wind_stress_x: Float[Array, "Ny Nx"]
     wind_stress_y: Float[Array, "Ny Nx"]
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
@@ -192,9 +200,17 @@ class SphericalSWM(Model):
         """``field`` with its ghosts filled on the periodic faces."""
         return wrap(field, self.grid, _WRAP, at)
 
+    def _potential_vorticity(self, u: Any, v: Any, h: Any) -> Any:
+        """``(zeta + f) / h`` at X-points, with ``f / h`` on walls and coasts."""
+        q = self.ops.sw_potential_vorticity(u, v, h, placed(self.f_field, h, "T"))
+        q = each(lambda array: self.free_slip(array, values(h)), q)
+        return self._wrap(q, "X")
+
     def _laplacian(self, velocity: Any, at: str) -> Any:
-        """The Laplacian of a velocity component, at its own points."""
-        return self.ops.laplacian(velocity, at=at)
+        """The Laplacian of a velocity component, with free slip along coasts."""
+        return velocity_laplacian(
+            velocity, self.grid, self.mask, at, thickness_bc=_BAND["h"], wraps=_WRAP
+        )
 
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
@@ -214,8 +230,7 @@ class SphericalSWM(Model):
         dh_dt = self._mass_tendency(h, u, v)
 
         # 2. Potential vorticity q = (zeta + f)/h at X-points.
-        f = placed(self.f_field, h, "T")
-        q = self.ops.sw_potential_vorticity(u, v, h, f)
+        q = self._potential_vorticity(u, v, h)
 
         # 3. Mass fluxes, then the cross-velocity PV fluxes (vector-invariant
         # Coriolis term).
@@ -223,7 +238,6 @@ class SphericalSWM(Model):
         vh = each(operator.mul, self.ops.interpolate(h, src="T", dst="V"), v)
         # The next averages read the ghosts of these, which the operators leave
         # at zero.
-        q = self._wrap(q, "X")
         uh, vh = self._wrap(uh, "U"), self._wrap(vh, "V")
         q_on_U = self.ops.interpolate(q, src="X", dst="U")
         q_on_V = self.ops.interpolate(q, src="X", dst="V")
@@ -537,6 +551,7 @@ class SphericalSWM(Model):
             ops=GridOps(grid, mask),
             mask=mask,
             f_field=f_field,
+            free_slip=FreeSlip.build(grid, mask, _BAND["h"], f_field, walls="y"),
             wind_stress_x=wind_stress_x,
             wind_stress_y=wind_stress_y,
             scheme=scheme,

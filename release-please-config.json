@@ -76,6 +76,23 @@
         }
       ]
     },
+    "packages/sesmax-experiment": {
+      "release-type": "python",
+      "package-name": "sesmax-experiment",
+      "component": "sesmax-experiment",
+      "changelog-path": "CHANGELOG.md",
+      "initial-version": "0.1.0",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        "src/sesmax_experiment/__init__.py",
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='sesmax-experiment')].version"
+        }
+      ]
+    },
     "packages/sesmax-ocean": {
       "release-type": "python",
       "package-name": "sesmax-ocean",

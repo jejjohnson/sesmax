@@ -7,11 +7,11 @@ description: Add a simulation monitor to sesmax — a BaseMonitor subclass with 
 
 Read "Monitors" under "The contracts" in `AGENTS.md` first. A monitor runs host-side between jitted chunks. If the check must stop the run at the offending step, it is a guard inside the tendency (`guard_finite`, `guard_positive`, `guard_ceiling`), not a monitor.
 
-Nothing in the core calls monitors yet: the run loop that does arrives with `sesmax_core.sim` (#28). Until then a monitor is exercised directly in its tests.
+`sesmax_experiment.run.run_chunks` calls the monitors, after each chunk.
 
 ## 1. Where it goes
 
-`packages/sesmax-core/src/sesmax_core/_src/monitor/builtins.py` for one every model can use. Anything ocean-specific goes in `sesmax-ocean`, once it exists (phase C2).
+`packages/sesmax-experiment/src/sesmax_experiment/_src/monitor/builtins.py` for one every model can use. A monitor that knows a component's fields belongs with that component, as a subclass its users import.
 
 ## 2. Write it
 
@@ -20,7 +20,7 @@ Subclass `BaseMonitor`, set `name` and override only the hooks you need.
 ```python
 import numpy as np
 
-from sesmax_core.monitor import BaseMonitor, ChunkInfo, MonitorVerdict
+from sesmax_experiment.monitor import BaseMonitor, ChunkInfo, MonitorVerdict
 
 
 class MaxValueMonitor(BaseMonitor):
@@ -47,14 +47,14 @@ class MaxValueMonitor(BaseMonitor):
 
 ## 3. Export and document it
 
-Add the name to `__all__` in `_src/monitor/__init__.py` and in `sesmax_core/monitor.py`. `docs/api/monitor.md` renders it from there; if it is a built-in, update the row in `docs/api/index.md`, and add it to `default_monitors()` only if every run should have it. Then run `make capabilities`.
+Add the name to `__all__` in `_src/monitor/__init__.py` and in `sesmax_experiment/monitor.py`. `docs/api/experiment_monitor.md` renders it from there; if it is a built-in, update the row in `docs/api/index.md`, and add it to `default_monitors()` only if every run should have it. Then run `make capabilities`.
 
 ## 4. Test it
 
-Tests join `packages/sesmax-core/tests/test_monitor.py`, using its lightweight fakes rather than an integration, so they stay in the fast tier. Check the quiet case, the triggering case with its `reason`, and each hook you overrode.
+Tests join `packages/sesmax-experiment/tests/test_monitor.py`, using its lightweight fakes rather than an integration, so they stay in the fast tier. Check the quiet case, the triggering case with its `reason`, and each hook you overrode.
 
 ```bash
-uv run pytest --no-cov packages/sesmax-core/tests/test_monitor.py -v
+uv run pytest --no-cov packages/sesmax-experiment/tests/test_monitor.py -v
 ```
 
 Finish with `pre-pr-check`.
