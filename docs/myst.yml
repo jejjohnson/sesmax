@@ -57,7 +57,7 @@ project:
         - file: notebooks/pressure_poisson.ipynb
         - file: notebooks/helmholtz_screening.ipynb
         - file: notebooks/inhomogeneous_bcs_tutorial.ipynb
-    - title: Rotating shallow water
+    - file: guide/rotating_flows.md
       children:
         - file: notebooks/step14_gravity_waves_1d.ipynb
         - file: notebooks/step15_shallow_water_1d.ipynb
