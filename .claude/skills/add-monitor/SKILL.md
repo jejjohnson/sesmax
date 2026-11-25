@@ -7,7 +7,7 @@ description: Add a simulation monitor to sesmax — a BaseMonitor subclass with 
 
 Read "Monitors" under "The contracts" in `AGENTS.md` first. A monitor runs host-side between jitted chunks. If the check must stop the run at the offending step, it is a guard inside the tendency (`guard_finite`, `guard_positive`, `guard_ceiling`), not a monitor.
 
-Nothing calls monitors yet: the run loop that does arrives with #189. Until then a monitor is exercised directly in its tests.
+`sesmax_experiment.run.run_chunks` calls the monitors, after each chunk.
 
 ## 1. Where it goes
 

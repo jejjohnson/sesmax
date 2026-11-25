@@ -20,6 +20,7 @@ import sesmax_experiment
 SUBMODULES: list[str] = [
     "checkpoint",
     "monitor",
+    "run",
 ]
 
 

@@ -97,6 +97,7 @@ nav:
   - Validation: validation.md
   - Test problems: testing.md
   - Components: component.md
+  - Experiment runs: experiment_run.md
   - Experiment monitors: experiment_monitor.md
   - Experiment checkpoints: experiment_checkpoint.md
   - Ocean QG models: ocean_qg.md

@@ -37,6 +37,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 
 | Page | Contents |
 |---|---|
+| [Runs in chunks](experiment_run.md) | `run_chunks`, `Timeline`, `ChunkedRun`, `ChunkFrame`, `RunStopped`; the schedules `every_chunks`, `every_sim_seconds`, `every_wall_seconds`, `at_snapshots`; the stages `AdvanceChunk`, `RunMonitors` |
 | [Monitors](experiment_monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
 | [Checkpointing](experiment_checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
 
