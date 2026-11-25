@@ -758,7 +758,7 @@ Every public name in `sesmax_core`, `sesmax_experiment`, `sesmax_ocean` (296 of 
 
 <!-- upstream -->
 
-Listed at gridax 0.3.2, spectraldiffx 0.1.2, diffrax 0.7.2, lineax 0.1.1, paramax 0.0.5, pipekit-ops 0.2.4, geonnax 0.0.11.
+Listed at gridax 0.3.3, spectraldiffx 0.1.2, diffrax 0.7.2, lineax 0.1.1, paramax 0.0.5, pipekit-ops 0.3.0, geonnax 0.0.11.
 
 ## Upstream: `gridax`
 
