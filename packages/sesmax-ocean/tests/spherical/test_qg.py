@@ -159,9 +159,11 @@ class TestVelocities:
         assert float(jnp.abs(divergence[inner]).max()) < 0.2 * scale
 
     def test_a_zonal_streamfunction_gives_no_meridional_flow(self):
-        model = build()
-        _, v = model.velocities(zonal_streamfunction(model))
-        assert float(jnp.abs(v[INTERIOR]).max()) == pytest.approx(0.0, abs=1e-9)
+        # In float64: the corner averages of a psi of 1e7 round at 1e-7 m/s.
+        with jax.enable_x64(True):
+            model = build()
+            _, v = model.velocities(zonal_streamfunction(model))
+            assert float(jnp.abs(v[INTERIOR]).max()) == pytest.approx(0.0, abs=1e-9)
 
     def test_sign_convention_is_the_usual_one(self):
         """u = -dpsi/dy: a poleward-increasing psi gives westward flow."""

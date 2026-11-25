@@ -16,7 +16,7 @@ import jax.numpy as jnp
 from sesmax_core import Model
 from sesmax_core.fields import placed, values
 from sesmax_ocean.qg import ReparameterizedQG
-from sesmax_ocean.spherical import SphericalSWM
+from sesmax_ocean.spherical import SphericalQG, SphericalSWM
 from sesmax_ocean.swm import MultilayerShallowWater2D, NonlinearShallowWater2D
 
 
@@ -49,10 +49,28 @@ class _Spherical(_SomaxNumerics, SphericalSWM):
     pass
 
 
+class _SphericalQG(SphericalQG):
+    """Velocities and fluxes that stop at the edge of the array."""
+
+    def velocities(self, psi: Any) -> Any:
+        dpsi_dlat = self.ops.difference(psi, axis="y", src="T", dst="V")
+        dpsi_dlon = self.ops.difference(psi, axis="x", src="T", dst="U")
+        u = -self.ops.interpolate(dpsi_dlat, src="V", dst="U")
+        v = self.ops.interpolate(dpsi_dlon, src="U", dst="V")
+        return u, v
+
+    def _advection(self, q: Any, u: Any, v: Any) -> Any:
+        return self.ops.advect(q, u, v, scheme=self.scheme)
+
+    def _laplacian_of_vorticity(self, q: Any) -> Any:
+        return self.ops.diffuse(q, kappa=1.0)
+
+
 _CLASSES = {
     NonlinearShallowWater2D: _Nonlinear,
     MultilayerShallowWater2D: _Multilayer,
     SphericalSWM: _Spherical,
+    SphericalQG: _SphericalQG,
 }
 
 
