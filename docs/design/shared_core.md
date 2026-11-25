@@ -21,7 +21,7 @@ numbering:
 
 ## Decision
 
-Proposed: design `sesmax-core` as the layer every time-stepping GeoModels repository can build on, with `sesmax-ocean` and plumax as its first two consumers, and add only what no library already owns: a temporal basis for time-resolved controls, a stable-step bound, a whole-window operator for source inversion, and a thin method that hands a model to `pipekit_jax.DiffraxForwardModel`.
+Proposed: design `sesmax-core` as the layer every time-stepping GeoModels repository can build on, with `sesmax-ocean` and plumax as its first two consumers, and add only what no library already owns: a temporal basis for time-resolved controls, a stable-step bound, a whole-window operator for source inversion, and a thin method that hands a model to `integrix.march.DiffraxForwardModel`.
 plumax designs against this API but does not switch over until the core and its stack are on PyPI.
 radtrax does not depend on the core.
 Status: proposed, for review. Nothing here is implemented, and the follow-up issues are filed, with #8 tracking them.
@@ -215,8 +215,8 @@ The repetition is re-implementation under other names, which a body comparison c
 | Horizontal advection and diffusion | finitevolX `Advection*`, `Diffusion*` | thin wrappers: plumax `advection_tendency`, `diffusion_tendency`; sesmax `_burgers_flux`, `_advective_form` | keep the wrappers thin; SC-6 removes the periodic logic they repeat |
 | Vertical advection and diffusion | nobody: `Advection3D` and `Diffusion3D` act per level | plumax `vertical_advection_tendency`, `vertical_diffusion_tendency` | move to finitevolX (SC-7) |
 | Periodic edge handling | nobody | plumax `advection_tendency`; sesmax `_burgers_flux`, `_advective_form`, `IncompressibleNS2D._wrap` | move to finitevolX (SC-6) |
-| Solver, controller, adjoint and step budget | pipekit-jax `DiffraxForwardModel` | plumax `solver_kwargs`, `_pick_solver`; vardax `_DynamicalForwardModel`; the core's `integrate(**kw)` | reuse it (SC-1) |
-| One step as a `ForwardModel` | pipekit-jax `DiffraxForwardModel` | plumax `EulerianForwardModel`; the core's `ModelOp`, `VardaxForwardModel`, `FilteraxDynamics` | plumax drops its adapter; the core keeps what adds flattening or pipelines |
+| Solver, controller, adjoint and step budget | integrix `DiffraxForwardModel` | plumax `solver_kwargs`, `_pick_solver`; vardax `_DynamicalForwardModel`; the core's `integrate(**kw)` | reuse it (SC-1) |
+| One step as a `ForwardModel` | integrix `DiffraxForwardModel` | plumax `EulerianForwardModel`; the core's `ModelOp`, `VardaxForwardModel`, `FilteraxDynamics` | plumax drops its adapter; the core keeps what adds flattening or pipelines |
 | Explicit Runge–Kutta schemes | diffrax, finitevolX `RK3SSP` and others | no copies found | use them through `solver=` |
 | Time-varying fields | a diffrax path, through the core's `InterpolatedForcing`: diffrax's own interpolations, or integrix's `SampledPath` over any functax 1-D scheme | plumax `WindSchedule`, `interpolate_in_time`, `_time_bracket`, `_interpolated_emission` | plumax can move at S4 |
 | Vertical modes | finitevolX `decompose_vertical_modes`, fixed in its #252 | nothing since `ModalTransform.from_physics` delegated to it | see below the table |
@@ -257,7 +257,7 @@ Some of what plumax needs already ships, so these are not candidates:
 
 | plumax today | Stack today |
 | --- | --- |
-| `EulerianForwardModel`, which takes one explicit Euler step | `pipekit_jax.DiffraxForwardModel` |
+| `EulerianForwardModel`, which takes one explicit Euler step | `integrix.march.DiffraxForwardModel` |
 | `WindSchedule`, `MetField.wind_at`, for a field through time | `InterpolatedForcing`, whose `from_data` already interpolates a tuple of components |
 | `GaussianSource` | `BasisForcing` with a one-column `SpatialBasis`, lifted by `ForcingTerm` |
 | `_to_dataset`, in part | `snapshots_to_dataset` |
@@ -265,7 +265,7 @@ Some of what plumax needs already ships, so these are not candidates:
 ### SC-1: reuse `DiffraxForwardModel`
 
 A run needs a solver, a step controller, an adjoint and a step budget, and each consumer has grown its own handling of them: plumax has `_pick_solver` and a `solver_kwargs` dict, and #80 added `adjoint` to `VardaxForwardModel`.
-`pipekit_jax.DiffraxForwardModel` already bundles all four, satisfies `pipekit_cycle.ForwardModel`, and has `as_dynamics()` for the `(state, t0, t1)` form that filterax uses. pipekit-jax is already a base dependency of the core, so a new settings class would be one more repeat.
+`integrix.march.DiffraxForwardModel` already bundles all four, satisfies `pipekit_cycle.ForwardModel`, and has `as_dynamics()` for the `(state, t0, t1)` form that filterax uses. integrix is already a base dependency of the core, so a new settings class would be one more repeat.
 
 | Check, at the same solver and step | Result |
 | --- | --- |
@@ -281,7 +281,7 @@ plumax can use this today, with no core at all, once it declares pipekit-jax:
 import diffrax as dfx
 import jax.numpy as jnp
 from pipekit_cycle import ForwardModel
-from pipekit_jax import DiffraxForwardModel
+from integrix.march import DiffraxForwardModel
 from plumax.les_fvm import EulerianDispersionRHS, make_grid, uniform_wind_field
 from plumax.les_fvm.boundary import build_default_concentration_bc
 from plumax.les_fvm.diffusion import make_eddy_diffusivity
@@ -298,7 +298,7 @@ rhs = EulerianDispersionRHS(
     horizontal_bc=horizontal,
     vertical_bc=vertical,
 )
-# today (pipekit_jax): in place of plumax's EulerianForwardModel
+# today (integrix): in place of plumax's EulerianForwardModel
 forward = DiffraxForwardModel(
     vector_field=rhs, solver=dfx.Heun(), dt0=1.0, dt=5.0, max_steps=100
 )
@@ -323,7 +323,7 @@ In `sesmax-ocean` and `sesmax_core.testing`, this is how a model enters a cycle 
 
 # proposed (SC-1)
 forward = model.as_forward_model(dt=0.05, dt0=0.05, solver=dfx.Tsit5())
-# today (filterax's form, from pipekit_jax)
+# today (filterax's form, from integrix)
 dynamics = forward.as_dynamics()
 # proposed (SC-1): the same model, with forward-mode gradients
 tangent_ready = model.as_forward_model(dt=0.05, dt0=0.05, adjoint=dfx.DirectAdjoint())
