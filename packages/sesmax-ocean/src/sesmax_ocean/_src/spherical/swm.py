@@ -191,6 +191,10 @@ class SphericalSWM(Model):
         """``field`` with its ghosts filled on the periodic faces."""
         return wrap(field, self.grid, _WRAP, at)
 
+    def _laplacian(self, velocity: Any, at: str) -> Any:
+        """The Laplacian of a velocity component, at its own points."""
+        return self.ops.laplacian(velocity, at=at)
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
         return self.ops.advect(h, u, v, scheme=self.scheme, bc=_BAND["h"])
@@ -236,18 +240,17 @@ class SphericalSWM(Model):
         wind_u = tau0 * self._masked(self.wind_stress_x, "U")
         wind_v = tau0 * self._masked(self.wind_stress_y, "V")
 
-        # 6. Lateral diffusion, by the operator for T-points on the array of a
-        # velocity.
-        diffusion_u = self.ops.diffuse(values(u), kappa=nu)
-        diffusion_v = self.ops.diffuse(values(v), kappa=nu)
-
-        # 7. Momentum: PV flux and pressure, then wind, diffusion and linear
+        # 6. Momentum: PV flux and pressure, then wind, diffusion and linear
         # bottom drag. The pressure gradients carry the spherical metric.
-        def zonal(pv: Array, flux: Array, dP: Array, velocity: Array) -> Array:
-            return pv * flux - dP + wind_u + diffusion_u - kappa * velocity
+        def zonal(
+            pv: Array, flux: Array, dP: Array, lap: Array, velocity: Array
+        ) -> Array:
+            return pv * flux - dP + wind_u + nu * lap - kappa * velocity
 
-        def meridional(pv: Array, flux: Array, dP: Array, velocity: Array) -> Array:
-            tendency = -pv * flux - dP + wind_v + diffusion_v - kappa * velocity
+        def meridional(
+            pv: Array, flux: Array, dP: Array, lap: Array, velocity: Array
+        ) -> Array:
+            tendency = -pv * flux - dP + wind_v + nu * lap - kappa * velocity
             # Hold the constrained rows fixed. ``apply_boundary_conditions``
             # zeroes the wall-normal v before each evaluation, but the
             # integrator projects only the RHS *input* — the returned and
@@ -259,8 +262,8 @@ class SphericalSWM(Model):
         P = self._wrap(P, "T")
         dP_dx = self.ops.difference(P, axis="x", src="T", dst="U")
         dP_dy = self.ops.difference(P, axis="y", src="T", dst="V")
-        du_dt = each(zonal, q_on_U, vh_on_U, dP_dx, u)
-        dv_dt = each(meridional, q_on_V, uh_on_V, dP_dy, v)
+        du_dt = each(zonal, q_on_U, vh_on_U, dP_dx, self._laplacian(u, "U"), u)
+        dv_dt = each(meridional, q_on_V, uh_on_V, dP_dy, self._laplacian(v, "V"), v)
 
         return SphericalSWMState(h=dh_dt, u=du_dt, v=dv_dt)
 

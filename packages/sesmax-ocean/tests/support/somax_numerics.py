@@ -13,6 +13,7 @@ from typing import Any
 import equinox as eqx
 
 from sesmax_core import Model
+from sesmax_core.fields import placed, values
 from sesmax_ocean.qg import ReparameterizedQG
 from sesmax_ocean.spherical import SphericalSWM
 from sesmax_ocean.swm import MultilayerShallowWater2D, NonlinearShallowWater2D
@@ -24,6 +25,11 @@ class _SomaxNumerics:
     def _wrap(self, field: Any, at: str) -> Any:
         """The ghosts of the products of the tendency stay at zero."""
         return field
+
+    def _laplacian(self, velocity: Any, at: str) -> Any:
+        """Diffusion as a tracer at T, with closed outer faces."""
+        diffusion = self.ops.diffuse(values(velocity), kappa=1.0)  # type: ignore[attr-defined]
+        return placed(diffusion, velocity, at)
 
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """No flux through the edge faces of the array."""

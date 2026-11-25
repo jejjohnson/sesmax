@@ -4,5 +4,6 @@ The shallow-water models, moved from somax. Each reproduces somax's tendencies, 
 
 - The models conserve mass. somax took no flux through the edge faces, so the cells along the edge had a wrong thickness tendency.
 - The Coriolis term and the Bernoulli gradient are right at a periodic edge. somax read ghosts there that no one had filled.
+- The viscous term is the Laplacian of a velocity component at its own points, with the ghosts of the boundary conditions. somax diffused it as a tracer, with no flux through the edge faces.
 
 ::: sesmax_ocean.swm
