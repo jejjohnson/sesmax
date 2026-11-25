@@ -182,6 +182,10 @@ class MultilayerShallowWater2D(Model):
         """``field`` with its ghosts filled on the periodic faces."""
         return wrap(field, self.grid, WRAPS[self.bc_type], at)
 
+    def _laplacian(self, velocity: Any, at: str) -> Any:
+        """The Laplacian of a velocity component, at its own points."""
+        return self.ops.laplacian(velocity, at=at)
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
         return self.ops.advect(h, u, v, scheme=self.scheme, bc=BCS[self.bc_type]["h"])
@@ -228,29 +232,29 @@ class MultilayerShallowWater2D(Model):
 
         P = each(bernoulli, kinetic_energy(u, v, self.grid), h)
 
-        # --- 5. Diffusion, by the operator for T-points on the array of a velocity ---
-        diffusion_u = self.ops.diffuse(values(u), kappa=nu)
-        diffusion_v = self.ops.diffuse(values(v), kappa=nu)
-
-        # --- 6. Momentum: PV flux and pressure, wind on the top layer, diffusion,
+        # --- 5. Momentum: PV flux and pressure, wind on the top layer, diffusion,
         #        bottom drag on the bottom layer ---
-        def x_momentum(pv: Array, flux: Array, dP: Array, velocity: Array) -> Array:
+        def x_momentum(
+            pv: Array, flux: Array, dP: Array, lap: Array, velocity: Array
+        ) -> Array:
             tendency = pv * flux - dP
             tendency = tendency.at[0].add(tau0 * self.wind_stress_x / self.strat.H[0])
-            tendency = tendency + diffusion_u
+            tendency = tendency + nu * lap
             return tendency.at[-1].add(-kappa * velocity[-1])
 
-        def y_momentum(pv: Array, flux: Array, dP: Array, velocity: Array) -> Array:
+        def y_momentum(
+            pv: Array, flux: Array, dP: Array, lap: Array, velocity: Array
+        ) -> Array:
             tendency = -pv * flux - dP
             tendency = tendency.at[0].add(tau0 * self.wind_stress_y / self.strat.H[0])
-            tendency = tendency + diffusion_v
+            tendency = tendency + nu * lap
             return tendency.at[-1].add(-kappa * velocity[-1])
 
         P = self._wrap(P, "T")
         dP_dx = self.ops.difference(P, axis="x", src="T", dst="U")
         dP_dy = self.ops.difference(P, axis="y", src="T", dst="V")
-        du_dt = each(x_momentum, q_on_U, vh_on_U, dP_dx, u)
-        dv_dt = each(y_momentum, q_on_V, uh_on_V, dP_dy, v)
+        du_dt = each(x_momentum, q_on_U, vh_on_U, dP_dx, self._laplacian(u, "U"), u)
+        dv_dt = each(y_momentum, q_on_V, uh_on_V, dP_dy, self._laplacian(v, "V"), v)
 
         # FAIL-HARD (in-JIT): halt at the first step that produces a
         # non-finite tendency, earlier than a host-side check, which only
