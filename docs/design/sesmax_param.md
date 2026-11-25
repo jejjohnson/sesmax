@@ -88,7 +88,7 @@ With $\mathbf{u} = (u, v)$ the horizontal velocity, $\zeta$ the vorticity, $h$ a
 | Backscatter | a negative viscosity, fed by the energy removed | a rate | no |
 | Learned | $g_ \text{net}(\mathbf{x}; \boldsymbol{\theta})$ | weights | `OperatorTerm` |
 
-Here $\mathbf{E} \in \mathbb{R}^{2 \times 2}$ is the strain-rate tensor with its trace removed. The Smagorinsky viscosity ([Smagorinsky, 1963](https://doi.org/10.1175/1520-0493%281963%29091%3C0099:GCEWTP%3E2.3.CO;2)) is
+Here $\mathbf{E} \in \mathbb{R}^{2 \times 2}$ is the strain-rate tensor with its trace removed. The Smagorinsky viscosity ([Smagorinsky, 1963](https://hdl.handle.net/10.1175/1520-0493(1963)091<0099:GCEWTP>2.3.CO;2)) is
 
 ```math
 \nu_\text{S} = (C_\text{S} \Delta)^2 \Vert \mathbf{S} \Vert
@@ -98,7 +98,7 @@ Here $\mathbf{E} \in \mathbb{R}^{2 \times 2}$ is the strain-rate tensor with its
 \Vert \mathbf{S} \Vert^2 = (\partial_x u - \partial_y v)^2 + (\partial_x v + \partial_y u)^2
 ```
 
-and the Leith viscosity is $\nu_ \text{L} = (C_ \text{L} \Delta)^3 \Vert \nabla \zeta \Vert$, which targets the enstrophy cascade of quasi-geostrophic turbulence. [Griffies and Hallberg (2000)](https://doi.org/10.1175/1520-0493%282000%29128%3C2935:BFWASL%3E2.0.CO;2) argue for the biharmonic form with a Smagorinsky coefficient at eddy-permitting resolution, [Gent and McWilliams (1990)](https://doi.org/10.1175/1520-0485%281990%29020%3C0150:IMIOCM%3E2.0.CO;2) is for grids which do not resolve the eddies at all, and [Jansen and Held (2014)](https://doi.org/10.1016/j.ocemod.2014.06.002) return part of the dissipated energy.
+and the Leith viscosity is $\nu_ \text{L} = (C_ \text{L} \Delta)^3 \Vert \nabla \zeta \Vert$, which targets the enstrophy cascade of quasi-geostrophic turbulence ([Leith, 1996](https://hdl.handle.net/10.1016/0167-2789(96)00107-8)). [Griffies and Hallberg (2000)](https://hdl.handle.net/10.1175/1520-0493(2000)128<2935:BFWASL>2.0.CO;2) argue for the biharmonic form with a Smagorinsky coefficient at eddy-permitting resolution, [Gent and McWilliams (1990)](https://hdl.handle.net/10.1175/1520-0485(1990)020<0150:IMIOCM>2.0.CO;2) is for grids which do not resolve the eddies at all, and [Jansen and Held (2014)](https://doi.org/10.1016/j.ocemod.2014.06.002) return part of the dissipated energy.
 
 Two constraints are worth enforcing by construction, for a formula and for a network alike. A momentum closure is the divergence of a symmetric stress, so that it moves momentum and makes none. A dissipative closure has a non-negative viscosity, so that the energy of the resolved flow falls. [Zanna and Bolton (2020)](https://doi.org/10.1029/2020GL088376) enforce the first in a learned ocean closure, and [Ross et al. (2023)](https://doi.org/10.1029/2022MS003258) compare learned closures on a common benchmark, online as well as offline. A network inside the right-hand side, trained through the solver, is a universal differential equation ([Rackauckas et al., 2020](https://arxiv.org/abs/2001.04385)), and NeuralGCM is one at the scale of an atmosphere ([Kochkov et al., 2024](https://doi.org/10.1038/s41586-024-07744-y)).
 
@@ -498,15 +498,15 @@ SP-4 matters most. A prior on a leaf means a parameter and its uncertainty trave
 - Berner, J. et al. (2017). [Stochastic parameterization: toward a new view of weather and climate models](https://doi.org/10.1175/BAMS-D-15-00268.1). *Bulletin of the American Meteorological Society* 98, 565–588.
 - Carrassi, A., Bocquet, M., Bertino, L. and Evensen, G. (2018). [Data assimilation in the geosciences](https://doi.org/10.1002/wcc.535). *WIREs Climate Change* 9.
 - Dee, D. P. (2005). [Bias and data assimilation](https://doi.org/10.1256/qj.05.137). *Quarterly Journal of the Royal Meteorological Society* 131, 3323–3343.
-- Gent, P. R. and McWilliams, J. C. (1990). [Isopycnal mixing in ocean circulation models](https://doi.org/10.1175/1520-0485%281990%29020%3C0150:IMIOCM%3E2.0.CO;2). *Journal of Physical Oceanography* 20, 150–155.
-- Griffies, S. M. and Hallberg, R. W. (2000). [Biharmonic friction with a Smagorinsky-like viscosity for use in large-scale eddy-permitting ocean models](https://doi.org/10.1175/1520-0493%282000%29128%3C2935:BFWASL%3E2.0.CO;2). *Monthly Weather Review* 128, 2935–2946.
+- Gent, P. R. and McWilliams, J. C. (1990). [Isopycnal mixing in ocean circulation models](https://hdl.handle.net/10.1175/1520-0485(1990)020<0150:IMIOCM>2.0.CO;2). *Journal of Physical Oceanography* 20, 150–155.
+- Griffies, S. M. and Hallberg, R. W. (2000). [Biharmonic friction with a Smagorinsky-like viscosity for use in large-scale eddy-permitting ocean models](https://hdl.handle.net/10.1175/1520-0493(2000)128<2935:BFWASL>2.0.CO;2). *Monthly Weather Review* 128, 2935–2946.
 - Jansen, M. F. and Held, I. M. (2014). [Parameterizing subgrid-scale eddy effects using energetically consistent backscatter](https://doi.org/10.1016/j.ocemod.2014.06.002). *Ocean Modelling* 80, 36–48.
 - Kennedy, M. C. and O'Hagan, A. (2001). [Bayesian calibration of computer models](https://doi.org/10.1111/1467-9868.00294). *Journal of the Royal Statistical Society B* 63, 425–464.
 - Kochkov, D. et al. (2024). [Neural general circulation models for weather and climate](https://doi.org/10.1038/s41586-024-07744-y). *Nature* 632, 1060–1066.
-- Leith, C. E. (1996). [Stochastic models of chaotic systems](https://doi.org/10.1016/0167-2789%2896%2900107-8). *Physica D* 98, 481–491.
+- Leith, C. E. (1996). [Stochastic models of chaotic systems](https://hdl.handle.net/10.1016/0167-2789(96)00107-8). *Physica D* 98, 481–491.
 - Rackauckas, C. et al. (2020). [Universal differential equations for scientific machine learning](https://arxiv.org/abs/2001.04385). arXiv:2001.04385.
 - Ross, A. et al. (2023). [Benchmarking of machine learning ocean subgrid parameterizations in an idealized model](https://doi.org/10.1029/2022MS003258). *Journal of Advances in Modeling Earth Systems* 15.
-- Smagorinsky, J. (1963). [General circulation experiments with the primitive equations](https://doi.org/10.1175/1520-0493%281963%29091%3C0099:GCEWTP%3E2.3.CO;2). *Monthly Weather Review* 91, 99–164.
+- Smagorinsky, J. (1963). [General circulation experiments with the primitive equations](https://hdl.handle.net/10.1175/1520-0493(1963)091<0099:GCEWTP>2.3.CO;2). *Monthly Weather Review* 91, 99–164.
 - Solin, A. and Särkkä, S. (2019). [Hilbert space methods for reduced-rank Gaussian process regression](https://doi.org/10.1007/s11222-019-09886-w). *Statistics and Computing* 30, 419–446.
 - Trémolet, Y. (2006). [Accounting for an imperfect model in 4D-Var](https://doi.org/10.1256/qj.05.224). *Quarterly Journal of the Royal Meteorological Society* 132, 2483–2504.
 - Zanna, L. and Bolton, T. (2020). [Data-driven equation discovery of ocean mesoscale closures](https://doi.org/10.1029/2020GL088376). *Geophysical Research Letters* 47.

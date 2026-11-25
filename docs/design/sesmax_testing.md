@@ -82,7 +82,7 @@ The tangent-linear model $\mathbf{M} = \partial m / \partial \mathbf{x} \in \mat
 \langle \mathbf{M} \mathbf{v}, \mathbf{w} \rangle = \langle \mathbf{v}, \mathbf{M}^\top \mathbf{w} \rangle
 ```
 
-This is the classic test of a hand-written adjoint ([Errico, 1997](https://doi.org/10.1175/1520-0477%281997%29078%3C2577:WIAAM%3E2.0.CO;2)). Ours is written by JAX, and the test still earns its place, as the two sides go through different code in diffrax (see the numerics below) and through every `custom_vjp` in the stack.
+This is the classic test of a hand-written adjoint ([Errico, 1997](https://hdl.handle.net/10.1175/1520-0477(1997)078<2577:WIAAM>2.0.CO;2)). Ours is written by JAX, and the test still earns its place, as the two sides go through different code in diffrax (see the numerics below) and through every `custom_vjp` in the stack.
 
 ### Convergence
 
@@ -92,7 +92,7 @@ With a step $\Delta$ (in time or in space) and the error $e(\Delta)$ against a r
 p = \log_2 \frac{e(\Delta)}{e(\Delta / 2)}
 ```
 
-and it must approach the order of the scheme. The reference is an exact solution where one exists (the standard ones on the sphere are those of [Williamson et al., 1992](https://doi.org/10.1016/S0021-9991%2805%2980016-6)). Where none does, a chosen field $\mathbf{x}_ \text{m}$ is made exact by adding the source $\mathrm{d}\mathbf{x}_ \text{m} / \mathrm{d}t - f(\mathbf{x}_ \text{m})$ to the right-hand side, which is the method of manufactured solutions ([Roache, 2001](https://doi.org/10.1115/1.1436090); [Oberkampf and Roy, 2010](https://doi.org/10.1017/CBO9780511760396)). In sesmax the source is a `ForcingTerm`, so the method needs no new machinery for a `TermModel`.
+and it must approach the order of the scheme. The reference is an exact solution where one exists (the standard ones on the sphere are those of [Williamson et al., 1992](https://hdl.handle.net/10.1016/S0021-9991(05)80016-6)). Where none does, a chosen field $\mathbf{x}_ \text{m}$ is made exact by adding the source $\mathrm{d}\mathbf{x}_ \text{m} / \mathrm{d}t - f(\mathbf{x}_ \text{m})$ to the right-hand side, which is the method of manufactured solutions ([Roache, 2001](https://doi.org/10.1115/1.1436090); [Oberkampf and Roy, 2010](https://doi.org/10.1017/CBO9780511760396)). In sesmax the source is a `ForcingTerm`, so the method needs no new machinery for a `TermModel`.
 
 ### Horizon
 
@@ -404,14 +404,14 @@ The core's own tests take `sesmax-testing` from the development group. 15 of its
 ## References
 
 - Claessen, K. and Hughes, J. (2000). [QuickCheck](https://doi.org/10.1145/351240.351266). *Proceedings of the ACM SIGPLAN International Conference on Functional Programming*, 268–279.
-- Errico, R. M. (1997). [What is an adjoint model?](https://doi.org/10.1175/1520-0477%281997%29078%3C2577:WIAAM%3E2.0.CO;2) *Bulletin of the American Meteorological Society* 78, 2577–2591.
+- Errico, R. M. (1997). [What is an adjoint model?](https://hdl.handle.net/10.1175/1520-0477(1997)078<2577:WIAAM>2.0.CO;2) *Bulletin of the American Meteorological Society* 78, 2577–2591.
 - Farrell, P. E., Ham, D. A., Funke, S. W. and Rognes, M. E. (2013). [Automated derivation of the adjoint of high-level transient finite element programs](https://doi.org/10.1137/120873558). *SIAM Journal on Scientific Computing* 35, C369–C393.
 - Griewank, A. and Walther, A. (2008). [Evaluating Derivatives](https://doi.org/10.1137/1.9780898717761). SIAM.
 - Köhl, A. and Willebrand, J. (2002). [An adjoint method for the assimilation of statistical characteristics into eddy-resolving ocean models](https://doi.org/10.3402/tellusa.v54i4.12150). *Tellus A* 54.
 - Lea, D. J., Allen, M. R. and Haine, T. W. N. (2000). [Sensitivity analysis of the climate of a chaotic system](https://doi.org/10.3402/tellusa.v52i5.12283). *Tellus A* 52, 523.
 - Oberkampf, W. L. and Roy, C. J. (2010). [Verification and Validation in Scientific Computing](https://doi.org/10.1017/CBO9780511760396). Cambridge University Press.
 - Roache, P. J. (2001). [Code verification by the method of manufactured solutions](https://doi.org/10.1115/1.1436090). *Journal of Fluids Engineering* 124, 4–10.
-- Williamson, D. L. et al. (1992). [A standard test set for numerical approximations to the shallow water equations in spherical geometry](https://doi.org/10.1016/S0021-9991%2805%2980016-6). *Journal of Computational Physics* 102, 211–224.
+- Williamson, D. L. et al. (1992). [A standard test set for numerical approximations to the shallow water equations in spherical geometry](https://hdl.handle.net/10.1016/S0021-9991(05)80016-6). *Journal of Computational Physics* 102, 211–224.
 
 ## Relationships
 
