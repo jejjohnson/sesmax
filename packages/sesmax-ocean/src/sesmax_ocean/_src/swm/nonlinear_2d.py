@@ -35,7 +35,7 @@ from sesmax_core.validation import (
     require_non_negative,
     require_positive,
 )
-from sesmax_ocean._src.swm._shared import BCS, UPWIND, fill_box
+from sesmax_ocean._src.swm._shared import BCS, UPWIND, WRAPS, fill_box, wrap
 
 
 class NonlinearSW2DState(State):
@@ -152,6 +152,10 @@ class NonlinearShallowWater2D(Model):
     bc_type: str = eqx.field(static=True, default="periodic")
     scheme: Scheme = eqx.field(static=True, default=UPWIND)
 
+    def _wrap(self, field: Any, at: str) -> Any:
+        """``field`` with its ghosts filled on the periodic faces."""
+        return wrap(field, self.grid, WRAPS[self.bc_type], at)
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
         return self.ops.advect(h, u, v, scheme=self.scheme, bc=BCS[self.bc_type]["h"])
@@ -179,6 +183,10 @@ class NonlinearShallowWater2D(Model):
         #    dv/dt = -q_bar * (hu)_bar   (u drives v via Coriolis)
         uh = each(operator.mul, self.ops.interpolate(h, src="T", dst="U"), u)
         vh = each(operator.mul, self.ops.interpolate(h, src="T", dst="V"), v)
+        # The next averages read the ghosts of these, which the operators leave
+        # at zero.
+        q = self._wrap(q, "X")
+        uh, vh = self._wrap(uh, "U"), self._wrap(vh, "V")
         q_on_U = self.ops.interpolate(q, src="X", dst="U")
         q_on_V = self.ops.interpolate(q, src="X", dst="V")
         vh_on_U = self.ops.interpolate(vh, src="V", dst="U")
@@ -211,6 +219,7 @@ class NonlinearShallowWater2D(Model):
                 - kappa * velocity
             )
 
+        P = self._wrap(P, "T")
         dP_dx = self.ops.difference(P, axis="x", src="T", dst="U")
         dP_dy = self.ops.difference(P, axis="y", src="T", dst="V")
         du_dt = each(x_momentum, q_on_U, vh_on_U, dP_dx, u)

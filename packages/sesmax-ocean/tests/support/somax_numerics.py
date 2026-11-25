@@ -21,6 +21,10 @@ from sesmax_ocean.swm import MultilayerShallowWater2D, NonlinearShallowWater2D
 class _SomaxNumerics:
     """The pieces of somax's shallow-water models."""
 
+    def _wrap(self, field: Any, at: str) -> Any:
+        """The ghosts of the products of the tendency stay at zero."""
+        return field
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """No flux through the edge faces of the array."""
         return self.ops.advect(h, u, v, scheme=self.scheme)  # type: ignore[attr-defined]

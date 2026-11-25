@@ -34,6 +34,28 @@ BCS = {
 }
 
 
+#: The faces of each ``bc_type`` a field wraps across.
+WRAPS = {"periodic": _BOX, "wall": None}
+
+
+def wrap(field: Any, grid: Any, bc: BC | None, at: str) -> Any:
+    """``field`` with its ghosts filled on the periodic faces of the grid.
+
+    For a product of a tendency, whose ghost ring an operator leaves at zero and
+    the next one reads. Behind a wall no cell of the tendency reads it.
+
+    Args:
+        field: An array or a field at ``at``.
+        grid: Its grid.
+        bc: The periodic faces, or ``None`` for none.
+        at: ``"T"``, ``"U"``, ``"V"`` or ``"X"``.
+
+    Returns:
+        The field.
+    """
+    return field if bc is None else fill_ghosts(field, grid, bc, stagger=at)
+
+
 def fill_box(state: Any, grid: CartesianCGrid2D, bc_type: str) -> Any:
     """A state with fields ``h``, ``u`` and ``v`` with its ghost ring filled.
 
