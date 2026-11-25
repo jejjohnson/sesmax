@@ -35,6 +35,8 @@ dependencies = [
     # bounded parameter in an unconstrained space, so an optimiser can never
     # step a viscosity or a drag negative.
     "paramax>=0.0.5",
+    # The CG and known-value solves of the elliptic inversions (``sesmax_core.gfd``).
+    "gaussx @ git+https://github.com/jejjohnson/gaussx@v0.8.1",
     "spectraldiffx @ git+https://github.com/jejjohnson/spectraldiffx.git@0.1.2",
     # The grids, masks and C-grid operators every grid-based model is written
     # on, with gridax.solvers (the ``jax`` extra: masked operators, multigrid,
