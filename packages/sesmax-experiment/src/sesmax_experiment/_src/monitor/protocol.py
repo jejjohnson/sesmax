@@ -62,12 +62,15 @@ class MonitorVerdict:
         terminate: Whether the monitor requests a clean stop of the run.
         reason: Why termination was requested. Required (non-``None``) when
             ``terminate`` is ``True``; ignored otherwise.
+        resumable: Whether a run that stops here may be continued, because the
+            state is good and only its time is up. Ignored unless ``terminate``.
     """
 
     metrics: dict[str, float] = dataclasses.field(default_factory=dict)
     messages: tuple[str, ...] = ()
     terminate: bool = False
     reason: str | None = None
+    resumable: bool = False
 
 
 @runtime_checkable

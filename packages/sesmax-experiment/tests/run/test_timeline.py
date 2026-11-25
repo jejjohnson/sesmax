@@ -65,3 +65,29 @@ def test_chunks_are_cut_and_the_snapshots_kept() -> None:
     assert (np.diff(cut.edges) > 0.0).all()
     with pytest.raises(ValueError, match="one or more"):
         timeline.subdivided(0)
+
+
+def test_the_rest_keeps_its_edges() -> None:
+    timeline = Timeline.build(0.1, 1.0, chunk=0.1, snapshot=0.3)
+    for k, t in enumerate(timeline.edges[:-1]):
+        rest = timeline.after(t)
+        np.testing.assert_array_equal(rest.edges, timeline.edges[k:])
+        assert {j + k for j in rest.snapshots} == {
+            j for j in timeline.snapshots if j >= k
+        }
+    # Rounding in the time a store holds makes no chunk of its own.
+    near = timeline.after(float(np.nextafter(timeline.edges[4], 0.0)))
+    np.testing.assert_array_equal(near.edges, timeline.edges[4:])
+
+
+def test_the_rest_from_between_two_edges() -> None:
+    rest = Timeline.build(0.0, 4.0, chunk=1.0, snapshot=2.0).after(2.5)
+    np.testing.assert_array_equal(rest.edges, [2.5, 3.0, 4.0])
+    assert sorted(rest.snapshots) == [2]
+
+
+def test_the_rest_of_all_and_of_nothing() -> None:
+    timeline = Timeline.build(1.0, 4.0, chunk=1.0)
+    assert timeline.after(0.5) is timeline
+    with pytest.raises(ValueError, match="nothing is left"):
+        timeline.after(4.0)

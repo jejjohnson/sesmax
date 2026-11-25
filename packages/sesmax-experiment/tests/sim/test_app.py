@@ -57,3 +57,38 @@ def test_list_models(capsys: pytest.CaptureFixture[str]) -> None:
 def test_show_config(config: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _run("show-config", config)
     assert "name: linear_swm" in capsys.readouterr().out
+
+
+def test_a_limit_of_wall_time_has_an_exit_code(config: Path, tmp_path: Path) -> None:
+    with pytest.raises(SystemExit) as stopped:
+        _run(
+            "simulate",
+            *("--config", config, "--output-dir", tmp_path / "a"),
+            *("--diagnostics-per-save", 2, "--max-wall-seconds", 0.0),
+        )
+    assert stopped.value.code == 75
+    _run(
+        "restart",
+        *("--config", config, "--from", tmp_path / "a"),
+        *("--output-dir", tmp_path / "b", "--diagnostics-per-save", 2),
+    )
+    assert (tmp_path / "b" / "final_state.zarr").is_dir()
+
+
+def test_checkpoints_are_written_and_kept(config: Path, tmp_path: Path) -> None:
+    _run(
+        "simulate",
+        *("--config", config, "--output-dir", tmp_path / "a"),
+        *("--diagnostics-per-save", 5, "--checkpoint-every-n-chunks", 1),
+        *("--checkpoint-every-seconds", 1e9, "--keep-last", 1, "--keep-every", 2),
+    )
+    names = sorted(p.name for p in (tmp_path / "a" / "checkpoints").iterdir())
+    assert names == ["00000002.zarr", "00000004.zarr", "00000005.zarr"]
+
+
+@pytest.mark.parametrize(
+    "option", ["--checkpoint-every-n-chunks", "--checkpoint-every-seconds"]
+)
+def test_a_cadence_is_not_negative(config: Path, tmp_path: Path, option: str) -> None:
+    with pytest.raises(ValueError, match=">= 0"):
+        _run("simulate", "--config", config, "--output-dir", tmp_path, f"{option}=-1")

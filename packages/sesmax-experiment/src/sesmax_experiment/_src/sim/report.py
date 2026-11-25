@@ -34,7 +34,8 @@ def state_line(state: Any, units: dict[str, str]) -> str:
     """The minimum, mean and maximum of each field, and how much is not finite."""
     parts = []
     for field in dataclasses.fields(state):
-        array = np.asarray(values(getattr(state, field.name)))
+        # In float64: the mean of a run that blows up overflows in single precision.
+        array = np.asarray(values(getattr(state, field.name)), dtype=np.float64)
         finite = array[np.isfinite(array)]
         low, mean, high = (
             (float("nan"),) * 3

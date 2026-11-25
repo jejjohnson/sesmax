@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pickle
 import warnings
 from typing import Any
 
@@ -13,7 +14,10 @@ import pytest
 from pipekit_ops import Branch, Retry, Sink, Tap, Try
 
 from sesmax_core import Model
+from sesmax_core.solvers import imex_solver, imex_stepsize_controller
 from sesmax_core.testing import (
+    Burgers2DState,
+    Burgers2DTermModel,
     L96State,
     LinearShallowWater2D,
     LinearSW2DState,
@@ -279,3 +283,67 @@ def test_a_controller_sets_its_own_steps() -> None:
     ).ys.x[-1]
     np.testing.assert_allclose(run.state.x, one, rtol=1e-5)
     assert run.frame.info.stats["num_steps"] != 10
+
+
+def _burgers() -> tuple[Model, Burgers2DState]:
+    model = Burgers2DTermModel.create(nx=12, ny=12, nu=0.05, imex=True)
+    x = jnp.linspace(0.0, 2.0 * jnp.pi, model.grid.Nx)
+    u = jnp.sin(x)[None, :] * jnp.cos(x)[:, None]
+    return model, Burgers2DState(u=u, v=-u)
+
+
+STEPPERS: dict[str, tuple[Any, dict[str, Any]]] = {
+    "Tsit5": (_lorenz, {}),
+    "Heun": (_lorenz, {"solver": dfx.Heun()}),
+    "Tsit5, adaptive": (
+        _lorenz,
+        {"stepsize_controller": dfx.PIDController(rtol=1e-6, atol=1e-8)},
+    ),
+    "IMEX, adaptive": (
+        _burgers,
+        {
+            "solver": imex_solver(),
+            "stepsize_controller": imex_stepsize_controller(),
+        },
+    ),
+}
+
+
+@pytest.mark.parametrize("name", list(STEPPERS))
+def test_a_restart_needs_the_state_alone(name: str) -> None:
+    """Each chunk starts its stepper afresh, so nothing else has to be kept."""
+    build, settings = STEPPERS[name]
+    model, state = build()
+    timeline = Timeline.build(0.0, 0.5, chunk=0.1, snapshot=0.1)
+    whole = run_chunks(model, state, timeline, dt=0.01, **settings)
+    middle = whole.snapshots[2]
+    rest = run_chunks(
+        model, middle.state, timeline.after(middle.info.t1), dt=0.01, **settings
+    )
+    for a, b in zip(
+        jax.tree.leaves(whole.state), jax.tree.leaves(rest.state), strict=True
+    ):
+        np.testing.assert_array_equal(a, b)
+
+
+@pytest.mark.parametrize("flags", [(True,), (True, True), (True, False)])
+def test_a_stop_is_resumable_if_every_monitor_says_so(flags: tuple[bool, ...]) -> None:
+    class Stop(BaseMonitor):
+        def __init__(self, name: str, resumable: bool) -> None:
+            self.name, self.resumable = name, resumable
+
+        def on_chunk_end(self, model: Any, state: Any, info: Any) -> MonitorVerdict:
+            return MonitorVerdict(
+                terminate=True, reason=self.name, resumable=self.resumable
+            )
+
+    model, state = _lorenz()
+    monitors = [Stop(f"m{i}", flag) for i, flag in enumerate(flags)]
+    timeline = Timeline.build(0.0, 0.2, chunk=0.1)
+    with pytest.raises(RunStopped, match="m0") as caught:
+        run_chunks(model, state, timeline, dt=0.01, monitors=monitors)
+    assert caught.value.resumable == all(flags)
+    copy = pickle.loads(
+        pickle.dumps(RunStopped("r", caught.value.frame, resumable=True))
+    )
+    assert copy.resumable and copy.reason == "r"

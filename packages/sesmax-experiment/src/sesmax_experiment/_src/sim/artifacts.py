@@ -35,7 +35,9 @@ _LIBRARIES = (
 )
 
 
-def run_attrs(spec: RunSpec, *, mode: str, coordinates: str) -> dict[str, Any]:
+def run_attrs(
+    spec: RunSpec, *, mode: str, coordinates: str, t0: float
+) -> dict[str, Any]:
     """The attributes that say where a store came from, numbers as numbers.
 
     Args:
@@ -43,6 +45,7 @@ def run_attrs(spec: RunSpec, *, mode: str, coordinates: str) -> dict[str, Any]:
         mode: ``"simulate"``, ``"spinup"`` or ``"restart"``.
         coordinates: ``"si"`` or ``"nondimensional"``. The class of a state is the
             same either way, so a restart reads this to know its units.
+        t0: The start of the run, later than the spec's if it is a restart.
 
     Returns:
         The attributes.
@@ -53,7 +56,7 @@ def run_attrs(spec: RunSpec, *, mode: str, coordinates: str) -> dict[str, Any]:
         "sesmax_coordinates": coordinates,
         "scenario_name": spec.scenario.name,
         "model_name": spec.model.name,
-        "t0": float(times.t0),
+        "t0": float(t0),
         "t1": float(times.t1),
         "dt": float(times.dt),
         "save_interval": float(times.save_interval),
@@ -118,6 +121,7 @@ def flat_diagnostics(diagnostics: Any) -> dict[str, float]:
                 continue
         except (TypeError, ValueError):
             continue
+        array = array.astype(np.float64)  # a mean overflows sooner in float32
         if array.ndim == 0:
             out[field.name] = float(array)
         elif array.ndim == 1 and array.size <= 16:
@@ -164,6 +168,10 @@ def manifest(
     spec: RunSpec,
     *,
     mode: str,
+    status: str,
+    reason: str | None,
+    t0: float,
+    t1: float,
     wall_seconds: float,
     numerics: dict[str, Any],
 ) -> dict[str, Any]:
@@ -172,6 +180,10 @@ def manifest(
     Args:
         spec: The spec of the run.
         mode: ``"simulate"``, ``"spinup"`` or ``"restart"``.
+        status: ``"finished"`` or ``"stopped"``.
+        reason: Why it stopped, or ``None``.
+        t0: Where it started.
+        t1: Where it finished or stopped.
         wall_seconds: How long it took.
         numerics: What the component says of the model's numerics; two runs that
             differ only in a filter strength can give different results.
@@ -181,14 +193,16 @@ def manifest(
     """
     return {
         "mode": mode,
+        "status": status,
+        "reason": reason,
         "versions": {name: _version(name) for name in _LIBRARIES},
         "x64_enabled": bool(jax.config.read("jax_enable_x64")),
         "platform": jax.default_backend(),
         "python": platform.python_version(),
         "device_count": jax.device_count(),
         "config_sha256": sha256_hex(stable_json(spec.to_dict())),
-        "t0": spec.timestepping.t0,
-        "t1": spec.timestepping.t1,
+        "t0": t0,
+        "t1": t1,
         "dt": spec.timestepping.dt,
         "wallclock_seconds": wall_seconds,
         "numerics": numerics,
