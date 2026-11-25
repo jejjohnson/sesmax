@@ -43,7 +43,7 @@ from sesmax_ocean._src.spherical._geometry import (
     require_global_longitude,
     require_open_poles,
 )
-from sesmax_ocean._src.swm._shared import POINTS, UPWIND
+from sesmax_ocean._src.swm._shared import POINTS, UPWIND, wrap
 
 
 # Periodic in longitude, solid walls with free slip in latitude.
@@ -52,6 +52,7 @@ _BAND = {
     "u": BC(x=Periodic(), y=Neumann()),
     "v": BC(x=Periodic(), y=Dirichlet(0.0)),
 }
+_WRAP = BC(x=Periodic())
 
 
 class SphericalSWMState(State):
@@ -186,6 +187,10 @@ class SphericalSWM(Model):
         """``field`` zeroed on land at the given C-grid stagger."""
         return field if self.mask is None else apply_mask(field, self.mask, at=at)
 
+    def _wrap(self, field: Any, at: str) -> Any:
+        """``field`` with its ghosts filled on the periodic faces."""
+        return wrap(field, self.grid, _WRAP, at)
+
     def _mass_tendency(self, h: Any, u: Any, v: Any) -> Any:
         """``-div(h u)``, with the boundary condition of ``h`` at the edge faces."""
         return self.ops.advect(h, u, v, scheme=self.scheme, bc=_BAND["h"])
@@ -211,6 +216,10 @@ class SphericalSWM(Model):
         # Coriolis term).
         uh = each(operator.mul, self.ops.interpolate(h, src="T", dst="U"), u)
         vh = each(operator.mul, self.ops.interpolate(h, src="T", dst="V"), v)
+        # The next averages read the ghosts of these, which the operators leave
+        # at zero.
+        q = self._wrap(q, "X")
+        uh, vh = self._wrap(uh, "U"), self._wrap(vh, "V")
         q_on_U = self.ops.interpolate(q, src="X", dst="U")
         q_on_V = self.ops.interpolate(q, src="X", dst="V")
         vh_on_U = self.ops.interpolate(vh, src="V", dst="U")
@@ -247,6 +256,7 @@ class SphericalSWM(Model):
             # through-flow at a wall the model says is closed.
             return tendency.at[0, :].set(0.0).at[-2, :].set(0.0).at[-1, :].set(0.0)
 
+        P = self._wrap(P, "T")
         dP_dx = self.ops.difference(P, axis="x", src="T", dst="U")
         dP_dy = self.ops.difference(P, axis="y", src="T", dst="V")
         du_dt = each(zonal, q_on_U, vh_on_U, dP_dx, u)
