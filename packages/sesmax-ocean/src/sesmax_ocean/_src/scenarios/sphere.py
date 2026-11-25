@@ -107,8 +107,11 @@ def _wind(name: str, scenario: Scenario, names: Mapping[str, str]) -> dict[str, 
         for field, argument in names.items()
         if (value := getattr(scenario.forcing, field)) is not None
     }
-    amplitude = {"wind_amplitude": 1.0} if fields else {}
-    return {**fields, **amplitude, **scenario.forcing_params}
+    if not fields:
+        return dict(scenario.forcing_params)
+    # A component the scenario has no field of is zero, not the profile's.
+    alone = {"wind_profile": "none"}
+    return {"wind_amplitude": 1.0, **scenario.forcing_params, **fields, **alone}
 
 
 def _numbers(
