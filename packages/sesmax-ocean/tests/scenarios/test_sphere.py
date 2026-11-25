@@ -134,6 +134,14 @@ def test_the_wind_of_a_scenario_reaches_the_model(
     model.vector_field(0.0, state)
 
 
+def test_a_component_without_a_field_is_zero() -> None:
+    """Not the zonal profile of the model, which the field replaces."""
+    model, _ = _build("spherical_swm", _scenario(tau_y=np.full(INTERIOR, 0.25)))
+    np.testing.assert_array_equal(np.asarray(model.wind_stress_x), 0.0)
+    model, _ = _build("spherical_swm")
+    assert np.abs(np.asarray(model.wind_stress_x)).max() > 0.5
+
+
 @pytest.mark.parametrize("name", BOTH)
 def test_the_amplitude_of_the_wind(name: str) -> None:
     def amplitude(**forcing: Any) -> float:
