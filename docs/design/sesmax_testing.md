@@ -382,7 +382,7 @@ The bound of 1e-14 sits eleven orders of magnitude below the defect and three ab
 | Multilayer, 3 layers | 3.7e-02 | 0.83 | 0 |
 | Linear toy | 0.24 | 1.3 | 0.24 |
 
-The ghost ring is the open sesmax#185, and the same size today. The last row is new: `LinearShallowWater2D` with walls has the defect of sesmax#183, and nobody has reported it.
+The ghost ring is the open sesmax#185, and the same size today. The last row is new: `LinearShallowWater2D` with walls has the defect of sesmax#183 (filed as sesmax#202).
 
 **Adjoint and gradient.** Twelve steps of 600 s for shallow water on 16 × 16 cells, twenty of 0.01 for Lorenz-96 with 40 variables.
 
@@ -423,7 +423,7 @@ Not covered: float32, located fields, a masked domain in the adjoint check, manu
 | Step | Pull request | Gate |
 | --- | --- | --- |
 | T1 | the package, with the toys and their twelve test files | the moved tests and 22 notebooks change imports only |
-| T2 | `Case`, `Report`, `conservation`, `translation`, `boundary`, `contract`, `reference` | the tables above, as tests; the copies in `sesmax-ocean` are deleted; the wall faces of the linear toy fixed |
+| T2 | `Case`, `Report`, `conservation`, `translation`, `boundary`, `contract`, `reference` | the tables above, as tests; the copies in `sesmax-ocean` are deleted; sesmax#202 is fixed |
 | T3 | `adjoint`, `gradient`, `convergence`, `horizon` (closes sesmax#105) | every public term and toy has a gradient check |
 | T4 | a guide page on choosing a window, from `horizon` | the table of horizons is printed by its notebook |
 
@@ -455,4 +455,4 @@ The core's own tests take `sesmax-testing` from the development group. 15 of its
 - Part of: [the workspace packages](workspace_packages.md), step W2
 - Uses the findings of: [the ocean plan](ocean.md)
 - Used by: [sesmax-param](sesmax_param.md), [sesmax-experiment](sesmax_experiment.md)
-- Issues: sesmax#105, sesmax#107, sesmax#145, sesmax#173, sesmax#183, sesmax#185
+- Issues: sesmax#105, sesmax#107, sesmax#145, sesmax#173, sesmax#183, sesmax#185, sesmax#202
