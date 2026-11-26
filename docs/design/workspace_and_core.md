@@ -70,11 +70,11 @@ Its top level exports 89 names, and 17 public modules hold the rest.
 | --- | --- |
 | diffrax, lineax, optimistix, equinox, paramax | time stepping, linear solves, modules, constrained parameters |
 | gridax, with its `jax` and `pipekit` extras | grids, masks, located fields, every stencil, ghost fills; 63 import lines across the workspace |
-| integrix | the IMEX solver, the stable step, `DiffraxForwardModel`, sampled paths |
+| integrix | the IMEX solver, the stable step (sesmax#118), `DiffraxForwardModel` (sesmax#181), sampled paths |
 | functax | the interpolation schemes of a sampled forcing |
 | geophysix | constants, the Coriolis parameter, the β-plane |
 | gaussx | the conjugate-gradient solve of the elliptic inversions |
-| spectraldiffx | the spectral solves of the inversions |
+| spectraldiffx | the Helmholtz solve of the Navier–Stokes toy |
 | geonnax | the dictionaries behind the eight `spatial_from_*` bases |
 | pipekit-ops, pipekit-array, pipekit-cycle, pipekit-jax | operators, the array backend, the forward-model protocol |
 | filterax, vardax, behind `[da]` | the filters and the variational methods the adapters serve |
@@ -83,7 +83,7 @@ Four places still hold what another library has, or will have, and each has a pl
 
 - **The bases** go through `geonnax.basis`, and functax now has them. sesmax#114 moves the core onto functax, and [`sesmax-param`](sesmax_param.md) takes the bases and the forcing out of the core.
 - **`SubsampleObs`** is an observation operator of our own, where vardax has `GridPointObs`, `InterpObs` and `MaskedIdentity`. sesmax#27 retires it.
-- **The toys** are a third of the public names. They move to [`sesmax-testing`](sesmax_testing.md), with checks built on pipekit-array's `testing` module, which the core does not import today.
+- **The toys** are 75 public names. They move to [`sesmax-testing`](sesmax_testing.md), with checks built on pipekit-array's `testing` module, which the core does not import today.
 - **Drag, wind stress and relaxation** came from gridax-jax in sesmax#122 and sit in `forcing`. They are parameterizations and forcing terms, and move to `sesmax-param`.
 
 ### What changed since the plan
@@ -93,12 +93,12 @@ Four places still hold what another library has, or will have, and each has a pl
 | finitevolX for grids and stencils | gridax: one `GridOps` per model, and the functions | sesmax#135, sesmax#146 |
 | states of arrays, with `mask_locations` | states of arrays or `gridax.CField`s, ghosts from `gridax.fill_ghosts` | sesmax#138 |
 | `sesmax_core.monitor` | `sesmax_experiment.monitor` | sesmax#197 |
-| `sesmax_core.checkpoint`, behind `[checkpoint]` | `sesmax_experiment.checkpoint` | sesmax#207 |
+| `sesmax_core.checkpoint`, behind `[checkpoint]` | `sesmax_experiment.checkpoint`, versioned since sesmax#207 | sesmax#197 |
 | `sesmax_core.sim`, behind `[sim]` | `sesmax_experiment.run` and `sesmax_experiment.sim` | sesmax#198, sesmax#203 |
 | a registry each component fills | `Component` in the core, found through the entry point `sesmax.components` | sesmax#197, sesmax#203 |
 | the Helmholtz caches in `gfd` | removed on 5 November, as no model used them | — |
 | constants copied or left in somax | geophysix | sesmax#124 |
-| `imex_solver` in the core | integrix, re-exported, with `stable_step` | sesmax#181 |
+| `imex_solver` in the core | integrix, re-exported, with `stable_step` | sesmax#118 |
 | the inversions in finitevolX | `sesmax_core.gfd` | sesmax#129 |
 | the vertical modes and the barotropic filter in finitevolX | `sesmax_core.vertical` | sesmax#122 |
 | a forcing sampled by diffrax's interpolations | any functax 1-D scheme, which reports its step times | sesmax#141 |
@@ -237,7 +237,7 @@ Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were
 | `da/` | `SomaxDynamics`, `SomaxForwardModel`, `SubsampleObs`, `state_to_vector`, `make_ensemble` | `sesmax_core.da`, behind `[da]` | `SomaxDynamics` → `FilteraxDynamics`, `SomaxForwardModel` → `VardaxForwardModel`; `SubsampleObs` stays until vardax#81 lands |
 | `core/flows.py` | `StateAffineBijection`, `to_flowjax`, `learned_prior` | `sesmax_core.flows`, behind `[flows]` | none |
 | `io/` | `state_to_dataset`, `dataset_to_state`, Zarr save and load, scale metadata | `sesmax_core.io`, behind `[xarray]` | none |
-| `core/checkpoint.py` | `SimulationCheckpointer` (orbax) | `sesmax_experiment.checkpoint`, behind its `[checkpoint]` | versioned and resumable since sesmax#207 |
+| `core/checkpoint.py` | `SimulationCheckpointer` (orbax) | `sesmax_experiment.checkpoint`, behind its `[checkpoint]` | moved in sesmax#197; versioned and resumable since sesmax#207 |
 | `models/lorenz63.py`, `lorenz96.py`, `lorenz96t.py` | the Lorenz systems on `Model` | `sesmax_core.testing` | none |
 | `models/pde1d/`, `models/pde2d/` | Burgers, diffusion, linear and nonlinear convection, Navier–Stokes, Poisson | `sesmax_core.testing` | none (SX-3) |
 | `models/base.py` | `DynamicalSystem`, marked for removal | dropped | — |
@@ -355,7 +355,7 @@ Each phase ships as its own PR (stacked, in this repository) and merges only whe
 | C2 Ocean (done, with a different gate) | `sesmax-ocean` from the ocean models, presets, `resolution`, `eval`, the runner and configs; its own design page first | every remaining somax test passes under `sesmax-ocean` with only import changes; the DUACS sea-surface-height benchmark from the esmax plan runs as a baseline |
 | C3 Levels (open, sesmax#29) | L1 in `_src/array.py`, `Step` and `simulate` behind `sesmax-core[geo]`, as geostack's SL-O2 decides | primitive modules import no carrier; `simulate` exposes `model.l1` |
 
-The gate of C2 was replaced by equality with somax's numbers, because the core had moved to gridax; [the ocean page](ocean.md) has it, and the DUACS baseline went to geobench (sesmax#236). The runner went to `sesmax-experiment` and not to `sesmax_core.sim`.
+The gate of C2 was replaced by equality with somax's numbers, because the core had moved to gridax; [the ocean page](ocean.md) has it, and the DUACS baseline is sesmax#236. The runner went to `sesmax-experiment` and not to `sesmax_core.sim`.
 C0 and C1 change no science.
 Releases follow release-please: `sesmax-core` starts at 0.1.0, and the umbrella's first release waits for `sesmax-ocean`.
 
