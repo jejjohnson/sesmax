@@ -19,6 +19,7 @@ keywords:
 Proposed: one package, `sesmax-param`, holds every term of a right-hand side whose form is ours to choose: parameterizations, forcing and model error. Each is a `Term` of the core, and each can carry a prior on what is unknown in it.
 Decided by the owner on 25 November: the package exists, it is called "param", model error belongs in it as a forcing in tendency units, and it comes after the ocean models are ported.
 Also decided: the prior of a parameterization sits here, with the parameterization, and the prior of a model (its state, its own parameters) sits in the model's package. An experiment holds no default priors.
+Proposed on 26 November, for review: forcing, covariate and control name three different things. A covariate is a known field from outside the model, a forcing is a term that may read covariates but not the state, and a control is what an experiment treats as unknown. The section on forcing, covariates and controls below defines them, and SP-7 asks what the known fields are called.
 Recommended for what is open: a prior here is attached to its leaf (SP-4).
 Alternative: a `priors()` method on each term, which leaves the leaves plain and writes each name twice.
 Status: proposed, for review. The numbers below are from a scratch prototype; the package is not started. It is step W5 of [the workspace packages](workspace_packages.md).
@@ -71,6 +72,26 @@ where $p$ is a parameterization with parameters $\boldsymbol{\theta} \in \mathbb
 | Model error $\boldsymbol{\eta}$ | no | $\boldsymbol{\eta}$ | on $\boldsymbol{\eta}$ |
 
 Two questions decide where a term goes. Does it read the state? Then it is a parameterization. Is its form ours to choose? Then it is in this package. "Can it be learned" is not the question, as every parameter of $f$ is a leaf too, gravity included.
+
+### Forcing, covariates and controls
+
+The equation above leaves out what the terms are computed from. Let $\mathbf{c}(\mathbf{s}, t) \in \mathbb{R}^{D_ c}$ be the covariates, the known fields from outside the model: a wind product, a sea surface temperature, the bathymetry, the latitude. Then
+
+```math
+\frac{\mathrm{d}\mathbf{x}}{\mathrm{d}t} = f(\mathbf{x}) + p(\mathbf{x}, \mathbf{c}; \boldsymbol{\theta}) + u(t, \mathbf{c}; \mathbf{w}) + \boldsymbol{\eta}(t)
+```
+
+and the three words mean three different things.
+
+- **A covariate** is data. It does not depend on the state, it is not a tendency, and it is known. It is the input of a function: a parameterization, a forcing, a prior mean, an observation operator or an emulator.
+- **A forcing** is a term. It has tendency units, does not read the state, and may read covariates. Wind speed is a covariate of a bulk formula, and the stress the formula returns, divided by $\rho_ 0 h$, is a forcing. A field that is already a tendency, such as the wind curl of a QG model, is a forcing whose map is the identity.
+- **A control** is neither. It is what one experiment treats as unknown, and [the experiment design](sesmax_experiment.md) owns it. Any of $\mathbf{x}_ 0$, $\boldsymbol{\theta}$, $\mathbf{w}$ and $\boldsymbol{\eta}$ can be a control in one experiment and fixed in the next, and no term knows which.
+
+The state decides between a forcing and a parameterization, as above. A bulk formula with the relative wind, the wind minus the surface current, reads $\mathbf{u}$ and is a parameterization, with the wind as its covariate. Model error is a forcing that is unknown.
+
+A covariate stays known. To infer an uncertain one, we promote it to a parameter with a prior, and it becomes a control like any other, as in an errors-in-variables problem. Values on an open boundary are a forcing that enters through the boundary operator instead of the tendency. Under coupling the rule holds for each component: the atmosphere's state is a covariate of the ocean, and the coupler is where one component's $\mathbf{x}$ becomes another's $\mathbf{c}$.
+
+Today the core does not draw these lines. `ForcingProtocol`, a map `(t, grid) -> field`, holds a known record (`InterpolatedForcing`), a field with a learnable amplitude (`SeasonalWindForcing`) and an expansion with unknown coefficients (`BasisForcing`). `forcing_ops` files drag, which reads the state, next to wind stress, which turns a stress into a tendency.
 
 ### The parameterizations
 
@@ -195,11 +216,11 @@ A forcing coefficient of $10^{-5}$ and a Smagorinsky constant of 0.1 do not belo
 
 ```mermaid
 flowchart TD
-    core["sesmax-core<br/>Term, Sum, TermModel<br/>ForcingProtocol, ForcingTerm"]
+    core["sesmax-core<br/>Term, Sum, TermModel<br/>ForcingProtocol, ForcingTerm, Covariates"]
     gridax["gridax<br/>strains, diffuse, biharmonic"]
     subgraph param["sesmax-param"]
         pz["parameterizations<br/>drag, viscosity, Smagorinsky, learned"]
-        fo["forcing<br/>wind, interpolated, basis"]
+        fo["forcing<br/>wind stress, seasonal, basis"]
         me["model error<br/>bias, coloured, white"]
         pr["priors<br/>Gaussian, priors()"]
         da["vardax adapter<br/>behind the da extra"]
@@ -218,17 +239,17 @@ flowchart TD
 | Module | Holds | Today |
 | --- | --- | --- |
 | `sesmax_param.parameterizations` | drag, damping, viscosity, eddy closures, learned terms | `forcing_ops`, as `AbstractForcing`; the models |
-| `sesmax_param.forcing` | known forcing fields: wind stress and curl, interpolated, seasonal | `forcing`, `forcing_ops` |
+| `sesmax_param.forcing` | forcing terms: wind stress and curl from a stress covariate, seasonal | `forcing`, `forcing_ops` |
 | `sesmax_param.basis` | spatial and temporal bases, `BasisForcing` | `basis`, `forcing_bank` |
 | `sesmax_param.error` | `ModelError` and its three kinds | nothing |
 | `sesmax_param.priors` | `Gaussian`, `priors` | `SpatialBasis.prior_std`, `regularization` |
 | `sesmax_param.da` | `to_vardax`, behind `[da]` | nothing |
 
-What stays in the core is the slot: `Term` and its algebra, `ForcingProtocol`, `ForcingTerm`, `add_to` and `add_vector_to`.
+What stays in the core is the slot: `Term` and its algebra, `ForcingProtocol`, `ForcingTerm`, `add_to` and `add_vector_to`. The covariates stay there too, as `Covariates`, a mapping from a name to a known field with `InterpolatedForcing` as its reader of records, because a component, a term and an experiment all read them.
 
 ### One hierarchy
 
-Everything is a `Term`. `AbstractForcing`, `ForcingSum`, `ForcingProduct` and `TimeVaryingForcing` go, as the algebra of terms has the sums and products. A forcing stays a field, `(t, grid) -> field`, and `ForcingTerm` lifts it.
+Everything is a `Term`. `AbstractForcing`, `ForcingSum`, `ForcingProduct` and `TimeVaryingForcing` go, as the algebra of terms has the sums and products. The map `(t, grid) -> field` stays as the shape of any field in time. A covariate is one that is known, in its own units, and a term holds the covariates it reads outside its trainable leaves. `BasisForcing` and `SeasonalWindForcing` are fields in tendency units with unknowns in them, and `ForcingTerm` lifts them.
 
 ```python
 # Shapes: Ny Nx cells with the ghost ring
@@ -484,7 +505,7 @@ Not covered: an SDE, located fields, Leith and Gent–McWilliams, masks and coas
 
 | Step | Pull request | Gate |
 | --- | --- | --- |
-| P1 | the package, with the bases, the forcing fields and the basis presets moved | the moved tests; imports only in callers |
+| P1 | the package, with the bases, the forcing terms and the basis presets moved; `Covariates` in the core | the moved tests; imports only in callers |
 | P2 | drag, damping and viscosity as `Term`s; `AbstractForcing` goes | same numbers as today on every moved test |
 | P3 | `Gaussian`, `with_prior`, `priors` | a model's priors round-trip through a fit on Lorenz-96 |
 | P4 | `ModelError` and `to_vardax` | the two-route table above, as a test |
@@ -504,6 +525,7 @@ The core's readme names forcing as one of its five uses, its quickstart inverts 
 | SP-4 | How is a prior attached here? (the owner is settled) | to the leaf, read by `priors` | a `priors()` method on each term |
 | SP-5 | Basis class | ours, with an adapter | vardax's `ModelErrorBasis` for both |
 | SP-6 | A networks dependency | none: `LearnedViscosity` takes any callable | geonnax |
+| SP-7 | What are the known fields called? | `Covariates` in the core, with `InterpolatedForcing` renamed `InterpolatedField` | `ForcingProtocol` for every field, with the known ones marked by convention |
 
 SP-4 is about the mechanism only. A prior on a leaf means a parameter and its uncertainty travel together in the pytree, and it has to survive `jit`, `tree_at` and an optimiser's partition. I would try that in P3 and fall back to the method if it does not.
 

@@ -22,6 +22,7 @@ Decided by the owner: the package covers simulation, parameter estimation, state
 Recommended for what is open: the problem says what is unknown, and one verb, `estimate`, covers states, parameters and forcing.
 Alternative: one function per kind of estimation, which reads well until someone wants two unknowns at once.
 Also decided, on 25 November: an experiment holds no default priors. Those of a parameterization sit in `sesmax-param`, and those of a model in its component.
+Proposed on 26 November, for review: a control is a role in one experiment and not a kind of input. The covariates of [the param design](sesmax_param.md), the known fields from outside the model, are never in it.
 Status: proposed, for review. The numbers are from a scratch prototype. The run half (W3) is under way: the package, the monitors and the runs in chunks are merged (sesmax#197, sesmax#198). The work half is step W6 of [the workspace packages](workspace_packages.md) and waits for `sesmax-param`.
 
 ## Motivation
@@ -51,6 +52,8 @@ So the joint problem, in which the state and the drag are both unknown, has no h
 ### One control
 
 Collect what might be unknown in one vector: the initial state $\mathbf{x}_ 0 \in \mathbb{R}^{D_ x}$, parameters $\boldsymbol{\theta} \in \mathbb{R}^{D_ \theta}$, forcing or model-error coefficients $\mathbf{w} \in \mathbb{R}^{D_ w}$. An experiment picks the rows it treats as unknown and stacks them in $\mathbf{z} \in \mathbb{R}^{D_ z}$, with prior $\mathcal{N}(\boldsymbol{\mu}_ z, \boldsymbol{\Sigma}_ z)$, $\boldsymbol{\mu}_ z \in \mathbb{R}^{D_ z}$ and $\boldsymbol{\Sigma}_ z \in \mathbb{R}^{D_ z \times D_ z}$. The rest is fixed. The trajectory $\mathbf{x}_ t(\mathbf{z}) \in \mathbb{R}^{D_ x}$, for $t = 1, \dots, T$, is a deterministic function of $\mathbf{z}$.
+
+The covariates, the known fields that the terms read ([the param design](sesmax_param.md) defines them), are not in this list. They are known by definition and sit outside the trainable leaves. An uncertain covariate is first promoted to a parameter with a prior, and then it is a row of $\mathbf{z}$ like any other. Which rows are unknown is the experiment's choice alone: no component or term records it. Today's `control_filter` and `trainable_mask` are two early forms of that choice.
 
 ```math
 \mathcal{J}(\mathbf{z}; \boldsymbol{\nu}) = \frac{1}{2} \Vert \mathbf{z} - \boldsymbol{\mu}_z \Vert^2_{\boldsymbol{\Sigma}_z^{-1}} + \frac{1}{2} \sum_{t \leq T} \Vert \mathbf{y}_t - h_t(\mathbf{x}_t(\mathbf{z})) \Vert^2_{\boldsymbol{\Sigma}_\varepsilon^{-1}}
