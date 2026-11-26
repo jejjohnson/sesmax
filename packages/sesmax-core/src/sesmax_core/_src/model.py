@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import diffrax as dfx
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import jax.tree_util as jtu
 import paramax
@@ -52,6 +53,35 @@ class _ModelVectorField(eqx.Module):
         model = paramax.unwrap(self.model)
         state = model.apply_boundary_conditions(state)
         return model.vector_field(t, state, args)
+
+
+class _SaveWithBoundaries(eqx.Module):
+    """A diffrax ``SaveAt(fn=...)`` that sees the state's boundary conditions."""
+
+    model: Any
+    fn: Callable[[Any, PyTree, Any], PyTree]
+
+    def __call__(self, t: Any, state: PyTree, args: Any) -> PyTree:
+        state = paramax.unwrap(self.model).apply_boundary_conditions(state)
+        return self.fn(t, state, args)
+
+
+def _with_boundaries(saveat: dfx.SaveAt, model: Any) -> dfx.SaveAt:
+    """``saveat``, saving states with the model's boundary conditions."""
+
+    def wrap(sub: dfx.SubSaveAt) -> dfx.SubSaveAt:
+        return eqx.tree_at(lambda s: s.fn, sub, _SaveWithBoundaries(model, sub.fn))
+
+    subs = jtu.tree_map(
+        wrap, saveat.subs, is_leaf=lambda x: isinstance(x, dfx.SubSaveAt)
+    )
+    return eqx.tree_at(
+        lambda s: s.subs, saveat, subs, is_leaf=lambda x: x is None or x is saveat.subs
+    )
+
+
+# These adjoints solve for the final state alone, and refuse a ``SaveAt(fn=...)``.
+_BARE_SAVE = (dfx.ImplicitAdjoint, dfx.BacksolveAdjoint)
 
 
 def _as_time(t: Any) -> Any:
@@ -133,8 +163,10 @@ class Model(eqx.Module):
     ) -> dfx.Solution:
         """Forward integration using diffrax.
 
-        Boundary conditions are applied to ``state0`` before starting
-        and enforced at every RHS evaluation via ``build_terms``.
+        Boundary conditions are applied to ``state0`` before starting,
+        enforced at every RHS evaluation via ``build_terms``, and applied to
+        every state that is saved, so ``diagnose`` may read the ghost cells of
+        what this returns. Between two steps the integrator does not apply them.
 
         Repeated calls compile once: with the same model structure, state
         shapes, solver and controller, a call at other times or with other
@@ -152,17 +184,22 @@ class Model(eqx.Module):
         solver = kw.pop("solver", dfx.Tsit5())
         saveat = kw.pop("saveat", dfx.SaveAt(t1=True))
         stepsize_controller = kw.pop("stepsize_controller", dfx.ConstantStepSize())
-        return dfx.diffeqsolve(
+        bare_save = isinstance(kw.get("adjoint"), _BARE_SAVE)
+        solution = dfx.diffeqsolve(
             terms=self.build_terms(),
             solver=solver,
             t0=_as_time(t0),
             t1=_as_time(t1),
             dt0=_as_time(dt),
             y0=state0,
-            saveat=saveat,
+            saveat=saveat if bare_save else _with_boundaries(saveat, self),
             stepsize_controller=stepsize_controller,
             **kw,
         )
+        if bare_save:
+            filled = jax.vmap(self.apply_boundary_conditions)(solution.ys)
+            solution = eqx.tree_at(lambda s: s.ys, solution, filled)
+        return solution
 
     def step(
         self,
@@ -228,9 +265,8 @@ class Model(eqx.Module):
         It differs from :meth:`step` in two ways. Its ``step`` integrates over
         ``[0, dt]``, so a model with time-dependent forcing needs
         ``as_dynamics()``. It also doesn't fill boundaries on the state it is
-        given, only in each evaluation of the right-hand side, so ghost cells in
-        the input stay as they are; pass
-        ``model.apply_boundary_conditions(state)`` to match :meth:`step` exactly.
+        given or returns, only in each evaluation of the right-hand side; apply
+        ``model.apply_boundary_conditions`` to both to match :meth:`step` exactly.
 
         Args:
             dt: Window length that a cycle reads.

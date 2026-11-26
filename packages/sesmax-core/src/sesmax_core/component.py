@@ -10,7 +10,13 @@ Not re-exported from the top-level ``sesmax_core``.
 
 from __future__ import annotations
 
-from sesmax_core._src.component import Builder, BuiltRun, Check, Component
+from sesmax_core._src.component import (
+    AssertionFailedError,
+    Builder,
+    BuiltRun,
+    Check,
+    Component,
+)
 
 
-__all__ = ["Builder", "BuiltRun", "Check", "Component"]
+__all__ = ["AssertionFailedError", "Builder", "BuiltRun", "Check", "Component"]

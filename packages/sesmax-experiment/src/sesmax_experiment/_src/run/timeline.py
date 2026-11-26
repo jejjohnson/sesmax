@@ -100,3 +100,65 @@ class Timeline:
             if is_snapshot:
                 snapshots.add(len(edges) - 1)
         return cls(edges=np.asarray(edges), snapshots=frozenset(snapshots))
+
+    def after(self, t: float) -> Timeline:
+        """The rest of the timeline, from a time on.
+
+        The edges that are left are the same numbers, so a run that continues from
+        an edge takes the steps it would have taken.
+
+        Args:
+            t: A time of the run. If it is not an edge, the first chunk starts there
+                and ends at the next one.
+
+        Returns:
+            The timeline, or this one if ``t`` is not after its start.
+
+        Raises:
+            ValueError: If ``t`` is not before the end.
+
+        Examples:
+            >>> from sesmax_experiment.run import Timeline
+            >>> timeline = Timeline.build(0.0, 10.0, chunk=2.0, snapshot=4.0)
+            >>> rest = timeline.after(6.0)
+            >>> rest.edges.tolist(), sorted(rest.snapshots)
+            ([6.0, 8.0, 10.0], [1, 2])
+        """
+        close = _CLOSE * max(abs(t), abs(self.edges[-1] - self.edges[0]))
+        if t <= self.edges[0] + close:
+            return self
+        if t >= self.edges[-1] - close:
+            raise ValueError(f"nothing is left of the run after t={t!r}")
+        # The last edge that is not after ``t``, which becomes the first.
+        first = int(np.searchsorted(self.edges, t + close, side="right")) - 1
+        edges = self.edges[first:].copy()
+        kept = {k - first for k in self.snapshots if k >= first}
+        if abs(edges[0] - t) > close:
+            edges[0] = t
+            kept.discard(0)
+        return Timeline(edges=edges, snapshots=frozenset(kept))
+
+    def subdivided(self, n: int) -> Timeline:
+        """The same snapshots, with each chunk cut into ``n`` equal ones.
+
+        Args:
+            n: The chunks in place of one, at least one.
+
+        Returns:
+            The timeline.
+
+        Raises:
+            ValueError: If ``n`` is less than one.
+
+        Examples:
+            >>> from sesmax_experiment.run import Timeline
+            >>> timeline = Timeline.build(0.0, 10.0, chunk=6.0, snapshot=6.0)
+            >>> timeline.subdivided(2).edges.tolist()
+            [0.0, 3.0, 6.0, 8.0, 10.0]
+        """
+        if n < 1:
+            raise ValueError(f"a chunk is cut into one or more, got {n!r}")
+        starts, lengths = self.edges[:-1], np.diff(self.edges)
+        inner = starts[:, None] + lengths[:, None] * np.arange(n) / n
+        edges = np.append(inner.ravel(), self.edges[-1])
+        return Timeline(edges=edges, snapshots=frozenset(n * k for k in self.snapshots))

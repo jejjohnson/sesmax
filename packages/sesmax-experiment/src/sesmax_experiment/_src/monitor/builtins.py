@@ -280,11 +280,12 @@ class ThroughputMonitor(BaseMonitor):
 
 
 class WatchdogMonitor(BaseMonitor):
-    """FAIL-HARD: terminate if cumulative wallclock exceeds a ceiling.
+    """Stop the run, resumably, if cumulative wallclock exceeds a ceiling.
 
     A wallclock budget for the whole run. The runner already ticks an
     alive-thread; this enforces a hard ceiling and stops cleanly at the next
-    chunk boundary rather than running indefinitely.
+    chunk boundary rather than running indefinitely. The state is good, so
+    ``sesmax_experiment.sim`` writes a checkpoint to restart from.
 
     Args:
         max_wall_s: Maximum cumulative wallclock seconds before termination.
@@ -310,6 +311,7 @@ class WatchdogMonitor(BaseMonitor):
                 reason=(
                     f"wallclock {elapsed:.0f}s exceeded ceiling {self.max_wall_s:.0f}s"
                 ),
+                resumable=True,
             )
         return MonitorVerdict(metrics={"elapsed_wall_s": elapsed})
 

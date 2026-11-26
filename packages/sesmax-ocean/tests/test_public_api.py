@@ -18,10 +18,13 @@ import sesmax_ocean
 
 # Every public submodule; a new one joins this list and gets an API doc page.
 SUBMODULES: list[str] = [
+    "basins",
+    "checks",
     "eval",
     "forcing",
     "qg",
     "resolution",
+    "scenarios",
     "spherical",
     "swm",
 ]

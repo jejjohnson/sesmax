@@ -11,6 +11,10 @@ from sesmax_core._src.model import Model
 from sesmax_core._src.types import State
 
 
+class AssertionFailedError(RuntimeError):
+    """A run fails a check its spec asks for."""
+
+
 @dataclasses.dataclass(frozen=True)
 class BuiltRun:
     """A model and the state it starts from.
@@ -29,8 +33,9 @@ class BuiltRun:
 
 #: Builds a run from the ``model`` and ``scenario`` mappings of a run spec.
 Builder = Callable[[Mapping[str, Any]], BuiltRun]
-#: Raises if a run's initial or final state, or its model, fails a check.
-Check = Callable[[Any, Model], None]
+#: Called before a run with the run spec, the model and the parameters the spec
+#: gives the check; raises :class:`AssertionFailedError` if the run fails it.
+Check = Callable[..., None]
 
 _EMPTY: Mapping[str, Any] = MappingProxyType({})
 
@@ -46,6 +51,8 @@ class Component:
     Args:
         name: The component, e.g. ``"ocean"``.
         models: ``name -> builder``, the names a run spec may ask for.
+        scenarios: ``name -> models it goes with``, the scenarios a run spec may ask
+            for, where a component has named ones.
         checks: ``name -> check``, beyond the run loop's own.
         evaluate: Scalar metrics of a model and a state, or ``None``.
         field_units: ``model name -> field -> unit``, for logs and files.
@@ -55,6 +62,7 @@ class Component:
 
     name: str
     models: Mapping[str, Builder]
+    scenarios: Mapping[str, tuple[str, ...]] = _EMPTY
     checks: Mapping[str, Check] = _EMPTY
     evaluate: Callable[[Model, State], dict[str, float]] | None = None
     field_units: Mapping[str, Mapping[str, str]] = _EMPTY

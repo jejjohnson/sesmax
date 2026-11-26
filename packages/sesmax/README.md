@@ -23,7 +23,7 @@ This package holds no code. It installs the packages of the [sesmax workspace](h
 | Package | Import | Holds | Status |
 |---|---|---|---|
 | [`sesmax-core`](../sesmax-core/README.md) | `sesmax_core` | states, terms, forcing, rescaling, rollouts and assimilation adapters | released |
-| [`sesmax-experiment`](../sesmax-experiment/README.md) | `sesmax_experiment` | runs in chunks, monitors and checkpoints | moving from somax |
+| [`sesmax-experiment`](../sesmax-experiment/README.md) | `sesmax_experiment` | runs in chunks, run specs and a command line, monitors and checkpoints | moving from somax |
 | [`sesmax-ocean`](../sesmax-ocean/README.md) | `sesmax_ocean` | shallow-water, QG and spherical ocean models | moving from somax |
 
 ## 📥 Install

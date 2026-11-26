@@ -432,8 +432,10 @@ class TestConstrainedRowsStayConstrained:
         model = build(nx=32, ny=16)
         out = model.integrate(self.sheared(model), t0=0.0, t1=6 * 3600.0, dt=600.0).ys
         final = np.asarray(out.v[-1])
-        for row in (0, -2, -1):
+        for row in (0, -2):
             np.testing.assert_allclose(final[row, :], 0.0, atol=1e-12)
+        # The row beyond the wall is a ghost, the odd image of the one inside.
+        np.testing.assert_array_equal(final[-1, :], -final[-3, :])
 
     def test_the_other_tendencies_are_untouched(self):
         """Only ``v`` is constrained; ``h`` and ``u`` are free there."""

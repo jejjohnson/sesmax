@@ -27,7 +27,7 @@ def test_a_builder_gives_a_model_and_its_state() -> None:
 
 
 def test_the_optional_parts_are_empty() -> None:
-    assert dict(COMPONENT.checks) == {}
+    assert dict(COMPONENT.checks) == dict(COMPONENT.scenarios) == {}
     assert dict(COMPONENT.field_units) == {}
     assert COMPONENT.evaluate is None
     assert COMPONENT.describe_numerics is None

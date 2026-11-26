@@ -1,0 +1,62 @@
+# The barotropic double gyre at 256², beside doublegyre_bc_qg_hires: the same basin,
+# planet and viscosity, with one layer.
+#
+# Can one layer give the separated jet and the recirculations of the three-layer run?
+# Only with a strong wind and a drag tuned to it, for two reasons:
+#
+# 1. The wind is another quantity. In three layers `wind_amplitude` is the curl of a
+#    kinematic stress over H[0] (1.3e-10 m/s², about 0.08 N/m²); here it forces the
+#    vorticity of the one layer directly (1/s²). The same stress over 4100 m would be
+#    3.2e-14, at which the gyres stay laminar, because nothing is baroclinically
+#    unstable. 4e-12 is about 125 times that. At 8e-12 the run went from rest, in three
+#    months, to one basin-wide inertial recirculation (25 m/s, Ro above 1.3). Half the
+#    wind and three times the bottom drag give a meandering jet that is statistically
+#    steady (Ro about 0.55, kinetic energy about 3.5e13).
+# 2. The Munk layer is not resolved. (A / beta)^(1/3) is 9.5 km, 0.6 of a cell. Resolving
+#    it needs A of about 500, which is laminar, so part of the dissipation at the western
+#    boundary is numerical. Watch the enstrophy near the grid scale; the answer to too
+#    much of it is 512², not another number here.
+scenario:
+  name: double_gyre
+  grid:
+    nx: 256
+    ny: 256
+    Lx: 4000000.0
+    Ly: 4000000.0
+  consts:
+    f0: 9.375e-05
+    beta: 1.754e-11
+  forcing:
+    wind_amplitude: 4.0e-12
+    wind_profile: doublegyre
+  initial_condition:
+    type: at_rest
+model:
+  name: barotropic_qg
+  params:
+    lateral_viscosity: 15.0
+    bottom_drag: 3.0e-07
+timestepping:
+  t0: 0.0
+  t1: 157788000.0
+  dt: 600.0
+  save_interval: 2592000.0
+output:
+  write_snapshots: true
+  write_metrics: true
+debug:
+  scenario:
+    grid:
+      nx: 32
+      ny: 32
+  timestepping:
+    t1: 86400.0
+    save_interval: 600.0
+assertions:
+  cfl:
+    wave_speed_m_per_s: 5.0
+    max_cfl: 0.5
+  bounded_metric:
+    name: kinetic_energy
+    min: 0.0
+    max: 2000000000000000.0

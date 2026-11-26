@@ -153,6 +153,22 @@ SHALLOW_WATER: dict[str, dict[str, tuple[str, str, bool]]] = {
 }
 
 
+#: The run configs, and the cells a side they are compared on. The dimensionless one
+#: refuses a grid on which its Stommel layer is narrower than a cell.
+CONFIGS: dict[str, int] = {
+    "doublegyre_bc_qg": 16,
+    "doublegyre_bc_qg_hires": 16,
+    "doublegyre_bt_qg": 16,
+    "doublegyre_bt_qg_hires": 16,
+    "doublegyre_bt_qg_nondim": 56,
+    "doublegyre_swm_hires": 16,
+    "spinup_bc_qg": 16,
+    "swm_jet": 16,
+}
+#: The steps of the first chunk.
+CHUNK = 20
+
+
 def load(family: str) -> dict[str, dict[str, dict[str, np.ndarray]]]:
     """``case -> kind -> field -> array`` of one family."""
     tree: dict[str, dict[str, dict[str, np.ndarray]]] = {}

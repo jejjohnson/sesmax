@@ -16,8 +16,8 @@ Each distribution lives in `packages/<dist>/` with its own `pyproject.toml`, `sr
 |---|---|---|---|---|
 | — | `sesmax` | `sesmax` | code-free umbrella that installs the packages | scaffolded |
 | 2 | `sesmax-couple` | `sesmax_couple` | flux exchange, regridding, coupled runs | later |
-| 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, their resolution checks, metrics and forcing presets | moving from somax (#152) |
-| 1 | `sesmax-experiment` | `sesmax_experiment` | runs of models in chunks, their monitors and checkpoints; names no component | the run loop is moving from somax (#186) |
+| 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, their scenarios and run configs, checks, metrics and forcing presets | moved from somax (#152, #186) |
+| 1 | `sesmax-experiment` | `sesmax_experiment` | runs of models in chunks or from a run spec, their monitors and checkpoints; names no component | the run loop is moving from somax (#186) |
 | 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, I/O, test problems | moved from somax; first release 0.1.0 |
 
 The public API of each package is its top-level `__all__`, plus its public submodules.
@@ -76,7 +76,9 @@ find out whether it exists:
 | A check on a factory's arguments, or a Burger number from a Froude number | `sesmax_core.validation`; `resolve_burger`, `burger_to_g_prime` (`sesmax_core.gfd`) |
 | A blow-up check inside a tendency, or between chunks | `guard_finite`, `guard_positive`, `guard_ceiling`; `sesmax_experiment.monitor` |
 | A loop over chunks of a run, a cadence, a retry around a write | `run_chunks`, `Timeline`, `every_chunks` and the other schedules (`sesmax_experiment.run`); pipekit's `Branch`, `Sink`, `Retry`, `Try` |
+| A run described by a file, with its snapshots, metrics and manifest | `RunSpec`, `simulate`, `spinup`, `restart` (`sesmax_experiment.sim`); `sesmax-experiment simulate` |
 | What a package of models offers to a run | `Component`, `BuiltRun` (`sesmax_core.component`) |
+| A named ocean set-up (geometry, wind, initial condition) to run a model on | `sesmax_ocean.scenarios`; the run configs in `packages/sesmax-ocean/configs/` |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 | A check that the grid resolves a boundary layer or a deformation radius, or a metric of an ocean state | `sesmax_ocean.resolution`, `sesmax_ocean.eval` |
 
@@ -88,7 +90,7 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 
 - A model subclasses `Model` and implements `vector_field(t, state, args=None)`, which returns a tendency pytree with the state's structure, and `apply_boundary_conditions(state)`, which returns a state. `diagnose(state)` is optional and returns a `Diagnostics`.
 - `Model` wraps those three methods so they run on the unwrapped model, so a `positive` or `interval` parameter behaves like a plain array inside them. Anything else reads a constrained parameter through the `diagnostics` method or `paramax.unwrap`, because arithmetic on a wrapper is a type error.
-- `integrate(state0, t0, t1, dt, **kw)` returns a diffrax `Solution`, and `step(state, dt, *, t0=0.0, **kw)` returns a bare state with the same structure as `state`. The DA adapters and `rollout` call `step`, so a model changes how it integrates by overriding `build_terms` (SDE or IMEX), never `step`.
+- `integrate(state0, t0, t1, dt, **kw)` returns a diffrax `Solution` whose saved states have their boundary conditions applied, and `step(state, dt, *, t0=0.0, **kw)` returns a bare state with the same structure as `state`. The DA adapters and `rollout` call `step`, so a model changes how it integrates by overriding `build_terms` (SDE or IMEX), never `step`.
 - `as_forward_model(dt=, dt0=, **settings)` returns an `integrix.march.DiffraxForwardModel`, which holds the solver, step controller, adjoint and step budget and satisfies `pipekit_cycle.ForwardModel`. It holds one vector field, so a model whose `build_terms` gives anything but one `ODETerm` (IMEX, SDE, or a `ScaledModel` around either) raises `ValueError`. pipekit-jax is imported inside the method, so `import sesmax_core` does not load it (pipekit-ops and pipekit-array come with gridax, as its array backend).
 - Boundary conditions usually live in `apply_boundary_conditions`, which fills the ghosts once per state. A term may fill its own instead, because advection and diffusion need different Dirichlet ghost values: the first reads the exterior value, the second a reflection about the face. The model's method is then a pass-through.
 - A model whose right-hand side is an assembled term tree subclasses `TermModel`, which owns `vector_field` and `build_terms`; it overrides `apply_boundary_conditions` when it has boundaries.
@@ -121,6 +123,16 @@ Everything composes because it keeps these contracts; the tests in "What enforce
 - Monitors run host-side between jitted chunks, so they may hold Python state and never run inside a trace. A halt that must happen at the offending step is a `guard_finite`, `guard_positive` or `guard_ceiling` in the tendency instead.
 - `on_chunk_end` returns a `MonitorVerdict`; `terminate=True` needs a `reason`.
 - They live in `sesmax_experiment.monitor`, and `sesmax_experiment.run.run_chunks` calls them.
+
+### Components and runs
+
+- A package of models holds one `sesmax_core.component.Component` and names it under the entry-point group `sesmax.components`. A builder gets the `scenario` and `model` mappings of a run spec and returns a `BuiltRun`; the run loop reads nothing else of them.
+- A model's name belongs to one component. Two components with one name, or one model name in two, raise.
+- `sesmax_experiment.sim` needs `[sim]`, stays out of the top-level `__init__` and raises an `ImportError` naming the extra. A run that fails leaves no `snapshots.zarr`, `final_state.zarr`, `metrics.json` or `manifest.json`.
+- A checkpoint is written under a partial name and renamed to a new one; nothing is renamed onto a store, because the data mount refuses it. A chunk starts its stepper afresh from the state, so a checkpoint is the state and its time.
+- A check raises `AssertionFailedError` (`sesmax_core.component`). Those of any component, `cfl` before a run and `bounded_metric` after it, are in `sesmax_experiment.sim`; a component's own run before and may not take their names.
+- A verdict with `terminate=True` and `resumable=True` stops a run whose state is good. The runner writes a checkpoint and a manifest with `status: "stopped"`, and no final state.
+- Attributes of a store are written as `sesmax_*`, and those of somax (`somax_*`) are read.
 
 ### Migrated code
 

@@ -17,7 +17,7 @@ from typing import Any
 
 import equinox as eqx
 import jax.numpy as jnp
-from gridax import GridOps, apply_mask, grad_perp, laplacian
+from gridax import GridOps, apply_mask, embed, grad_perp, interior, laplacian
 
 from sesmax_core import Model
 from sesmax_core.fields import placed, values
@@ -106,7 +106,24 @@ class _SphericalQG(SphericalQG):
         return self.ops.diffuse(q, kappa=1.0)
 
 
+class _HoldsTheRing:
+    """q is zero on the ring of ghosts, as a field of cells (#212)."""
+
+    def _hold_walls(self, q: Any) -> Any:
+        return embed(interior(q, self.grid), self.grid)  # type: ignore[attr-defined]
+
+
+class _BarotropicQG(_HoldsTheRing, BarotropicQG):
+    pass
+
+
+class _BaroclinicQG(_HoldsTheRing, BaroclinicQG):
+    pass
+
+
 _CLASSES = {
+    BarotropicQG: _BarotropicQG,
+    BaroclinicQG: _BaroclinicQG,
     NonlinearShallowWater2D: _Nonlinear,
     MultilayerShallowWater2D: _Multilayer,
     SphericalSWM: _Spherical,

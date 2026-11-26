@@ -40,6 +40,8 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Runs in chunks](experiment_run.md) | `run_chunks`, `Timeline`, `ChunkedRun`, `ChunkFrame`, `RunStopped`; the schedules `every_chunks`, `every_sim_seconds`, `every_wall_seconds`, `at_snapshots`; the stages `AdvanceChunk`, `RunMonitors` |
 | [Monitors](experiment_monitor.md) | `Monitor`, `BaseMonitor`, `MonitorVerdict`, `ChunkInfo`, the six built-in monitors, `default_monitors` |
 | [Checkpointing](experiment_checkpoint.md) (`[checkpoint]`) | `SimulationCheckpointer` |
+| [Run specs](experiment_sim.md) (`[sim]`) | `RunSpec` and its blocks, `load_yaml`, `dump_yaml`; `simulate`, `spinup`, `restart`, `SimulationResult`, `IntegrationDivergedError`; `build_run`, `timeline_of`; `Checkpointing`, `CheckpointStore`; `MetricWriter`, `JsonLinesWriter`; `check_cfl`, `check_bounded_metric`; `model_op`; the command `sesmax-experiment` |
+| [Components](experiment_components.md) | `components`, `find_model` |
 
 ### sesmax-ocean
 
@@ -48,6 +50,9 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [QG models](ocean_qg.md) | `BarotropicQG`, `BaroclinicQG`, with their state, parameter, constant and diagnostic classes; `ReparameterizedQG` and its diagnostics |
 | [Shallow-water models](ocean_swm.md) | `NonlinearShallowWater2D`, `MultilayerShallowWater2D`, with their state, parameter, constant and diagnostic classes |
 | [Models on the sphere](ocean_spherical.md) | `SphericalSWM`, `SphericalQG`, with their state, parameter, constant and diagnostic classes |
+| [Scenarios](ocean_scenarios.md) | `SCENARIOS`, `MODELS`, `build_ocean_run`, `check_compatible` |
+| [Basin data](ocean_basins.md) | `BASINS`, `placeholder_bundle`, `write_bundle` |
+| [Model checks](ocean_checks.md) | `check_pv_inversion`, `check_static_stability` |
 | [Resolution checks](ocean_resolution.md) | `check_munk_width`, `check_stommel_width`, `check_deformation_radius`, `check_equatorial_deformation_radius`, `AssertionFailedError` |
 | [Metrics](ocean_eval.md) | `rms_divergence`, `total_enstrophy`, `kinetic_energy`, `geostrophic_imbalance`, `qg_balance_residual`, `compute_eval_metrics` |
 | [Forcing presets](ocean_forcing.md) | `ssh_geostrophic`, `sss_coastal`, `sst_frontal`, `geostrophic_currents` |

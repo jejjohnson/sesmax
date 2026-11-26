@@ -117,7 +117,8 @@ class RunMonitors(Operator):
     """Ask every monitor about a frame, and stop the run if one wants to.
 
     Every monitor is asked before the run stops, so the metrics of a stopped chunk
-    are complete. The first reason counts.
+    are complete. The first reason counts, and the stop is resumable only if every
+    monitor that asks for one says so.
 
     Args:
         model: The model the monitors see.
@@ -137,13 +138,15 @@ class RunMonitors(Operator):
     def _apply(self, frame: ChunkFrame) -> ChunkFrame:
         metrics, messages = dict(frame.metrics), list(frame.messages)
         reason: str | None = None
+        resumable = True
         for monitor in self.monitors:
             verdict = monitor.on_chunk_end(self.model, frame.state, frame.info)
             metrics |= {f"{monitor.name}.{k}": v for k, v in verdict.metrics.items()}
             messages += [f"[{monitor.name}] {text}" for text in verdict.messages]
-            if verdict.terminate and reason is None:
-                reason = f"monitor {monitor.name!r}: {verdict.reason}"
+            if verdict.terminate:
+                reason = reason or f"monitor {monitor.name!r}: {verdict.reason}"
+                resumable = resumable and verdict.resumable
         frame = dataclasses.replace(frame, metrics=metrics, messages=tuple(messages))
         if reason is not None:
-            raise RunStopped(reason, frame)
+            raise RunStopped(reason, frame, resumable=resumable)
         return frame

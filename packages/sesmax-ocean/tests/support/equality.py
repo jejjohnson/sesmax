@@ -84,7 +84,15 @@ def initial_state(
 @eqx.filter_jit
 def _run(model: Model, given: State, state: State, dt: float) -> dict[str, Any]:
     """What the reference holds, computed by the ported model."""
-    solution = model.integrate(state, t0=0.0, t1=N_STEPS * dt, dt=dt, solver=dfx.Heun())
+    # Not `integrate`, which fills the ghosts of what it returns, as somax's did not.
+    solution = dfx.diffeqsolve(
+        model.build_terms(),
+        dfx.Heun(),
+        t0=0.0,
+        t1=N_STEPS * dt,
+        dt0=dt,
+        y0=model.apply_boundary_conditions(state),
+    )
     return {
         "init": model.apply_boundary_conditions(given),
         "tendency": model.vector_field(0.0, state),

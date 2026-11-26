@@ -241,20 +241,21 @@ def qg_balance_residual(
     q = values(state.q)
     psi = model._invert_pv(q)
     q_hat = model.ops.laplacian(psi, at="T")
-    trim = _inversion_unknowns(model) if interior else (...,)
+    trim = pv_unknowns(model) if interior else (...,)
     resid = (q_hat - q)[trim]
     ref = q[trim]
     return jnp.linalg.norm(resid) / (jnp.linalg.norm(ref) + eps)
 
 
-def _inversion_unknowns(model: Any) -> tuple[slice, slice]:
-    """The cells a rectangular spectral inversion solves for.
+def pv_unknowns(model: Any) -> tuple[slice, slice]:
+    """The cells the inversion of a barotropic QG model solves for.
 
-    The inversion puts psi on X points: ``"dst"`` / ``"dct"`` solve on
-    ``[1:-2, 1:-2]`` with the wall on node ``N-2``, ``"fft"`` on
-    ``[1:-1, 1:-1]``. Only there does ``laplacian(invert(q)) == q`` hold.
+    The spectral inversions put psi on X points: ``"dst"`` / ``"dct"`` solve on
+    ``[1:-2, 1:-2]`` with the wall on node ``N-2``. ``"fft"``, and the iterative
+    one on the sphere, solve on ``[1:-1, 1:-1]``. Only there does
+    ``laplacian(invert(q)) == q`` hold.
     """
-    if getattr(model, "poisson_bc", "dst") in ("dst", "dct"):
+    if getattr(model, "poisson_bc", None) in ("dst", "dct"):
         return (slice(1, -2), slice(1, -2))
     return _INTERIOR
 
