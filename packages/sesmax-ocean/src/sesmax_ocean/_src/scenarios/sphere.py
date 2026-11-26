@@ -11,7 +11,16 @@ from typing import Any
 
 import jax.numpy as jnp
 import numpy as np
-from gridax import Mask2D, apply_mask
+from gridax import (
+    BC,
+    Mask2D,
+    Neumann,
+    Periodic,
+    SphericalCGrid2D,
+    apply_mask,
+    embed,
+    fill_ghosts,
+)
 from jaxtyping import Float
 
 from sesmax_core import Model, State
@@ -30,6 +39,8 @@ from sesmax_ocean._src.spherical.swm import SphericalSWM, SphericalSWMState
 
 
 _FRICTION = {"lateral_viscosity": float, "bottom_drag": float, "method": scheme}
+# The ring of a scenario's field, as the models fill h and u.
+_FIELD_BC = BC(x=Periodic(), y=Neumann())
 
 
 def _with_ghosts(
@@ -52,8 +63,11 @@ def _with_ghosts(
             f"{name} has shape {array.shape}; expected the physical grid "
             f"{(ny, nx)} or the ghosted grid {(ny + 2, nx + 2)}"
         )
-    array = np.pad(array, ((0, 0), (1, 1)), mode="wrap")
-    return np.pad(array, ((1, 1), (0, 0)), mode="edge")
+    geometry = scenario.geometry
+    grid = SphericalCGrid2D.from_interior(
+        nx, ny, geometry.lon_bounds, geometry.lat_bounds
+    )
+    return np.asarray(fill_ghosts(embed(array, grid), grid, _FIELD_BC))
 
 
 def _band(name: str, scenario: Scenario) -> dict[str, Any]:
