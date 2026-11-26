@@ -26,7 +26,7 @@ numbering:
 Proposed: give the workspace five kinds of package. `sesmax-core` holds the contracts, `sesmax-param` the parametric part of a model (parameterizations, forcing and model error), each component of the Earth system is a package of models, `sesmax-testing` says whether a model is right, and `sesmax-experiment` is where models are used: simulation, parameter estimation, state estimation, bilevel problems and monitoring.
 Benchmarks, which say whether a model is good, live in the planned geobench repository.
 Alternative: keep one core and add modules to it as needed (`sesmax_core.testing`, `sesmax_core.sim`), which is fewer releases, but the core then carries every toy and every workflow to anyone who only wants the model contract.
-Status: proposed, for review. The ocean models of W1 are merged (sesmax#152), and so is the start of W3 (sesmax#197, sesmax#198); the rest is not started. The owner has settled six points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, the ocean models come before the split, and a prior sits with what it describes, so those of parameterizations in param and those of models in their component (25 November).
+Status: proposed, for review. The ocean models of W1 are merged (sesmax#152), and so is the start of W3 (sesmax#197, sesmax#198); the rest is not started. The owner has settled six points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, the ocean models come before the split, and a prior sits with what it describes, so those of parameterizations in param and those of models in their component (25 November). A seventh came on 26 November: sesmax composes the machinery of the stack instead of writing its own, so a missing piece is added first to the package that owns it, and each design page says which.
 
 Each new package has its own design page, with the motivation, the maths, the numerics, the API, examples and a prototype: [sesmax-testing](sesmax_testing.md), [sesmax-param](sesmax_param.md) and [sesmax-experiment](sesmax_experiment.md). This page says what the packages are and how they depend on each other.
 
@@ -38,6 +38,7 @@ Each new package has its own design page, with the motivation, the maths, the nu
 | Where do drag, closures, forcing and model error live? | `sesmax-param` |
 | Where do runs and estimation live? | `sesmax-experiment` |
 | Who owns the methods? | vardax, filterax, argminax, as today |
+| Where does the machinery come from? | the stack (gridax, functax, integrix, kernellib, gaussx, argminax, filterax, vardax, diagnostix, geophysix, pipekit); a gap goes there first |
 | Where do benchmarks live? | geobench |
 | When do we split? | After the ocean models, before the run loop |
 

@@ -19,6 +19,7 @@ keywords:
 Proposed: one package, `sesmax-testing`, holds the toy models and a set of checks that take any sesmax model and say whether its code does what its equations say.
 Recommended: a check returns a number and a tolerance, so the same function serves a test suite, a notebook and a run report.
 Alternative: pytest helpers that only raise, which are shorter but leave nothing to print or to store.
+Decided by the owner on 26 November: sesmax composes the machinery of the stack and does not write its own. A piece that is missing is added first to the package that owns the concept, and the section on what this package builds on says which piece goes where.
 Status: proposed, for review. The checks below are prototyped in a scratch script; the package is not started. It is step W2 of [the workspace packages](workspace_packages.md), and it does not block [the run loop](run_loop.md).
 
 ## Motivation
@@ -160,6 +161,33 @@ A central difference has a truncation error of order $\epsilon^2$ and a round-of
 **Cost.**
 Nearly all of it is compilation. The adjoint check took 6 s on Lorenz-96 and 40 s on a 16 × 16 nonlinear shallow-water model, 12 steps long, and the Taylor test 13 s and 59 s. A test suite which runs them on every case belongs in the `slow` tier, and the conservation and translation checks (one tendency) in the fast one.
 
+## What it builds on
+
+A check is generic: it takes a function and a vector, and it knows nothing of a model. So the checks belong in the `testing` module of pipekit-array, which ships in the wheel and with which geophysix and diagnostix already test themselves. What a check has to know about a model, such as how to flatten a state, where the ghosts are and which weights make an invariant, is what this package adds.
+
+| Check | Built on | On `main` |
+| --- | --- | --- |
+| adjoint | `pipekit_array.testing.assert_adjoint`, on `jax.jvp` and `jax.vjp` of the flattened step | exists |
+| gradient | `pipekit_array.testing.assert_grad_matches_fd` | exists, with one column per input |
+| reference | `pipekit_array.testing.assert_matches_oracle` | exists |
+| contract | `pipekit_jax.testing.check_jax_operator`, gridax's `pipekit.testing.check_operator` | exists |
+| sampling | `pipekit_array.testing.assert_mean`, `assert_variance` | exists |
+| conservation | gridax's `area_sum` and `area_weights` give $\mathcal{C}$ | the ratio $\rho$ is missing |
+| boundary | `gridax.fill_ghosts` and its `BC` atoms give $B$ | idempotence is not tested |
+| translation, convergence | nothing | missing |
+| horizon | the Taylor test, over windows | missing with it |
+
+What is missing goes upstream, before the step here that needs it.
+
+- **A directional Taylor test**, in `pipekit_array.testing`. `assert_grad_matches_fd` forms a column of the Jacobian per input, which is a thousand forward runs for a state of a thousand values. The Taylor test needs one direction and a sweep of $\epsilon$, and it reports the slope.
+- **An invariant test**, the ratio $\rho$ of the numerics below, in `pipekit_array.testing`. It needs a functional and a vector field, and no grid.
+- **An equivariance test and an idempotence test**, $f(S\mathbf{x}) = S f(\mathbf{x})$ for a given $S$ and $B(B(m)) = B(m)$, in `pipekit_array.testing`. Translation is the first with $S$ a roll, and boundary is the second.
+- **An observed order of convergence**, $p = \log_ 2 (e(\Delta) / e(\Delta / 2))$ over a sequence of refinements, in `pipekit_array.testing`.
+- **A measurement next to each assertion**, in `pipekit_array.testing`. Every check there raises, so a notebook has nothing to print. A twin that returns the value and the tolerance, called by the assertion, settles ST-1 upstream.
+- **A tendency held at the wall faces**, in gridax's boundary module, next to `Wall` and `fill_ghosts`. Today it is `hold_walls` in `sesmax-ocean`, and the toys need it too (sesmax#202). gridax's tests should also state that each fill is idempotent.
+
+What stays here is small: the toys; `Case`, which says how to flatten a model's state, where its ghosts are and what its invariants are; `Report`; and one function per check that turns a `Case` into the arguments of the check upstream.
+
 ## Proposal: the API
 
 ```mermaid
@@ -207,6 +235,8 @@ class Case(eqx.Module):
 
 ### The checks
 
+Each function below turns a `Case` into the arguments of the check upstream that it names, and makes a `Report` from what that check measures.
+
 ```python
 # proposed (sesmax-testing)
 class Report(eqx.Module):
@@ -227,46 +257,55 @@ class Report(eqx.Module):
 
 # proposed (sesmax-testing)
 # ρ = |∑ᵢ gᵢ fᵢ| / ∑ᵢ |gᵢ fᵢ|, one report per invariant
+# on the invariant test (proposed, pipekit-array), with gridax's area weights
 def conservation(case: Case, *, rtol: float = 1e-14) -> tuple[Report, ...]: ...
 
 
 # proposed (sesmax-testing)
 # max |f(S x) − S f(x)| / max |f(x)|
+# on the equivariance test (proposed, pipekit-array), with S a roll
 def translation(case: Case, *, shift: int = 5, rtol: float = 1e-13) -> Report: ...
 
 
 # proposed (sesmax-testing)
 # max |m(x) − B m(x)| / max |B m(x)|, on the wall faces and on the ghost ring
+# B is gridax.fill_ghosts (today), on the idempotence test (proposed, pipekit-array)
 def boundary(case: Case, *, rtol: float = 1e-14) -> tuple[Report, Report]: ...
 
 
 # proposed (sesmax-testing)
 # the slope of log r(ε) over a sweep of ε
+# on the Taylor test (proposed, pipekit-array)
 def gradient(case: Case, *, min_slope: float = 1.7, seed: int = 0) -> Report: ...
 
 
 # proposed (sesmax-testing)
 # |⟨M v, w⟩ − ⟨v, Mᵀ w⟩| / |⟨M v, w⟩|
+# on pipekit_array.testing.assert_adjoint (today)
 def adjoint(case: Case, *, rtol: float = 1e-12, seed: int = 0) -> Report: ...
 
 
 # proposed (sesmax-testing)
 # p = log₂ e(Δ) / e(Δ/2), against a fine run or an exact solution
+# on the observed order (proposed, pipekit-array)
 def convergence(case: Case, *, exact: Callable | None = None) -> Report: ...
 
 
 # proposed (sesmax-testing)
 # max |x_T − x_ref| / max |x_ref|
+# on pipekit_array.testing.assert_matches_oracle (today)
 def reference(case: Case, stored: Path, *, rtol: float = 1e-12) -> Report: ...
 
 
 # proposed (sesmax-testing)
 # jit, vmap, structure of the tendency, arrays against located fields
+# on pipekit_jax.testing.check_jax_operator (today)
 def contract(case: Case) -> Report: ...
 
 
 # proposed (sesmax-testing): a measurement, so it has no tolerance on the model
 # t_ε, the longest window over which ∇ℒᵀv agrees with a central difference
+# the Taylor test, over windows of growing length
 def horizon(case: Case, *, sizes: tuple[float, ...], rtol: float = 0.01) -> dict[float, float]: ...
 ```
 
@@ -416,12 +455,14 @@ Not covered: float32, located fields, a masked domain in the adjoint check, manu
 | Does a run stay healthy? | the monitors, in [`sesmax-experiment`](sesmax_experiment.md) |
 | Timing of the steppers (sesmax#107) | a script in this repository |
 | Stencil tests of gridax, solver tests of spectraldiffx | those repositories |
+| The checks themselves, on any function | the `testing` module of pipekit-array |
 | vardax's own Lorenz models | vardax, which is below sesmax and cannot import ours |
 
 ## Steps and gates
 
 | Step | Pull request | Gate |
 | --- | --- | --- |
+| T0 | upstream: the Taylor, invariant, equivariance and idempotence tests, the observed order and the measurements in pipekit-array; the wall faces in gridax | each merged and released there, with its own tests |
 | T1 | the package, with the toys and their twelve test files | the moved tests and 22 notebooks change imports only |
 | T2 | `Case`, `Report`, `conservation`, `translation`, `boundary`, `contract`, `reference` | the tables above, as tests; the copies in `sesmax-ocean` are deleted; sesmax#202 is fixed |
 | T3 | `adjoint`, `gradient`, `convergence`, `horizon` (closes sesmax#105) | every public term and toy has a gradient check |
@@ -433,7 +474,7 @@ The core's own tests take `sesmax-testing` from the development group. 15 of its
 
 | ID | Question | Recommended | Alternative |
 | --- | --- | --- | --- |
-| ST-1 | Report or raise? | a `Report`, with `raise_if_failed` | functions that only assert |
+| ST-1 | Report or raise? | a `Report`, made from the measurements of pipekit-array, with `raise_if_failed` | the assertions of pipekit-array alone |
 | ST-2 | Where do a component's cases live? | in its own tests | a public `sesmax_ocean.cases` |
 | ST-3 | Initial conditions and topographies of sesmax#145 | ocean science, so `sesmax-ocean` | here, next to the toys |
 | ST-4 | Random states by a library (Hypothesis)? | no, a seeded draw | shrinking would help on masks |
@@ -453,6 +494,7 @@ The core's own tests take `sesmax-testing` from the development group. 15 of its
 ## Relationships
 
 - Part of: [the workspace packages](workspace_packages.md), step W2
+- Builds on: pipekit-array (`testing`), pipekit-jax, gridax, diffrax
 - Uses the findings of: [the ocean plan](ocean.md)
 - Used by: [sesmax-param](sesmax_param.md), [sesmax-experiment](sesmax_experiment.md)
 - Issues: sesmax#105, sesmax#107, sesmax#145, sesmax#173, sesmax#183, sesmax#185, sesmax#202

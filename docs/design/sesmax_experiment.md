@@ -22,6 +22,7 @@ Decided by the owner: the package covers simulation, parameter estimation, state
 Recommended for what is open: the problem says what is unknown, and one verb, `estimate`, covers states, parameters and forcing.
 Alternative: one function per kind of estimation, which reads well until someone wants two unknowns at once.
 Also decided, on 25 November: an experiment holds no default priors. Those of a parameterization sit in `sesmax-param`, and those of a model in its component.
+Decided by the owner on 26 November: sesmax composes the machinery of the stack and does not write its own. A piece that is missing is added first to the package that owns the concept, and the section on what this package builds on says which piece goes where.
 Proposed on 26 November, for review: a control is a role in one experiment and not a kind of input. The covariates of [the param design](sesmax_param.md), the known fields from outside the model, are never in it.
 Status: proposed, for review. The numbers are from a scratch prototype. The run half (W3) is under way: the package, the monitors and the runs in chunks are merged (sesmax#197, sesmax#198). The work half is step W6 of [the workspace packages](workspace_packages.md) and waits for `sesmax-param`.
 
@@ -162,6 +163,35 @@ Until sesmax#196, `Model.integrate` compiled again on every call. A problem buil
 **Precision.**
 4D-Var on a chaotic model loses significant digits, so the default of the package is float64, and a float32 run is opt-in.
 
+## What it builds on
+
+A method, a diagnostic and a score are already in the stack, so this package writes none. What it adds is the problem that every method solves, and the verbs that hand a problem to one.
+
+| Need | Built on | On `main` |
+| --- | --- | --- |
+| BFGS, Levenberg–Marquardt, the implicit gradient of a minimum | optimistix: `BFGS`, `LevenbergMarquardt`, `ImplicitAdjoint` | exists |
+| Gauss–Newton with matrix-free CG, its dual form, solvers stopped early | argminax: `GaussNewtonCG`, `dual_solve`, `KStep`, `OneStep` | exists |
+| the Laplace posterior, the Gauss–Newton Hessian, variances, samples | `argminax.curvature`: `Laplace`, `gauss_newton`, `marginal_variance`, `sample_by_perturbation` | exists |
+| $d_ s$, the information content, the evidence, a prior precision from the evidence | `argminax.diagnose`: `degrees_of_freedom`, `information_content`, `evidence`, `optimize_prior_precision` | exists |
+| ensemble filters and inversion | filterax: `EKI`, `ETKF` and the rest | exists |
+| $\chi^2$, Desroziers, spread against skill, rank histograms | `filterax.utils`: `chi2_consistency`, `desroziers_R_estimate`, `spread_skill_ratio`, `rank_histogram` | exists |
+| 4D-Var, strong, weak and incremental | vardax: `StrongFourDVar`, `WeakFourDVar`, `IncrementalFourDVar` | exists |
+| observation operators: points, interpolation, masks | vardax: `GridPointObs`, `InterpObs`, `MaskedIdentity`; `pipekit_cycle.LinearObs` | exists |
+| the scores of a twin | `diagnostix.skill`: `rmse`, `bias`, `crps`, `spread_skill` | exists |
+| cycling windows | pipekit-cycle: `DACycle`, `WindowedCycle` | exists |
+| the adjoint of a solve, checkpointing | integrix: `adjoint.Checkpointed`, `adjoint.to_diffrax_adjoint` | exists |
+| the condition number of a whitened Hessian | nothing | missing |
+| the gradient of an outer loss through a minimum | nothing, by name | missing |
+
+What is missing goes upstream, before the step here that needs it.
+
+- **A bilevel gradient**, in argminax, which owns the adjoints of a minimiser: the gradient of an outer loss through $\hat{\mathbf{z}}(\boldsymbol{\nu})$ by the implicit function theorem, with Hessian-vector products. Today every caller writes `jax.grad` through `optx.minimise` with `ImplicitAdjoint`. `bilevel` here calls it.
+- **The condition number of a whitened Gauss–Newton Hessian**, in `argminax.diagnose`, next to `degrees_of_freedom`.
+
+Two needs are met by choosing the right piece. `rollout` passes no adjoint today (step E1), and the choice of one is integrix's `to_diffrax_adjoint`, which already resolves to `DirectAdjoint`. The synthetic observations of a twin are a draw from an observation operator and its noise, which is a few lines here.
+
+What stays here: `Problem`, which joins a model, the priors and the observations into one function of the control; the verbs; `Result`, which collects what the libraries above return; and the run loop.
+
 ## Proposal: the API
 
 ```mermaid
@@ -282,6 +312,8 @@ class Method(Protocol):
 method = sxe.Minimise(optx.BFGS(rtol=1e-8, atol=1e-8))
 # today (optimistix), needs adjoint=DirectAdjoint()
 method = sxe.LeastSquares(optx.LevenbergMarquardt(rtol=1e-8, atol=1e-8))
+# today (argminax), matrix-free
+method = sxe.LeastSquares(amx.GaussNewtonCG(rtol=1e-8, atol=1e-8))
 # today (filterax)
 method = sxe.Ensemble(fx.EKI, n_members=50)
 # today (vardax), state and model error only
@@ -303,6 +335,7 @@ def estimate(problem: Problem, *, method: Method) -> Result: ...
 
 # proposed (sesmax-experiment)
 # ν̂ = argmin ℒ(ẑ(ν)), by the implicit gradient
+# the gradient is argminax's (proposed); this verb calls it
 def bilevel(
     problem: Problem,
     *,
@@ -325,7 +358,7 @@ def twin(
 ) -> TwinResult: ...
 ```
 
-`Gaussian` is the class of [`sesmax-param`](sesmax_param.md), re-exported. Two helpers serve the bilevel problems:
+`Gaussian` is gaussx's, re-exported by [`sesmax-param`](sesmax_param.md). Two helpers serve the bilevel problems:
 
 ```python
 # proposed (sesmax-experiment)
@@ -335,6 +368,7 @@ def with_prior_std(problem: Problem, path: str, std: Float[Array, "*shape"]) -> 
 
 # proposed (sesmax-experiment)
 # mean of (y_t − h(x_t(ẑ)))² over the observations that ``mask`` selects
+# diagnostix.skill.rmse, squared (today)
 def misfit(result: Result, mask: Bool[Array, "time obs"]) -> Float[Array, ""]: ...
 ```
 
@@ -351,7 +385,7 @@ class Result(eqx.Module):
     white: Float[Array, " control"]
     # P, the whitened posterior covariance, or None where a method gives an ensemble
     covariance: Float[Array, "control control"] | None
-    # d_s = D_z − tr P
+    # d_s = D_z − tr P, from argminax.diagnose.degrees_of_freedom
     dof_signal: Float[Array, ""] | None
     cost_start: Float[Array, ""]
     cost_end: Float[Array, ""]
@@ -360,7 +394,7 @@ class Result(eqx.Module):
     converged: Bool[Array, ""]
     n_evaluations: int
 
-    # predictions against observations: innovations, χ², spread
+    # predictions against observations: innovations, χ², spread, from filterax.utils
     def diagnose(self) -> Mapping[str, Float[Array, ""]]: ...
 
 
@@ -369,7 +403,7 @@ class TwinResult(eqx.Module):
     """An estimate next to the truth it was made from."""
 
     result: Result
-    # RMS error of the estimate and of the prior, by path
+    # RMS error of the estimate and of the prior, by path, from diagnostix.skill.rmse
     rmse: dict[str, Float[Array, ""]]
     prior_rmse: dict[str, Float[Array, ""]]
 ```
@@ -532,11 +566,11 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 | Step | Pull request | Gate |
 | --- | --- | --- |
 | E0 | the rest of the run half: epic sesmax#186 | [the run-loop design](run_loop.md) |
-| E1 | `rollout` and `rollout_loss` take an `adjoint` | Levenberg–Marquardt and the implicit gradient run, as tests |
+| E1 | `rollout` and `rollout_loss` take an integrix adjoint | Levenberg–Marquardt and the implicit gradient run, as tests |
 | E2 | `Component.priors`, `priors`, `Window`, `Observations`, `Problem`, `Result`, `simulate`, `estimate` with `Minimise` | the four-row table, as tests; the README quickstart of the core gives the same numbers |
 | E3 | `LeastSquares`, `Ensemble`, `Variational` | one problem, three methods, a documented difference |
 | E4 | `twin`, and the diagnostics of a `Result` | the truth lies within the stated spread on a seeded twin |
-| E5 | `bilevel` | the gradient against a finite difference, to 1 % |
+| E5 | `bilevel`, over argminax's bilevel gradient | that gradient released in argminax; the gradient against a finite difference, to 1 % |
 | E6 | the analysis monitors and their record | a run and an estimate write the same record |
 
 ## Open questions
@@ -570,6 +604,7 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 ## Relationships
 
 - Part of: [the workspace packages](workspace_packages.md), steps W3 (run) and W6 (work)
+- Builds on: optimistix, argminax, filterax, vardax, integrix, diagnostix, pipekit-cycle
 - Depends on: [the run-loop design](run_loop.md), [sesmax-param](sesmax_param.md) for priors
 - Uses: the horizon of [sesmax-testing](sesmax_testing.md)
 - Issues: sesmax#186, sesmax#15

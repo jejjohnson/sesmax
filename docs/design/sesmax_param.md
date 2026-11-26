@@ -20,6 +20,7 @@ Proposed: one package, `sesmax-param`, holds every term of a right-hand side who
 Decided by the owner on 25 November: the package exists, it is called "param", model error belongs in it as a forcing in tendency units, and it comes after the ocean models are ported.
 Also decided: the prior of a parameterization sits here, with the parameterization, and the prior of a model (its state, its own parameters) sits in the model's package. An experiment holds no default priors.
 Proposed on 26 November, for review: forcing, covariate and control name three different things. A covariate is a known field from outside the model, a forcing is a term that may read covariates but not the state, and a control is what an experiment treats as unknown. The section on forcing, covariates and controls below defines them, and SP-7 asks what the known fields are called.
+Decided by the owner on 26 November: sesmax composes the machinery of the stack and does not write its own. A piece that is missing is added first to the package that owns the concept, and the section on what this package builds on says which piece goes where.
 Recommended for what is open: a prior here is attached to its leaf (SP-4).
 Alternative: a `priors()` method on each term, which leaves the leaves plain and writes each name twice.
 Status: proposed, for review. The numbers below are from a scratch prototype; the package is not started. It is step W5 of [the workspace packages](workspace_packages.md).
@@ -212,12 +213,45 @@ A coefficient with a sign is stored through `positive()` and its prior is on the
 **Scaling.**
 A forcing coefficient of $10^{-5}$ and a Smagorinsky constant of 0.1 do not belong in one vector unscaled. The estimation works on the whitened control, and [the experiment design](sesmax_experiment.md) measures what it changes.
 
+## What it builds on
+
+The terms here are laws: a formula for a viscosity, a drag, a map from a covariate to a tendency. The stencils, bases, densities, constants and Gaussians they are made of come from the stack.
+
+| Need | Built on | On `main` |
+| --- | --- | --- |
+| strain rates; diffusion of a tracer, harmonic and biharmonic | gridax: `Strain2D`, `strain_magnitude_squared`, `Diffusion2D`, `BiharmonicDiffusion2D` | exists |
+| the divergence of a stress for a field $\nu$, harmonic and biharmonic, with masks | gridax | missing |
+| spatial bases: Fourier, Gabor, RBF, divergence-free, EOF, graph Laplacian | `functax.basis` | exists; the core's `spatial_from_*` still read `geonnax.basis` |
+| temporal bases | `functax.basis`: `fourier_features`, `seasonal_features`, `gaussian_window_features` | exists, without a hat basis |
+| the prior variance of a spectral mode | kernellib: the `spectral_density` of `RBF` and `Matern`, `LaplaceEigenfunctionFeatures` | exists |
+| a record read in time | `functax.interp` (`Pchip`, `CubicSpline`) through integrix's `SampledPath` | exists, used today |
+| $g$, $\rho_ 0$, $f$, $\beta$, the density of air | geophysix: `constants.STANDARD.standard_gravity`, `seawater.LINEAR_EOS.reference_density`, `rotation.coriolis`, `rotation.beta_plane`, `thermo.dry_air_density` | exists |
+| a Gaussian, whitening | gaussx: `sqrt_matmul`, `whiten_covariance`; `pyrox_gauss.MultivariateNormal` with NumPyro | exists, without a prior class free of NumPyro |
+| model error: a separable basis, a Kronecker prior, a whitened control | vardax: `ModelErrorBasis`, `WeakFourDVar` | exists |
+| coloured model error | gaussx: `ar1_precision`, `MaternSDE` | the parts exist |
+| the stable step of an explicit scheme | integrix: `march.stable_step` | harmonic only |
+
+What is missing goes upstream, before the step here that needs it.
+
+- **The viscosity of a stress**, in gridax: $\nabla \cdot (2 \nu \mathbf{E})$ and its biharmonic form, for a field $\nu$ on the C-grid, with masks. Smagorinsky, Leith and a learned viscosity are each a formula for $\nu$ on top of it, so the formulas stay here and the stencil goes there.
+- **A Gaussian prior free of NumPyro**, in gaussx: a mean, a scale operator, `whiten`, `unwhiten` and a log density. gaussx has the operations, and its distribution classes moved to pyrox-gauss, which needs NumPyro. It takes the place of the `Gaussian` sketched below.
+- **Priors by path in a pytree**, the registry that `priors` reads. No package has one. The nearest is pyrox's `Parameterized.set_prior`, which keys by name inside one module and is bound to NumPyro. SP-8 asks where it goes.
+- **A hat basis in time**, in `functax.basis`.
+- **The biharmonic bound** $\Delta t \leq \Delta^4 / (32 \kappa_ 4)$, in integrix's `stable_step`.
+- **Coloured model error**, an AR(1) or Ornstein–Uhlenbeck prior on the temporal modes, in vardax next to `ModelErrorBasis`, from gaussx's `ar1_precision`.
+
+What stays here: the laws (drag, the formulas for $\nu$, the maps from covariates to tendencies, the bulk formula of the stress), model error as a tendency, and the priors of all of them. geostack's page on geophysix leaves parameterizations and bulk formulas to the models, so this is their place in the stack.
+
 ## Proposal: the API
 
 ```mermaid
 flowchart TD
     core["sesmax-core<br/>Term, Sum, TermModel<br/>ForcingProtocol, ForcingTerm, Covariates"]
-    gridax["gridax<br/>strains, diffuse, biharmonic"]
+    gridax["gridax<br/>strains, diffusion, the viscosity of a stress"]
+    functax["functax, kernellib<br/>bases, spectral densities"]
+    gaussx["gaussx<br/>Gaussians, whitening"]
+    geophysix["geophysix<br/>g, ρ₀, f"]
+    vardax["vardax<br/>ModelErrorBasis"]
     subgraph param["sesmax-param"]
         pz["parameterizations<br/>drag, viscosity, Smagorinsky, learned"]
         fo["forcing<br/>wind stress, seasonal, basis"]
@@ -229,6 +263,11 @@ flowchart TD
     exp["sesmax-experiment<br/>reads the priors"]
     core --> param
     gridax --> pz
+    functax --> fo
+    geophysix --> pz
+    geophysix --> fo
+    gaussx --> pr
+    vardax --> me
     pz --> ocean
     fo --> ocean
     me --> exp
@@ -240,9 +279,9 @@ flowchart TD
 | --- | --- | --- |
 | `sesmax_param.parameterizations` | drag, damping, viscosity, eddy closures, learned terms | `forcing_ops`, as `AbstractForcing`; the models |
 | `sesmax_param.forcing` | forcing terms: wind stress and curl from a stress covariate, seasonal | `forcing`, `forcing_ops` |
-| `sesmax_param.basis` | spatial and temporal bases, `BasisForcing` | `basis`, `forcing_bank` |
-| `sesmax_param.error` | `ModelError` and its three kinds | nothing |
-| `sesmax_param.priors` | `Gaussian`, `priors` | `SpatialBasis.prior_std`, `regularization` |
+| `sesmax_param.basis` | `BasisForcing` and its presets, over functax's bases and kernellib's densities | `basis`, `forcing_bank` |
+| `sesmax_param.error` | `ModelError` and its three kinds, a tendency over vardax's `ModelErrorBasis` | nothing |
+| `sesmax_param.priors` | `priors`, `with_prior`, `lognormal`, and gaussx's `Gaussian` re-exported | `SpatialBasis.prior_std`, `regularization` |
 | `sesmax_param.da` | `to_vardax`, behind `[da]` | nothing |
 
 What stays in the core is the slot: `Term` and its algebra, `ForcingProtocol`, `ForcingTerm`, `add_to` and `add_vector_to`. The covariates stay there too, as `Covariates`, a mapping from a name to a known field with `InterpolatedForcing` as its reader of records, because a component, a term and an experiment all read them.
@@ -317,12 +356,12 @@ Each prior is owned by the package that owns what it describes.
 | a model's state | the component | the background of sea-surface height and its spread |
 | a model's own parameters | the component | layer depths, stratification |
 
-An experiment reads both and may replace any of them for one run. The component's priors reach it through `Component`, the registration type in the core, so `sesmax-experiment` still names no component; [its page](sesmax_experiment.md) has the sketch. `Gaussian` is defined here, below the components, so that they can use it.
+An experiment reads both and may replace any of them for one run. The component's priors reach it through `Component`, the registration type in the core, so `sesmax-experiment` still names no component; [its page](sesmax_experiment.md) has the sketch. `Gaussian` is gaussx's once it is there, re-exported here so that the components and the experiment use one class.
 
 A prior is stated where the parameter is made, and `priors` collects those of the terms.
 
 ```python
-# proposed (sesmax-param)
+# proposed (gaussx), re-exported here
 class Gaussian(eqx.Module):
     """𝒩(μ, σ²), with a diagonal covariance."""
 
@@ -505,11 +544,11 @@ Not covered: an SDE, located fields, Leith and Gent–McWilliams, masks and coas
 
 | Step | Pull request | Gate |
 | --- | --- | --- |
-| P1 | the package, with the bases, the forcing terms and the basis presets moved; `Covariates` in the core | the moved tests; imports only in callers |
+| P1 | the package, with the bases, the forcing terms and the basis presets moved; `Covariates` in the core; the presets on `functax.basis` in place of `geonnax.basis` | the moved tests; imports only in callers |
 | P2 | drag, damping and viscosity as `Term`s; `AbstractForcing` goes | same numbers as today on every moved test |
-| P3 | `Gaussian`, `with_prior`, `priors` | a model's priors round-trip through a fit on Lorenz-96 |
-| P4 | `ModelError` and `to_vardax` | the two-route table above, as a test |
-| P5 | Smagorinsky and `LearnedViscosity` | the energy identity, the net momentum and the gradient checks |
+| P3 | `with_prior`, `priors`, over gaussx's `Gaussian` | gaussx's prior class released; a model's priors round-trip through a fit on Lorenz-96 |
+| P4 | `ModelError` over vardax's `ModelErrorBasis`, and `to_vardax` | the two-route table above, as a test |
+| P5 | Smagorinsky and `LearnedViscosity` | gridax's viscosity of a stress released; the energy identity, the net momentum and the gradient checks |
 | P6 | the ocean models as sums of terms | the reference check of every model, unchanged |
 | P7 | Leith, Gent–McWilliams, backscatter | one issue each, when a user needs it |
 
@@ -523,9 +562,10 @@ The core's readme names forcing as one of its five uses, its quickstart inverts 
 | SP-2 | White-noise error in the package | no: a filter or an SDE draws it, `Q` is a field of the method | a `WhiteNoise` term with a diffrax SDE path |
 | SP-3 | Noise that scales with a parameterization | left out until a user needs it | a perturbed parameter or tendency scheme ([Berner et al., 2017](https://doi.org/10.1175/BAMS-D-15-00268.1)) |
 | SP-4 | How is a prior attached here? (the owner is settled) | to the leaf, read by `priors` | a `priors()` method on each term |
-| SP-5 | Basis class | ours, with an adapter | vardax's `ModelErrorBasis` for both |
+| SP-5 | Basis class | functax's bases for forcing, vardax's `ModelErrorBasis` for model error | ours, with an adapter |
 | SP-6 | A networks dependency | none: `LearnedViscosity` takes any callable | geonnax |
 | SP-7 | What are the known fields called? | `Covariates` in the core, with `InterpolatedForcing` renamed `InterpolatedField` | `ForcingProtocol` for every field, with the known ones marked by convention |
+| SP-8 | Where does the registry of priors by path go? | argminax, which has `Reparametrised` and reads prior precisions in `curvature` and `diagnose` | pyrox, next to `Parameterized.set_prior` |
 
 SP-4 is about the mechanism only. A prior on a leaf means a parameter and its uncertainty travel together in the pytree, and it has to survive `jit`, `tree_at` and an optimiser's partition. I would try that in P3 and fall back to the method if it does not.
 
@@ -550,6 +590,7 @@ SP-4 is about the mechanism only. A prior on a leaf means a parameter and its un
 ## Relationships
 
 - Part of: [the workspace packages](workspace_packages.md), step W5
+- Builds on: gridax, functax, kernellib, integrix, gaussx, geophysix, vardax
 - Depends on: [sesmax-testing](sesmax_testing.md) for its checks, and the ocean models of [the ocean plan](ocean.md)
 - Feeds: [sesmax-experiment](sesmax_experiment.md)
 - Issues: sesmax#106, sesmax#114, sesmax#144
