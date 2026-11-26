@@ -183,7 +183,7 @@ A method, a diagnostic and a score are already in the stack, so this package wri
 | the condition number of a whitened Hessian | nothing | missing |
 | the gradient of an outer loss through a minimum | nothing, by name | missing |
 
-What is missing goes upstream, before the step here that needs it.
+What is missing goes upstream, before the step here that needs it. The issues are argminax#102 and argminax#103, under geostack#327.
 
 - **A bilevel gradient**, in argminax, which owns the adjoints of a minimiser: the gradient of an outer loss through $\hat{\mathbf{z}}(\boldsymbol{\nu})$ by the implicit function theorem, with Hessian-vector products. Today every caller writes `jax.grad` through `optx.minimise` with `ImplicitAdjoint`. `bilevel` here calls it.
 - **The condition number of a whitened Gauss–Newton Hessian**, in `argminax.diagnose`, next to `degrees_of_freedom`.

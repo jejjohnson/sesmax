@@ -231,9 +231,9 @@ The terms here are laws: a formula for a viscosity, a drag, a map from a covaria
 | coloured model error | gaussx: `ar1_precision`, `MaternSDE` | the parts exist |
 | the stable step of an explicit scheme | integrix: `march.stable_step` | harmonic only |
 
-What is missing goes upstream, before the step here that needs it.
+What is missing goes upstream, before the step here that needs it. The issues are gridax#585, gaussx#888, functax#179, integrix#113 and vardax#316, under geostack#327.
 
-- **The viscosity of a stress**, in gridax: $\nabla \cdot (2 \nu \mathbf{E})$ and its biharmonic form, for a field $\nu$ on the C-grid, with masks. Smagorinsky, Leith and a learned viscosity are each a formula for $\nu$ on top of it, so the formulas stay here and the stencil goes there.
+- **The viscosity of a stress**, in gridax: $\nabla \cdot (2 \nu \mathbf{E})$ and its biharmonic form, for a field $\nu$ on the C-grid, with masks. Smagorinsky, Leith and a learned viscosity are each a formula for $\nu$ on top of it, so the formulas stay here and the stencil goes there. gridax#584 already asks for the Smagorinsky formula in gridax, for plumax, and the term here would call it.
 - **A Gaussian prior free of NumPyro**, in gaussx: a mean, a scale operator, `whiten`, `unwhiten` and a log density. gaussx has the operations, and its distribution classes moved to pyrox-gauss, which needs NumPyro. It takes the place of the `Gaussian` sketched below.
 - **Priors by path in a pytree**, the registry that `priors` reads. No package has one. The nearest is pyrox's `Parameterized.set_prior`, which keys by name inside one module and is bound to NumPyro. SP-8 asks where it goes.
 - **A hat basis in time**, in `functax.basis`.

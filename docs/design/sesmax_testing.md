@@ -184,7 +184,8 @@ What is missing goes upstream, before the step here that needs it.
 - **An equivariance test and an idempotence test**, $f(S\mathbf{x}) = S f(\mathbf{x})$ for a given $S$ and $B(B(m)) = B(m)$, in `pipekit_array.testing`. Translation is the first with $S$ a roll, and boundary is the second.
 - **An observed order of convergence**, $p = \log_ 2 (e(\Delta) / e(\Delta / 2))$ over a sequence of refinements, in `pipekit_array.testing`.
 - **A measurement next to each assertion**, in `pipekit_array.testing`. Every check there raises, so a notebook has nothing to print. A twin that returns the value and the tolerance, called by the assertion, settles ST-1 upstream.
-- **A tendency held at the wall faces**, in gridax's boundary module, next to `Wall` and `fill_ghosts`. Today it is `hold_walls` in `sesmax-ocean`, and the toys need it too (sesmax#202). gridax's tests should also state that each fill is idempotent.
+
+One candidate was not a gap. `hold_walls` of `sesmax-ocean`, which the toys need too (sesmax#202), is what `gridax.fill_ghosts(tendency, grid, BC.wall_normal(), stagger="U")` already does: the same wall faces are zero and the interior is identical (measured with gridax 0.3.2). So sesmax#202 tries gridax first.
 
 What stays here is small: the toys; `Case`, which says how to flatten a model's state, where its ghosts are and what its invariants are; `Report`; and one function per check that turns a `Case` into the arguments of the check upstream.
 
@@ -462,7 +463,7 @@ Not covered: float32, located fields, a masked domain in the adjoint check, manu
 
 | Step | Pull request | Gate |
 | --- | --- | --- |
-| T0 | upstream: the Taylor, invariant, equivariance and idempotence tests, the observed order and the measurements in pipekit-array; the wall faces in gridax | each merged and released there, with its own tests |
+| T0 | upstream: the Taylor, invariant, equivariance and idempotence tests, the observed order and the measurements in pipekit-array (pipekit#299 to pipekit#302, under geostack#327) | each merged and released there, with its own tests |
 | T1 | the package, with the toys and their twelve test files | the moved tests and 22 notebooks change imports only |
 | T2 | `Case`, `Report`, `conservation`, `translation`, `boundary`, `contract`, `reference` | the tables above, as tests; the copies in `sesmax-ocean` are deleted; sesmax#202 is fixed |
 | T3 | `adjoint`, `gradient`, `convergence`, `horizon` (closes sesmax#105) | every public term and toy has a gradient check |
