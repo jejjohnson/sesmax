@@ -8,13 +8,16 @@ from typing import Any
 import equinox as eqx
 import jax.numpy as jnp
 from gridax import (
+    BC,
     CartesianCGrid2D,
     CField,
+    Dirichlet,
     GridOps,
     Mask2D,
     arakawa_jacobian,
     area_sum,
     embed,
+    fill_ghosts,
     interior,
 )
 from jaxtyping import Array, Float, PyTree
@@ -42,6 +45,10 @@ from sesmax_ocean._src.resolution import (
     check_munk_width,
     check_stommel_width,
 )
+
+
+# q is zero on the walls, which lie on the corners (free slip).
+_WALLS = BC(x=Dirichlet(0.0), y=Dirichlet(0.0))
 
 
 class BaroclinicQGState(State):
@@ -222,8 +229,17 @@ class BaroclinicQG(Model):
         return BaroclinicQGState(q=each(tendency, self.ops.laplacian(state.q, at="T")))
 
     def apply_boundary_conditions(self, state: PyTree) -> BaroclinicQGState:
-        """Apply Dirichlet BCs (q=0 at boundaries) for all layers."""
-        return BaroclinicQGState(q=embed(interior(state.q, self.grid), self.grid))
+        """q = 0 on the four walls (free slip), which lie on the corners 0 and N."""
+        return BaroclinicQGState(q=self._hold_walls(state.q))
+
+    def _hold_walls(self, q: Any) -> Any:
+        """Zero on the wall corners, and odd about them on the ghost ring.
+
+        ψ is zero on the same corners, so q is the vorticity at the corners; a ring
+        of zeros, as for a field of cells, would leave the northern and eastern walls
+        free.
+        """
+        return each(lambda a: fill_ghosts(a, self.grid, _WALLS, stagger="X"), q)
 
     def diagnose(self, state: PyTree) -> BaroclinicQGDiagnostics:
         """Compute streamfunction, velocity, KE, and enstrophy per layer."""

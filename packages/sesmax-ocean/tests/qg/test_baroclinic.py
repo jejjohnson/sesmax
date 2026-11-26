@@ -236,7 +236,7 @@ class TestBaroclinicQG:
         assert float(jnp.max(jnp.abs(q))) < f0
 
     def test_boundary_conditions(self):
-        """BCs should zero out boundary cells for all layers."""
+        """q is zero on the four walls, the corners 0 and N, in every layer."""
         model = BaroclinicQG.create(
             nx=16,
             ny=16,
@@ -246,13 +246,13 @@ class TestBaroclinicQG:
         )
         q0 = jnp.ones((2, model.grid.Ny, model.grid.Nx))
         state = model.apply_boundary_conditions(BaroclinicQGState(q=q0))
-        # Boundaries should be zero
+        # The walls are zero
         assert jnp.allclose(state.q[:, 0, :], 0.0)
-        assert jnp.allclose(state.q[:, -1, :], 0.0)
+        assert jnp.allclose(state.q[:, -2, :], 0.0)
         assert jnp.allclose(state.q[:, :, 0], 0.0)
-        assert jnp.allclose(state.q[:, :, -1], 0.0)
-        # Interior should be unchanged
-        assert jnp.allclose(state.q[:, 1:-1, 1:-1], 1.0)
+        assert jnp.allclose(state.q[:, :, -2], 0.0)
+        # The corners between them are unchanged
+        assert jnp.allclose(state.q[:, 1:-2, 1:-2], 1.0)
 
     def test_integrate_short(self):
         """Short integration should produce finite results."""
