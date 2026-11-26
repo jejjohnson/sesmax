@@ -64,6 +64,7 @@ project:
         - file: notebooks/step16_geostrophic_adjustment.ipynb
         - file: notebooks/step17_shallow_water_2d.ipynb
         - file: notebooks/step18_barotropic_qg.ipynb
+        - file: notebooks/doublegyre_barotropic_qg.ipynb
     - title: Composing models
       children:
         - file: notebooks/composable_models.ipynb
