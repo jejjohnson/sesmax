@@ -2,8 +2,8 @@
 title: "sesmax: the workspace scaffold and sesmax-core"
 subtitle: "Design · moving somax's model-agnostic machinery into the first sesmax package"
 short_title: Workspace and core
-description: "Plans the sesmax uv workspace (adopted from the package template), the contents of sesmax-core taken from somax at a pinned commit, the renames, the tests that move with it, and the phases and gates up to the ocean component."
-date: 2026-10-30
+description: "The sesmax uv workspace and sesmax-core: the plan of 30 October 2026 to take somax's model-agnostic machinery at a pinned commit, and what the core holds, is built on and still owes at 26 November 2026."
+date: 2026-11-26
 keywords:
   - sesmax
   - somax
@@ -17,14 +17,14 @@ numbering:
   code: true
 ---
 
-30 Oct 2026 · J. Emmanuel Johnson (drafted with Claude Code)
+30 Oct 2026, revised 26 Nov 2026 · J. Emmanuel Johnson (drafted with Claude Code)
 
 ## Decision
 
 Decided: build sesmax as a uv workspace in the new `jejjohnson/sesmax` repository, and make its first package, `sesmax-core`, a copy of somax's model-agnostic machinery at somax `9cb19b3` with mechanical renames and no change in behaviour.
 The ocean models, the `somax-sim` runner and the ocean diagnostics stay in somax until a second phase moves them into `sesmax-ocean`.
 Rejected alternative: rename `jejjohnson/somax` to sesmax in place and split it there, as the geostack plan proposed, which keeps the git history but drops the template scaffold this repository already has.
-Status: decided on 30 Oct 2026; the open questions SX-1 to SX-6 are settled in their table below, and C0 (the scaffold) has started.
+Status on 26 November 2026, at sesmax `a34e46c`: C0, C1 and C2 are done. `sesmax-core` is released at 0.3.1, `sesmax-ocean` and `sesmax-experiment` are merged and unreleased, and C3 (the levels) is open as sesmax#29. The sections "The core today" and "What changed since the plan" say where the code differs from the plan below; the plan itself is kept as it was decided on 30 October.
 
 ## What this page settles
 
@@ -37,6 +37,75 @@ This page answers four questions, in order.
 
 The science case, the component list (ocean, atmosphere, land, ice, coupler) and the levels L1 to L3 are in geostack's `docs/design/esmax.md` and `docs/design/stack_levels.md`.
 This page only repeats what the core needs.
+
+## The core today
+
+`sesmax-core` is 15,612 lines of source with 1,026 test functions in 60 files (counted at `a34e46c`).
+Its top level exports 89 names, and 17 public modules hold the rest.
+
+| Module | Holds |
+| --- | --- |
+| top level | `Model`, `TermModel`, `State`, `Params`, `PhysConsts`, `Diagnostics`, `positive`, `interval`, `frozen`, `trainable_mask` |
+| `terms` | `Term`, `TermFn`, `Sum`, `Scaled`, `Compose`, `explicit`, `implicit`, `partition`, `build_diffrax_terms`, `OperatorTerm` |
+| `forcing` | 48 names: `ForcingProtocol` and its fields, `BasisForcing`, `ForcingTerm`, the eight `spatial_from_*` bases, the temporal bases, drag, wind stress and relaxation |
+| `scales` | `Scales`, `StateAffine`, `ScaledModel` |
+| `gfd` | `streamfunction_from_vorticity`, `pressure_from_divergence`, `pv_inversion`, `ModalTransform`, `StratificationProfile`, the Burger-number helpers |
+| `vertical` | `multilayer`, `build_coupling_matrix`, `decompose_vertical_modes`, `layer_to_mode`, `mode_to_layer`, `barotropic_filter` |
+| `fields` | `each`, `map_fields`, `placed`, `values`, `is_field`, for states of arrays or of `gridax.CField`s |
+| `domain` | `Domain`, `TimeDomain` |
+| `solvers` | `imex_solver`, `imex_stepsize_controller`, `stable_step`, re-exported from integrix |
+| `train` | `rollout`, `rollout_loss`, `state_mse`, `ModelStep` |
+| `guards` | `guard_finite`, `guard_positive`, `guard_ceiling` |
+| `validation` | `require_positive`, `require_non_negative`, `reject_derived_kwargs` |
+| `operators` | `ModelOp`, `OperatorTerm` |
+| `component` | `Component`, `Builder`, `BuiltRun`, `Check`: how a package of models offers itself to a run |
+| `da`, behind `[da]` | `FilteraxDynamics`, `VardaxForwardModel`, `WindowOperator`, `SubsampleObs`, `state_to_vector`, `make_ensemble` |
+| `io`, behind `[xarray]` | states to and from xarray and Zarr, with scale metadata |
+| `flows`, behind `[flows]` | `StateAffineBijection`, `to_flowjax`, `learned_prior` |
+| `testing` | 75 names: the Lorenz systems, the 1-D and 2-D PDE problems, the linear shallow-water models |
+
+### What it is built on
+
+| Library | Gives the core |
+| --- | --- |
+| diffrax, lineax, optimistix, equinox, paramax | time stepping, linear solves, modules, constrained parameters |
+| gridax, with its `jax` and `pipekit` extras | grids, masks, located fields, every stencil, ghost fills; 63 import lines across the workspace |
+| integrix | the IMEX solver, the stable step, `DiffraxForwardModel`, sampled paths |
+| functax | the interpolation schemes of a sampled forcing |
+| geophysix | constants, the Coriolis parameter, the β-plane |
+| gaussx | the conjugate-gradient solve of the elliptic inversions |
+| spectraldiffx | the spectral solves of the inversions |
+| geonnax | the dictionaries behind the eight `spatial_from_*` bases |
+| pipekit-ops, pipekit-array, pipekit-cycle, pipekit-jax | operators, the array backend, the forward-model protocol |
+| filterax, vardax, behind `[da]` | the filters and the variational methods the adapters serve |
+
+Four places still hold what another library has, or will have, and each has a plan.
+
+- **The bases** go through `geonnax.basis`, and functax now has them. sesmax#114 moves the core onto functax, and [`sesmax-param`](sesmax_param.md) takes the bases and the forcing out of the core.
+- **`SubsampleObs`** is an observation operator of our own, where vardax has `GridPointObs`, `InterpObs` and `MaskedIdentity`. sesmax#27 retires it.
+- **The toys** are a third of the public names. They move to [`sesmax-testing`](sesmax_testing.md), with checks built on pipekit-array's `testing` module, which the core does not import today.
+- **Drag, wind stress and relaxation** came from gridax-jax in sesmax#122 and sit in `forcing`. They are parameterizations and forcing terms, and move to `sesmax-param`.
+
+### What changed since the plan
+
+| Plan of 30 October | Today | Change |
+| --- | --- | --- |
+| finitevolX for grids and stencils | gridax: one `GridOps` per model, and the functions | sesmax#135, sesmax#146 |
+| states of arrays, with `mask_locations` | states of arrays or `gridax.CField`s, ghosts from `gridax.fill_ghosts` | sesmax#138 |
+| `sesmax_core.monitor` | `sesmax_experiment.monitor` | sesmax#197 |
+| `sesmax_core.checkpoint`, behind `[checkpoint]` | `sesmax_experiment.checkpoint` | sesmax#207 |
+| `sesmax_core.sim`, behind `[sim]` | `sesmax_experiment.run` and `sesmax_experiment.sim` | sesmax#198, sesmax#203 |
+| a registry each component fills | `Component` in the core, found through the entry point `sesmax.components` | sesmax#197, sesmax#203 |
+| the Helmholtz caches in `gfd` | removed on 5 November, as no model used them | — |
+| constants copied or left in somax | geophysix | sesmax#124 |
+| `imex_solver` in the core | integrix, re-exported, with `stable_step` | sesmax#181 |
+| the inversions in finitevolX | `sesmax_core.gfd` | sesmax#129 |
+| the vertical modes and the barotropic filter in finitevolX | `sesmax_core.vertical` | sesmax#122 |
+| a forcing sampled by diffrax's interpolations | any functax 1-D scheme, which reports its step times | sesmax#141 |
+| validators and field helpers private | `sesmax_core.validation`, `sesmax_core.fields` | sesmax#163 |
+| two tiers, core and components | `sesmax-experiment` beside the ocean at tier 1; [the workspace packages](workspace_packages.md) proposes `sesmax-param` and `sesmax-testing` | sesmax#197 |
+
+Two fixes after the move changed what every model returns: `Model.integrate` compiles once across calls (sesmax#196), and the states a run returns have their boundary conditions (sesmax#201).
 
 ## Motivation
 
@@ -68,24 +137,27 @@ The geostack plan's module table was inferred from somax's capability index; rea
 The repository holds one uv workspace, like pyrox: a root project that is never published and one directory per distribution under `packages/`.
 Each distribution is imported as `sesmax_<part>`, and imports only point down the tiers.
 
-```{mermaid}
+```mermaid
 flowchart TD
     couple["sesmax-couple<br/>tier 2 · later"]
-    ocean["sesmax-ocean<br/>tier 1 · phase C2"]
+    ocean["sesmax-ocean<br/>tier 1 · merged"]
+    exp["sesmax-experiment<br/>tier 1 · merged"]
     atmos["sesmax-atmos<br/>tier 1 · later"]
-    core["sesmax-core<br/>tier 0 · phase C1"]
-    stack["finitevolX · spectraldiffx · geonnax · pipekit<br/>filterax · vardax (extras)"]
+    core["sesmax-core<br/>tier 0 · 0.3.1"]
+    stack["gridax · integrix · functax · geophysix · gaussx<br/>spectraldiffx · geonnax · pipekit<br/>filterax · vardax (extras)"]
     umbrella["sesmax<br/>code-free umbrella"]
     couple --> ocean
     couple --> atmos
     ocean --> core
+    exp --> core
     atmos --> core
     core --> stack
     umbrella -.installs.-> core
     umbrella -.installs.-> ocean
+    umbrella -.installs.-> exp
 ```
 
-The tree after phase C1 (the scaffold plus the core):
+The tree after phase C1 (the scaffold plus the core); `packages/sesmax-ocean/` and `packages/sesmax-experiment/` have joined it since:
 
 ```text
 sesmax/
@@ -141,7 +213,7 @@ The workspace changes, taken from pyrox where it already solves them:
 
 ### Where each somax module goes
 
-Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were read from the source (`git show 9cb19b3:<path>`), not run.
+Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were read from the source (`git show 9cb19b3:<path>`), not run. The table is the plan, with the rows that ended somewhere else corrected on 26 November.
 
 | somax module (`somax/_src/…`) | Holds | Goes to | Change |
 | --- | --- | --- | --- |
@@ -154,18 +226,18 @@ Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were
 | `core/scales.py`, `core/scaled.py` | `Scales` (Rossby, Burger, Froude numbers, `dt_from_cfl`), `ScaledModel` | `sesmax_core.scales` | none |
 | `core/transforms.py` | `StateAffine`; `StratificationProfile`, `ModalTransform` | `StateAffine` to `sesmax_core.scales`; the layered pieces to `sesmax_core.gfd` | split by concept |
 | `core/helmholtz.py` | the periodic, Dirichlet, Neumann and multimodal Helmholtz caches over spectraldiffx | moved to `sesmax_core.gfd`, then removed on 5 Nov 2026 because no model used them | none |
-| `models/_nondim.py` | `require_positive`, `require_non_negative`, `reject_derived_kwargs`; `resolve_burger`, `burger_to_g_prime`, `resolve_burger_spherical` | validators to `sesmax_core._validation`; Burger helpers to `sesmax_core.gfd` | split by concept |
+| `models/_nondim.py` | `require_positive`, `require_non_negative`, `reject_derived_kwargs`; `resolve_burger`, `burger_to_g_prime`, `resolve_burger_spherical` | validators to `sesmax_core.validation`, public since sesmax#163; Burger helpers to `sesmax_core.gfd` | split by concept |
 | `constants/` | physical constants | not moved: nothing imported them, and geophysix owns them (`geophysix.constants.STANDARD`, `geophysix.earth.SPHERE`) | none |
 | `domain/` | `Domain`, `TimeDomain` | `sesmax_core.domain` | none |
-| `solvers.py` | `imex_solver`, `imex_stepsize_controller` (Krylov Newton) | `sesmax_core.solvers` | none |
+| `solvers.py` | `imex_solver`, `imex_stepsize_controller` (Krylov Newton) | `sesmax_core.solvers` | since moved to integrix and re-exported |
 | `guards.py` | `guard_finite`, `guard_positive`, `guard_ceiling` | `sesmax_core.guards` | none |
-| `monitor/` | `Monitor`, `BaseMonitor`, the six built-in monitors, `default_monitors` | `sesmax_core.monitor` | none |
+| `monitor/` | `Monitor`, `BaseMonitor`, the six built-in monitors, `default_monitors` | `sesmax_core.monitor`, then `sesmax_experiment.monitor` | moved again in sesmax#197 |
 | `train/` | `rollout`, `rollout_loss`, `state_mse`, `ModelStep` | `sesmax_core.train` | none |
 | `operators.py` | `SomaxModelOp`; `Burgers2DOp` | `ModelOp` to `sesmax_core.operators`; `Burgers2DOp` to `sesmax_core.testing` | `SomaxModelOp` → `ModelOp` |
 | `da/` | `SomaxDynamics`, `SomaxForwardModel`, `SubsampleObs`, `state_to_vector`, `make_ensemble` | `sesmax_core.da`, behind `[da]` | `SomaxDynamics` → `FilteraxDynamics`, `SomaxForwardModel` → `VardaxForwardModel`; `SubsampleObs` stays until vardax#81 lands |
 | `core/flows.py` | `StateAffineBijection`, `to_flowjax`, `learned_prior` | `sesmax_core.flows`, behind `[flows]` | none |
 | `io/` | `state_to_dataset`, `dataset_to_state`, Zarr save and load, scale metadata | `sesmax_core.io`, behind `[xarray]` | none |
-| `core/checkpoint.py` | `SimulationCheckpointer` (orbax) | `sesmax_core.checkpoint`, behind `[checkpoint]` | none |
+| `core/checkpoint.py` | `SimulationCheckpointer` (orbax) | `sesmax_experiment.checkpoint`, behind its `[checkpoint]` | versioned and resumable since sesmax#207 |
 | `models/lorenz63.py`, `lorenz96.py`, `lorenz96t.py` | the Lorenz systems on `Model` | `sesmax_core.testing` | none |
 | `models/pde1d/`, `models/pde2d/` | Burgers, diffusion, linear and nonlinear convection, Navier–Stokes, Poisson | `sesmax_core.testing` | none (SX-3) |
 | `models/base.py` | `DynamicalSystem`, marked for removal | dropped | — |
@@ -174,7 +246,7 @@ Every module in `somax/_src/` at `9cb19b3` has one destination; the imports were
 | `models/swm/linear_1d.py`, `nonlinear_1d.py`, `linear_2d.py`, `linear_swm_terms.py`, `gfd_testcases.py` | 1D linear and nonlinear shallow water, 2D linear shallow water (monolithic and term-based), gravity-wave, inertial-oscillation and geostrophic-adjustment cases | `sesmax_core.testing` | none (SX-3) |
 | `models/_diagnostic_ops.py` | finitevolX pipekit diagnostics shared by the C-grid models | `sesmax_core` (private until C2 needs a public name) | none |
 | `models/qg/`, `swm/nonlinear_2d.py`, `swm/multilayer.py`, `spherical/` | the ocean models | `sesmax-ocean` (C2) | — |
-| `cli/` runner (`_run`, `_progress`, `spec`, `_units`, `_data`, `_assertions`) | the `somax-sim` run loop, run specs, units, progress logs | `sesmax_core.sim`, behind `[sim]` (C2, SX-4) | the runner learns models through a registry each component fills |
+| `cli/` runner (`_run`, `_progress`, `spec`, `_units`, `_data`, `_assertions`) | the `somax-sim` run loop, run specs, units, progress logs | `sesmax_experiment.run` and `.sim`, behind its `[sim]` | the runner learns models through `Component`, which each package registers |
 | `cli/models_registry/`, `cli/scenarios/`, `configs/`, DVC | the registered ocean models, scenarios (double gyre, Gulf Stream, …), run configs | `sesmax-ocean` (C2) | — |
 
 `sesmax_core.testing` holds about 3,960 lines of toy models (counted with `wc -l` at `9cb19b3`): the Lorenz systems, the PDE test problems, and the linear shallow-water models that steps 14 to 16 of somax's tutorial series use.
@@ -182,18 +254,16 @@ They are standard test problems (numerical analysis, chaos, linear geophysical w
 
 ### Dependencies
 
-The base install is what somax's base install already pulls for these modules; anything that somax imports lazily becomes an extra.
+The base install is what these modules need; anything imported lazily is an extra. The table is today's, from `packages/sesmax-core/pyproject.toml` at `a34e46c`.
 
 | Install | Brings | Needed by |
 | --- | --- | --- |
-| base | jax, jaxtyping, equinox, diffrax, lineax, optimistix, paramax, einops, finitevolX (tag), spectraldiffx, geonnax (commit), pipekit, pipekit-jax | everything not listed below |
-| `[da]` | filterax (commit), vardax (commit), gaussx through the workspace override | `sesmax_core.da` |
-| `[sim]` | cyclopts, loguru, hydra-zen, omegaconf, pyyaml (C2) | `sesmax_core.sim` |
+| base | jax, jaxtyping, equinox, diffrax, lineax, optimistix, paramax, einops; gridax 0.3.3 with `jax` and `pipekit`, integrix 0.0.11, functax 0.0.13, geophysix 0.0.9, gaussx 0.8.1, spectraldiffx 0.1.2, geonnax 0.0.11; pipekit-ops, -array, -cycle and -jax at pipekit-array 0.2.0 | everything not listed below |
+| `[da]` | filterax 0.0.6, vardax 0.3.5 | `sesmax_core.da` |
 | `[flows]` | flowjax | `sesmax_core.flows` |
 | `[xarray]` | xarray, zarr | `sesmax_core.io` |
-| `[checkpoint]` | orbax-checkpoint | `sesmax_core.checkpoint` |
 
-finitevolX is a base dependency for `ModalTransform` (`build_coupling_matrix`) and for the PDE toys.
+gridax is a base dependency for the located fields, the inversions and the PDE toys. `[sim]` and `[checkpoint]` are extras of `sesmax-experiment` now.
 Making `[da]` an extra is what somax#212 does for somax; sesmax-core starts that way.
 An optional module imported without its extra raises an `ImportError` that names the extra, as `somax.flows` already does.
 
@@ -280,11 +350,12 @@ Each phase ships as its own PR (stacked, in this repository) and merges only whe
 
 | Phase | Scope | Gate |
 | --- | --- | --- |
-| C0 Scaffold | adopt the template as the workspace above; `sesmax-core` and the umbrella `sesmax` as empty packages with `__version__`; CI, release-please, docs and agent files for a workspace | `uv sync --all-packages --all-groups`, ruff, ty, the public-API and capability tests and `make docs` all pass; `git grep -e mypackage -e pypackage_template` finds nothing |
-| C1 Core | copy the modules above from somax `9cb19b3`; the renames; the 22 whole and 7 split test files; the four extras; API pages and the capability index | every moved somax test passes with only import and rename changes; a bare `pip install ./packages/sesmax-core` imports `sesmax_core` with none of xarray, orbax, filterax, vardax or flowjax installed; an import-boundary test fails if `sesmax_core` imports `sesmax_ocean` or `somax`; coverage of `sesmax_core` passes the low starting gate of 30 % (SX-6) |
-| C2 Ocean | `sesmax-ocean` from the ocean models, presets, `resolution`, `eval`, the runner and configs; its own design page first | every remaining somax test passes under `sesmax-ocean` with only import changes; the DUACS sea-surface-height benchmark from the esmax plan runs as a baseline |
-| C3 Levels | L1 in `_src/array.py`, `Step` and `simulate` behind `sesmax-core[geo]`, as geostack's SL-O2 decides | primitive modules import no carrier; `simulate` exposes `model.l1` |
+| C0 Scaffold (done) | adopt the template as the workspace above; `sesmax-core` and the umbrella `sesmax` as empty packages with `__version__`; CI, release-please, docs and agent files for a workspace | `uv sync --all-packages --all-groups`, ruff, ty, the public-API and capability tests and `make docs` all pass; `git grep -e mypackage -e pypackage_template` finds nothing |
+| C1 Core (done, 0.1.0 on 10 November) | copy the modules above from somax `9cb19b3`; the renames; the 22 whole and 7 split test files; the four extras; API pages and the capability index | every moved somax test passes with only import and rename changes; a bare `pip install ./packages/sesmax-core` imports `sesmax_core` with none of xarray, orbax, filterax, vardax or flowjax installed; an import-boundary test fails if `sesmax_core` imports `sesmax_ocean` or `somax`; coverage of `sesmax_core` passes the low starting gate of 30 % (SX-6) |
+| C2 Ocean (done, with a different gate) | `sesmax-ocean` from the ocean models, presets, `resolution`, `eval`, the runner and configs; its own design page first | every remaining somax test passes under `sesmax-ocean` with only import changes; the DUACS sea-surface-height benchmark from the esmax plan runs as a baseline |
+| C3 Levels (open, sesmax#29) | L1 in `_src/array.py`, `Step` and `simulate` behind `sesmax-core[geo]`, as geostack's SL-O2 decides | primitive modules import no carrier; `simulate` exposes `model.l1` |
 
+The gate of C2 was replaced by equality with somax's numbers, because the core had moved to gridax; [the ocean page](ocean.md) has it, and the DUACS baseline went to geobench (sesmax#236). The runner went to `sesmax-experiment` and not to `sesmax_core.sim`.
 C0 and C1 change no science.
 Releases follow release-please: `sesmax-core` starts at 0.1.0, and the umbrella's first release waits for `sesmax-ocean`.
 
@@ -306,6 +377,12 @@ somax stays the working ocean package until C2 merges, so the migration must not
 - **The core keeps finitevolX in its base install.** `ModalTransform` and the PDE toys need it, so a user who only wants the term algebra still installs a C-grid library. Fallback: move `gfd` and `testing` behind a `[gfd]` extra if the install size becomes a complaint.
 - **The modal eigensolver.** somax fixed the non-symmetric layer matrix in its own `ModalTransform` (a symmetric similarity transform, `D^½ A D^-½`), and finitevolX has since fixed its own, in its #252. The [shared-core design](shared_core.md) has the comparison, and `ModalTransform` has delegated to finitevolX since 5 Nov 2026.
 
+**What became of them, on 26 November.**
+The nine ty rules are still ignored (sesmax#30), and the coverage gate is still 30 % (sesmax#31).
+The doctests run, on every module.
+The dependencies are still git references, now by release tag and no longer by commit.
+finitevolX left the base install with the move to gridax, which the core needs for more than the toys.
+
 ## Decisions on the open questions
 
 All six were settled on 30 Oct 2026.
@@ -315,17 +392,19 @@ All six were settled on 30 Oct 2026.
 | SX-1 | What `sesmax` installs | a code-free umbrella; `sesmax-core` is the core | the umbrella's first release waits for `sesmax-ocean` |
 | SX-2 | How the code arrives | a copy at somax `9cb19b3`, with the source commit named in each C1 commit message and in the CHANGELOG | history and `git blame` stay in the archived somax repository |
 | SX-3 | Where the toy models live | `sesmax_core.testing`: Lorenz, the PDE test problems and, decided later the same day, the 1D shallow-water and 2D linear shallow-water models (the models of steps 1 to 16 of somax's tutorial series) | 27 somax test files move to the core whole; the step tutorials move with the models |
-| SX-4 | Where the `somax-sim` runner lives | leaning towards the core: the generic run loop in `sesmax_core.sim` behind a `[sim]` extra, with each component registering its models and scenarios; confirmed in the C2 design page | the runner stops hard-coding the ocean registry |
-| SX-5 | Spatial bases | stay on `geonnax.basis`, changed on 4 Nov 2026 from taking vardax's, whose constructors delegate to it | the core's base install keeps geonnax and needs no vardax; see the [shared-core design](shared_core.md) |
+| SX-4 | Where the `somax-sim` runner lives | first leaning towards `sesmax_core.sim`; changed on 25 November to its own package, `sesmax-experiment`, with each component registering through `Component` | the runner names no ocean model, and the core carries no run loop |
+| SX-5 | Spatial bases | stay on `geonnax.basis`, changed on 4 Nov 2026 from taking vardax's, whose constructors delegate to it | the core's base install keeps geonnax and needs no vardax; see the [shared-core design](shared_core.md). functax has the bases since, and sesmax#114 moves the core onto it |
 | SX-6 | Coverage gate | very low to start: `fail_under = 30` per package, raised in follow-ups | the template's 90 % is a target, not a C1 gate |
 
 ## Follow-up issues
 
-- [ ] `chore(workspace): adopt the template as a uv workspace with sesmax-core and the sesmax umbrella` (C0)
-- [ ] `feat(core): move somax's model-agnostic machinery into sesmax-core at 9cb19b3` (C1)
-- [ ] `test(core): move somax's core tests, and add toy-model cases for the split ones` (C1)
-- [ ] `docs(core): API pages, capability index and agent files from the moved code` (C1)
-- [ ] `docs(design): sesmax-ocean, the ocean models, the runner and the DUACS benchmark` (C2)
+- [x] `chore(workspace): adopt the template as a uv workspace with sesmax-core and the sesmax umbrella` (C0)
+- [x] `feat(core): move somax's model-agnostic machinery into sesmax-core at 9cb19b3` (C1)
+- [x] `test(core): move somax's core tests, and add toy-model cases for the split ones` (C1)
+- [x] `docs(core): API pages, capability index and agent files from the moved code` (C1)
+- [x] `docs(design): sesmax-ocean, the ocean models, the runner and the DUACS benchmark` (C2)
+
+Open after the move: sesmax#19 (later somax commits), sesmax#27 (`SubsampleObs`), sesmax#29 (the levels), sesmax#30 and sesmax#31 (types and coverage), sesmax#105 (gradient checks), sesmax#114 (functax for the bases), sesmax#202 (the walls of the linear toys), and the epics sesmax#6, sesmax#7 and sesmax#8.
 
 ## Relationships
 
