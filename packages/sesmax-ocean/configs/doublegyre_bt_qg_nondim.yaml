@@ -1,0 +1,46 @@
+# The barotropic double gyre, described by dimensionless numbers.
+#
+# `rossby` sets f0 = 1 / rossby and `beta_hat` is beta, in units of L = U = 1. `munk` and
+# `stommel` are the widths of the western boundary layers as fractions of the basin, which
+# is what the grid has to resolve: `munk: 0.05` is 3.2 of 64 cells, above the 2 that the
+# check asks for, so the debug run keeps the 64 cells and is shorter instead. A time is in
+# units of L / U, so `t1: 20` is 20 crossings of the basin.
+scenario:
+  name: double_gyre
+  grid:
+    nx: 64
+    ny: 64
+    Lx: 1.0
+    Ly: 1.0
+  nondim:
+    rossby: 0.02
+    beta_hat: 50.0
+    munk: 0.05
+    stommel: 0.02
+  forcing:
+    wind_profile: doublegyre
+  initial_condition:
+    type: at_rest
+model:
+  name: barotropic_qg
+timestepping:
+  t0: 0.0
+  t1: 20.0
+  dt: 0.001
+  save_interval: 1.0
+output:
+  write_snapshots: true
+  write_metrics: true
+debug:
+  scenario:
+    grid:
+      nx: 64
+      ny: 64
+  timestepping:
+    t1: 2.0
+    save_interval: 0.5
+assertions:
+  munk_width:
+    n_cells_min: 2.0
+  stommel_width:
+    n_cells_min: 1.0

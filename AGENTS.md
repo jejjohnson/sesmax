@@ -16,7 +16,7 @@ Each distribution lives in `packages/<dist>/` with its own `pyproject.toml`, `sr
 |---|---|---|---|---|
 | — | `sesmax` | `sesmax` | code-free umbrella that installs the packages | scaffolded |
 | 2 | `sesmax-couple` | `sesmax_couple` | flux exchange, regridding, coupled runs | later |
-| 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, their resolution checks, metrics and forcing presets | moving from somax (#152) |
+| 1 | `sesmax-ocean` | `sesmax_ocean` | the ocean models, their scenarios and run configs, checks, metrics and forcing presets | moved from somax (#152, #186) |
 | 1 | `sesmax-experiment` | `sesmax_experiment` | runs of models in chunks or from a run spec, their monitors and checkpoints; names no component | the run loop is moving from somax (#186) |
 | 0 | `sesmax-core` | `sesmax_core` | state and parameter types, term algebra, steppers, forcing and bases, scales, DA adapters, I/O, test problems | moved from somax; first release 0.1.0 |
 
@@ -78,6 +78,7 @@ find out whether it exists:
 | A loop over chunks of a run, a cadence, a retry around a write | `run_chunks`, `Timeline`, `every_chunks` and the other schedules (`sesmax_experiment.run`); pipekit's `Branch`, `Sink`, `Retry`, `Try` |
 | A run described by a file, with its snapshots, metrics and manifest | `RunSpec`, `simulate`, `spinup`, `restart` (`sesmax_experiment.sim`); `sesmax-experiment simulate` |
 | What a package of models offers to a run | `Component`, `BuiltRun` (`sesmax_core.component`) |
+| A named ocean set-up (geometry, wind, initial condition) to run a model on | `sesmax_ocean.scenarios`; the run configs in `packages/sesmax-ocean/configs/` |
 | A Lorenz system, a 1D or 2D PDE or a linear shallow-water toy for a test or example | `sesmax_core.testing` |
 | A check that the grid resolves a boundary layer or a deformation radius, or a metric of an ocean state | `sesmax_ocean.resolution`, `sesmax_ocean.eval` |
 

@@ -33,6 +33,9 @@ dependencies = [
     "geophysix @ git+https://github.com/jejjohnson/geophysix@v0.0.9",
 ]
 
+[project.entry-points."sesmax.components"]
+ocean = "sesmax_ocean._src.component:COMPONENT"
+
 [project.urls]
 Repository = "https://github.com/jejjohnson/sesmax"
 

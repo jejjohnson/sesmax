@@ -51,6 +51,8 @@ class Component:
     Args:
         name: The component, e.g. ``"ocean"``.
         models: ``name -> builder``, the names a run spec may ask for.
+        scenarios: ``name -> models it goes with``, the scenarios a run spec may ask
+            for, where a component has named ones.
         checks: ``name -> check``, beyond the run loop's own.
         evaluate: Scalar metrics of a model and a state, or ``None``.
         field_units: ``model name -> field -> unit``, for logs and files.
@@ -60,6 +62,7 @@ class Component:
 
     name: str
     models: Mapping[str, Builder]
+    scenarios: Mapping[str, tuple[str, ...]] = _EMPTY
     checks: Mapping[str, Check] = _EMPTY
     evaluate: Callable[[Model, State], dict[str, float]] | None = None
     field_units: Mapping[str, Mapping[str, str]] = _EMPTY

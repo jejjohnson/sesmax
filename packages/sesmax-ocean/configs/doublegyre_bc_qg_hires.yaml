@@ -1,0 +1,45 @@
+# The three-layer double gyre at 256²: five years from rest, with snapshots.
+#
+# The basin, the layers and the wind are those of doublegyre_bc_qg, on cells of 15.6 km in
+# place of 31 km. The first deformation radius, 42.3 km, is then 2.7 cells, so the western
+# boundary current is baroclinically unstable and sheds eddies; the second, 24.9 km, is
+# 1.6 cells. At 128² the first one is not resolved. About 1.5 hours per year on a CPU.
+scenario:
+  name: double_gyre
+  grid:
+    nx: 256
+    ny: 256
+    Lx: 4000000.0
+    Ly: 4000000.0
+  consts:
+    f0: 9.375e-05
+    beta: 1.754e-11
+  forcing:
+    wind_amplitude: 1.3e-10
+    wind_profile: doublegyre
+  initial_condition:
+    type: at_rest
+model:
+  name: multilayer_qg
+  stratification:
+    H: [400.0, 1100.0, 2600.0]
+    g_prime: [9.81, 0.025, 0.0125]
+  params:
+    lateral_viscosity: 15.0
+    bottom_drag: 1.0e-07
+timestepping:
+  t0: 0.0
+  t1: 157788000.0
+  dt: 600.0
+  save_interval: 2592000.0
+output:
+  write_snapshots: true
+  write_metrics: true
+debug:
+  scenario:
+    grid:
+      nx: 32
+      ny: 32
+  timestepping:
+    t1: 86400.0
+    save_interval: 600.0

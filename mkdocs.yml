@@ -105,6 +105,8 @@ nav:
   - Ocean QG models: ocean_qg.md
   - Ocean shallow-water models: ocean_swm.md
   - Ocean models on the sphere: ocean_spherical.md
+  - Ocean scenarios: ocean_scenarios.md
   - Ocean resolution checks: ocean_resolution.md
+  - Ocean model checks: ocean_checks.md
   - Ocean metrics: ocean_eval.md
   - Ocean forcing presets: ocean_forcing.md
