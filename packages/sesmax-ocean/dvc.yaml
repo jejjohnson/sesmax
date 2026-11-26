@@ -1,0 +1,43 @@
+# The basin bundles and the reference runs, for DVC. Run from this directory:
+#
+#   sesmax-ocean data build med_sea     # or: dvc repro build-basin@med_sea
+#   dvc repro simulate-bc-qg            # the spinup, then a year from its end
+#
+# A bundle is a placeholder until sesmax#115 brings the real data.
+stages:
+  build-basin:
+    foreach: [gulf_stream, med_sea, north_atlantic, southern_ocean]
+    do:
+      cmd: sesmax-ocean data write ${item} --out data/basin/${item}.zarr
+      deps: [src/sesmax_ocean/_src/basins/bundle.py]
+      outs: ["data/basin/${item}.zarr"]
+
+  simulate:
+    foreach: [doublegyre_bt_qg, swm_jet]
+    do:
+      cmd: sesmax-experiment simulate --config configs/${item}.yaml --output-dir data/simulations/${item}
+      deps: ["configs/${item}.yaml", src/sesmax_ocean]
+      outs:
+        - data/simulations/${item}/snapshots.zarr
+        - data/simulations/${item}/final_state.zarr
+      metrics:
+        - data/simulations/${item}/metrics.json:
+            cache: false
+
+  spinup-bc-qg:
+    cmd: sesmax-experiment spinup --config configs/spinup_bc_qg.yaml --output-dir data/spinup/bc_qg
+    deps: [configs/spinup_bc_qg.yaml, src/sesmax_ocean]
+    outs: [data/spinup/bc_qg/final_state.zarr]
+
+  simulate-bc-qg:
+    cmd: sesmax-experiment restart --config configs/doublegyre_bc_qg.yaml --from data/spinup/bc_qg/final_state.zarr --output-dir data/simulations/doublegyre_bc_qg
+    deps:
+      - configs/doublegyre_bc_qg.yaml
+      - data/spinup/bc_qg/final_state.zarr
+      - src/sesmax_ocean
+    outs:
+      - data/simulations/doublegyre_bc_qg/snapshots.zarr
+      - data/simulations/doublegyre_bc_qg/final_state.zarr
+    metrics:
+      - data/simulations/doublegyre_bc_qg/metrics.json:
+          cache: false

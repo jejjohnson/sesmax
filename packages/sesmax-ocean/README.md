@@ -15,6 +15,7 @@ The models and their run configs come from [somax](https://github.com/jejjohnson
 | `sesmax_ocean.resolution` | `check_munk_width`, `check_stommel_width`, `check_deformation_radius`, `check_equatorial_deformation_radius` | Does the grid span the boundary layers and the deformation radius? |
 | `sesmax_ocean.checks` | `check_pv_inversion`, `check_static_stability` | Is the inversion sound, and are the layers stable? |
 | `sesmax_ocean.eval` | `compute_eval_metrics` and the metrics it picks from | Numbers about one state, with no truth to compare with |
+| `sesmax_ocean.basins` (`[data]`) | `BASINS`, `placeholder_bundle`, `write_bundle` | The mask, depth and wind of a real basin, as a Zarr store |
 | `sesmax_ocean.forcing` | `ssh_geostrophic`, `sss_coastal`, `sst_frontal`, `geostrophic_currents` | Reduced-order forcings for one ocean field each |
 
 ## 📥 Install
@@ -67,6 +68,19 @@ uv run sesmax-experiment list-scenarios
 uv run sesmax-experiment simulate --debug --config packages/sesmax-ocean/configs/swm_jet.yaml --output-dir runs/swm_jet
 uv run sesmax-experiment spinup --config packages/sesmax-ocean/configs/spinup_bc_qg.yaml --output-dir runs/spinup
 uv run sesmax-experiment restart --config packages/sesmax-ocean/configs/doublegyre_bc_qg.yaml --from runs/spinup/final_state.zarr --output-dir runs/bc_qg
+```
+
+## 🗺️ Basin data
+
+`sesmax-ocean data` builds and fetches the bundles of four basins with [DVC](https://dvc.org), from a remote of your own. A bundle is a placeholder with the layout of the real one, and no scenario reads it yet ([sesmax#115](https://github.com/jejjohnson/sesmax/issues/115)). `dvc.yaml` has the stages, with those of four reference runs, so the commands run in this directory:
+
+```bash
+uv pip install dvc
+sesmax-ocean data status
+sesmax-ocean data init s3://<bucket>/<key>
+sesmax-ocean data build med_sea --push
+sesmax-ocean data fetch gulf_stream
+dvc repro simulate-bc-qg
 ```
 
 ## 📄 License

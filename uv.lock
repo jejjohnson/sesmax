@@ -3015,17 +3015,30 @@ dependencies = [
     { name = "sesmax-core" },
 ]
 
+[package.optional-dependencies]
+data = [
+    { name = "cyclopts" },
+    { name = "loguru" },
+    { name = "xarray" },
+    { name = "zarr" },
+]
+
 [package.metadata]
 requires-dist = [
+    { name = "cyclopts", marker = "extra == 'data'", specifier = ">=4.0" },
     { name = "equinox", specifier = ">=0.13.8" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.8.1" },
     { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.9" },
     { name = "gridax", extras = ["jax", "pipekit"], git = "https://github.com/jejjohnson/gridax?subdirectory=packages%2Fgridax&tag=gridax-v0.3.3" },
     { name = "jax", specifier = ">=0.10.2" },
     { name = "jaxtyping", specifier = ">=0.3.9" },
+    { name = "loguru", marker = "extra == 'data'", specifier = ">=0.7.3" },
     { name = "paramax", specifier = ">=0.0.5" },
     { name = "sesmax-core", editable = "packages/sesmax-core" },
+    { name = "xarray", marker = "extra == 'data'", specifier = ">=2026.4.0" },
+    { name = "zarr", marker = "extra == 'data'", specifier = ">=3.1.6" },
 ]
+provides-extras = ["data"]
 
 [[package]]
 name = "sesmax-workspace"
@@ -3041,7 +3054,7 @@ dev = [
     { name = "sesmax" },
     { name = "sesmax-core", extra = ["da", "flows", "xarray"] },
     { name = "sesmax-experiment", extra = ["checkpoint", "sim"] },
-    { name = "sesmax-ocean" },
+    { name = "sesmax-ocean", extra = ["data"] },
 ]
 docs = [
     { name = "ipykernel" },
@@ -3072,7 +3085,7 @@ dev = [
     { name = "sesmax", editable = "packages/sesmax" },
     { name = "sesmax-core", extras = ["da", "flows", "xarray"], editable = "packages/sesmax-core" },
     { name = "sesmax-experiment", extras = ["checkpoint", "sim"], editable = "packages/sesmax-experiment" },
-    { name = "sesmax-ocean", editable = "packages/sesmax-ocean" },
+    { name = "sesmax-ocean", extras = ["data"], editable = "packages/sesmax-ocean" },
 ]
 docs = [
     { name = "ipykernel", specifier = ">=7.3.0" },

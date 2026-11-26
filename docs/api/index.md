@@ -51,6 +51,7 @@ The [capability index](capabilities.md) lists every public name on one page, wit
 | [Shallow-water models](ocean_swm.md) | `NonlinearShallowWater2D`, `MultilayerShallowWater2D`, with their state, parameter, constant and diagnostic classes |
 | [Models on the sphere](ocean_spherical.md) | `SphericalSWM`, `SphericalQG`, with their state, parameter, constant and diagnostic classes |
 | [Scenarios](ocean_scenarios.md) | `SCENARIOS`, `MODELS`, `build_ocean_run`, `check_compatible` |
+| [Basin data](ocean_basins.md) | `BASINS`, `placeholder_bundle`, `write_bundle` |
 | [Model checks](ocean_checks.md) | `check_pv_inversion`, `check_static_stability` |
 | [Resolution checks](ocean_resolution.md) | `check_munk_width`, `check_stommel_width`, `check_deformation_radius`, `check_equatorial_deformation_radius`, `AssertionFailedError` |
 | [Metrics](ocean_eval.md) | `rms_divergence`, `total_enstrophy`, `kinetic_energy`, `geostrophic_imbalance`, `qg_balance_residual`, `compute_eval_metrics` |
