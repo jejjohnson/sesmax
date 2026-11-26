@@ -82,7 +82,7 @@ with coefficients $c_ i$ that are leaves, so a gradient reaches them.
 Each term is explicit or implicit. With $f = f_ \text{E} + f_ \text{I}$, an implicit-explicit scheme takes the non-stiff part explicitly and the stiff part (a diffusion, a fast wave) implicitly ([Ascher et al., 1997](https://hdl.handle.net/10.1016/S0168-9274(97)00056-1)):
 
 ```math
-\mathbf{x}_{k+1} = \mathbf{x}_k + \Delta t \, f_\text{E}(\mathbf{x}_k) + \Delta t \, f_\text{I}(\mathbf{x}_{k+1})
+\mathbf{x}_{k+1} = \mathbf{x}_k + \Delta t f_\text{E}(\mathbf{x}_k) + \Delta t f_\text{I}(\mathbf{x}_{k+1})
 ```
 
 in its first-order form, so the step is bound by the advection and not by the diffusion.
