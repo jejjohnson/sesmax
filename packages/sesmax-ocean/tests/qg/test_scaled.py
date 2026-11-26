@@ -212,7 +212,7 @@ class TestBoundaryConditions:
         y0 = model.transform.forward(qg_state)
         inner_view = model.transform.inverse(model.apply_boundary_conditions(y0))
         np.testing.assert_allclose(np.asarray(inner_view.q)[0, :], 0.0, atol=1e-20)
-        np.testing.assert_allclose(np.asarray(inner_view.q)[-1, :], 0.0, atol=1e-20)
+        np.testing.assert_allclose(np.asarray(inner_view.q)[-2, :], 0.0, atol=1e-20)
 
 
 class TestTransformsAndGradients:

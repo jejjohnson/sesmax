@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import diffrax as dfx
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 from gridax import Mask2D
 
@@ -112,3 +113,47 @@ def test_accepts_an_all_ocean_mask():
     mask = Mask2D.from_dimensions(ny=16, nx=16)
     model = BarotropicQG.create(nx=14, ny=14, mask=mask)
     assert model.ops.mask is mask
+
+
+def _asymmetry(psi):
+    """‖ψ(y) + ψ(L_y - y)‖ / ‖ψ‖ over the corners from wall to wall."""
+    psi = psi[..., :-1, 1:-1]
+    mirrored = jnp.flip(psi, axis=-2)
+    return jnp.sqrt(jnp.sum((psi + mirrored) ** 2) / jnp.sum(psi**2))
+
+
+def test_holds_q_at_zero_on_all_four_walls():
+    """The walls are the corners 0 and N, where ψ is zero too (#212)."""
+    model = BarotropicQG.create(nx=16, ny=16)
+    state = model.apply_boundary_conditions(
+        BarotropicQGState(q=jnp.ones(model.grid.shape))
+    )
+    for wall in (state.q[0], state.q[-2], state.q[:, 0], state.q[:, -2]):
+        assert jnp.all(wall == 0.0)
+    assert jnp.all(state.q[1:-2, 1:-2] == 1.0)
+
+
+def test_a_double_gyre_from_rest_stays_a_mirror_image():
+    """The wind is odd about the middle latitude, and so is ψ (#212).
+
+    With q free on the northern and eastern walls the asymmetry was 5e-4 after
+    ten days; with all four walls held it is that of float32 rounding.
+    """
+    model = BarotropicQG.create(
+        nx=32,
+        ny=32,
+        Lx=1.0e6,
+        Ly=1.0e6,
+        lateral_viscosity=150.0,
+        bottom_drag=1.0e-7,
+        wind_amplitude=1.0e-12,
+    )
+    solution = model.integrate(
+        BarotropicQGState(q=jnp.zeros(model.grid.shape)),
+        t0=0.0,
+        t1=10.0 * 86400.0,
+        dt=3600.0,
+        max_steps=1000,
+    )
+    final = jax.tree.map(lambda field: field[-1], solution.ys)
+    assert _asymmetry(model.diagnose(final).psi) < 1e-5
