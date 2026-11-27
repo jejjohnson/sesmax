@@ -24,6 +24,7 @@ Alternative: one function per kind of estimation, which reads well until someone
 Also decided, on 25 November: an experiment holds no default priors. Those of a parameterization sit in `sesmax-param`, and those of a model in its component.
 Decided by the owner on 26 November: sesmax composes the machinery of the stack and does not write its own. A piece that is missing is added first to the package that owns the concept, and the section on what this package builds on says which piece goes where.
 Proposed on 26 November, for review: a control is a role in one experiment and not a kind of input. The covariates of [the param design](sesmax_param.md), the known fields from outside the model, are never in it.
+Proposed on 27 November, for review: an observation operator is a composition of three maps, what the model can show, a reading at places and times, and the instrument, and this package writes none of them. A control may be in other coordinates than the unknowns, through a basis or a decoder, with whitening as the first case.
 Status: proposed, for review. The numbers are from a scratch prototype. The run half (W3) is under way: the package, the monitors and the runs in chunks are merged (sesmax#197, sesmax#198). The work half is step W6 of [the workspace packages](workspace_packages.md) and waits for `sesmax-param`.
 
 ## Motivation
@@ -88,6 +89,63 @@ d_s = D_z - \mathrm{tr}(\mathbf{P})
 ```
 
 ([Rodgers, 2000](https://doi.org/10.1142/3171)). These are the summaries a record should keep, and argminax computes both.
+
+### The control in other coordinates
+
+Whitening is one case of a map from the numbers a method moves to the unknowns. Write the map $g_ \text{dec}: \mathbb{R}^{D_ \omega} \to \mathbb{R}^{D_ z}$, so that $\mathbf{z} = g_ \text{dec}(\boldsymbol{\omega})$, and give $\boldsymbol{\omega}$ a penalty $\mathcal{R}(\boldsymbol{\omega})$ in place of the prior term:
+
+```math
+\mathcal{J}(\boldsymbol{\omega}) = \mathcal{R}(\boldsymbol{\omega}) + \frac{1}{2} \sum_{t \leq T} \Vert \mathbf{y}_t - h_t(\mathbf{x}_t(g_\text{dec}(\boldsymbol{\omega}))) \Vert^2_{\boldsymbol{\Sigma}_\varepsilon^{-1}}
+```
+
+| Map | $g_ \text{dec}(\boldsymbol{\omega})$ | $\mathcal{R}(\boldsymbol{\omega})$ | $D_ \omega$ |
+| --- | --- | --- | --- |
+| whitening | $\boldsymbol{\mu}_ z + \boldsymbol{\Sigma}_ z^{1/2} \boldsymbol{\omega}$ | $\frac{1}{2} \Vert \boldsymbol{\omega} \Vert^2$ | $D_ z$ |
+| a reduced basis | $\boldsymbol{\mu}_ z + \boldsymbol{\Phi} \boldsymbol{\omega}$ | $\frac{1}{2} \boldsymbol{\omega}^\top \boldsymbol{\Sigma}_ \omega^{-1} \boldsymbol{\omega}$ | the number of modes |
+| a learned decoder | a network | a weight decay, or $\frac{1}{2} \Vert \boldsymbol{\omega} \Vert^2$ | the latent size |
+
+where $\boldsymbol{\Phi} \in \mathbb{R}^{D_ z \times D_ \omega}$ holds the modes (empirical orthogonal functions, Fourier modes, wavelets) and $\boldsymbol{\Sigma}_ \omega \in \mathbb{R}^{D_ \omega \times D_ \omega}$ is the prior covariance of their coefficients. The map is chosen per unknown: the state may be in a basis while a drag is whitened.
+
+Three consequences follow.
+
+- A gradient method needs only $g_ \text{dec}$ and $\mathcal{R}$. An ensemble method that starts from members in $\mathbf{z}$ also needs the way back, an encoder $g_ \text{enc}: \mathbb{R}^{D_ z} \to \mathbb{R}^{D_ \omega}$, and it sees the observations through the lifted operator $h \circ g_ \text{dec}$ ([Peyron et al., 2021](https://doi.org/10.1002/qj.4153)).
+- With a basis the estimate stays in the span of $\boldsymbol{\Phi}$, so $d_ s \leq D_ \omega$, and the posterior covariance of the unknowns is $\boldsymbol{\Phi} \mathbf{P} \boldsymbol{\Phi}^\top$. The part of the truth outside the span, $(\mathbf{I} - \boldsymbol{\Phi} \boldsymbol{\Phi}^\top)(\mathbf{z} - \boldsymbol{\mu}_ z)$ for orthonormal modes, is an error the cost cannot see. A twin measures it.
+- The map changes the unknowns and not the model. The trajectory $\mathbf{x}_ t$ is still that of the full model. A model whose own state is reduced is a different thing: it is a model, so it is `sesmax-core`'s, and a `Problem` takes it like any other.
+
+### The observation operator
+
+An observation is rarely a component of the state. An altimeter measures the height of the sea surface at a point of its track, at the time it passes, and the model carries vorticity at the corners of a grid, at its own steps. So $h$ is a composition of three maps, each owned by a different package:
+
+```math
+h = m \circ \mathbf{L} \circ o
+```
+
+| Map | From, to | What it knows | Owner |
+| --- | --- | --- | --- |
+| the observable $o$ | the state, to a field on the grid | the model: height from a streamfunction, a velocity from a thickness flux | the component |
+| the reading $\mathbf{L}$ | a field, to values at $N_ y$ places and times | the grid, its points and its land | functax, with gridax |
+| the instrument $m$ | those values, to what is measured | a footprint, an averaging kernel, a radiative transfer | vardax, radtrax |
+
+The reading is linear in the field. With $N$ grid values, $\mathbf{L} \in \mathbb{R}^{N_ y \times N}$ has a few non-zeros per row, so $\mathbf{L}$ and $\mathbf{L}^\top$ both cost their number of non-zeros, and the Jacobian of the whole operator is $\mathbf{H} = \mathbf{J}_ m \mathbf{L} \mathbf{J}_ o$. Four things decide its rows.
+
+- **The point of the field.** On a C-grid the height is at cell centres, the eastward velocity on the east faces and the northward velocity on the north faces, half a cell apart. Row $i$ takes its corners from the coordinates of the field's own point. Reading a face field with the centre coordinates is an error of half a cell times its gradient.
+- **Land.** A corner on land holds no value. With $m_ k \in \lbrace 0, 1 \rbrace$ the wet flag of corner $k$ and $w_ {ik}$ its weight,
+
+```math
+\hat{y}_i = \frac{\sum_k w_{ik} m_k x_k}{\sum_k w_{ik} m_k}
+```
+
+and an observation with no wet corner is dropped.
+- **Time.** An observation at $t_ i$ falls between two steps, $t_ n \leq t_ i \leq t_ {n+1}$. With $\alpha_ i = (t_ i - t_ n) / \Delta t$,
+
+```math
+\hat{y}_i = (1 - \alpha_i) (\mathbf{L} \mathbf{x}_n)_i + \alpha_i (\mathbf{L} \mathbf{x}_{n+1})_i
+```
+
+which is second order in $\Delta t$. Taking the nearest step is first order, and for a signal moving at speed $c$ it displaces the observation by up to $c \Delta t / 2$.
+- **The footprint.** A pixel is an average over an area, so its row is a set of area weights and not four corners. It is still a sparse row.
+
+What no reading can give is the part of the signal that the grid does not resolve. That is the representation error, and it belongs in $\boldsymbol{\Sigma}_ \varepsilon$ with the error of the instrument ([Janjić et al., 2018](https://doi.org/10.1002/qj.3130)).
 
 ### Two families of methods
 
@@ -157,6 +215,15 @@ On a chaotic model the gradient is useful only within the horizon, so a window i
 **Time.**
 A forcing or an error that depends on time needs the model's clock in every step. `rollout` carries `(t, state)`, and `VardaxForwardModel` does not. The problem always goes through a rollout that carries time.
 
+**Reading a field at a point.**
+A functax plan is built once, on the host, from the coordinates of the field's point and the places of the observations. Applying it traces, and its adjoint is written by hand. The policy `missing="renormalise"` is the land rule above, for a field that holds NaN on land. Measured on 27 November on a 10 by 8 grid with land in the east (see the prototype): the adjoint passes the dot-product test to rounding, a point beside the coast reads 13.8 without the rule and 13.0 with it, and a face field read with centre coordinates is off by 1.0, half a cell of a gradient of 2.
+
+**Between two steps.**
+There are two ways to blend in time. The first saves the window and reads it with one plan over time and space, which is exact for the formula above and stores $T$ fields. The second reads inside the rollout, where each step adds its share $(1 - \alpha_ i)$ or $\alpha_ i$ to the observations it brackets, and stores nothing. The first is the one to build, because `rollout` already saves the window for the reverse pass. Observations are padded to a fixed count with a validity flag, as vardax's `PointObsBatch` does, so that a new pass of a satellite does not compile again.
+
+**A reduced control.**
+With $D_ \omega$ in the tens, the Gauss–Newton Hessian is a small dense matrix, so its inverse, $d_ s$ and the posterior covariance are exact and cheap. An ensemble of more than $D_ \omega$ members spans the whole control.
+
 **Compile once.**
 Until sesmax#196, `Model.integrate` compiled again on every call. A problem builds one function of the control and reuses it, so an optimiser or an ensemble compiles once.
 
@@ -176,7 +243,15 @@ A method, a diagnostic and a score are already in the stack, so this package wri
 | ensemble filters and inversion | filterax: `EKI`, `ETKF` and the rest | exists |
 | $\chi^2$, Desroziers, spread against skill, rank histograms | `filterax.utils`: `chi2_consistency`, `desroziers_R_estimate`, `spread_skill_ratio`, `rank_histogram` | exists |
 | 4D-Var, strong, weak and incremental | vardax: `StrongFourDVar`, `WeakFourDVar`, `IncrementalFourDVar` | exists |
-| observation operators: points, interpolation, masks | vardax: `GridPointObs`, `InterpObs`, `MaskedIdentity`; `pipekit_cycle.LinearObs` | exists |
+| reading a field at points, with its adjoint and the rules for land and for the outside | `functax.interp`: `Linear`, `Plan`, `Policies`; `functax.geometry`: `RectilinearGrid`, `Points` | exists |
+| the coordinates of each point of a C-grid, and its wet cells | gridax: `grid.coords(axis, at=)`, `Mask2D.wet(at=)` | exists |
+| footprints and area averages | `functax.interp`: `Conservative`, `Binning` | exists |
+| padded point observations and their cost | vardax: `PointObsBatch`, `point_obs_cost`, `GridPointObs`, `MaskedIdentity` | exists, at the step of an index |
+| an observation operator around a plan | vardax: `InterpObs` has its own bilinear stencil, clamps at the edge and takes a bare array | vardax#277, open |
+| averaging kernels, several instruments | vardax: `AveragingKernel`, `MultiInstrumentFusion` | exists |
+| a control in a basis or in a network | vardax: `ReducedBasis`, `StateParameterization`, `LinearParameterization`, `NeuralFieldParameterization`, `eof_basis` | exists |
+| filtering in a latent space | filterax: `LatentETKF`, `LatentLETKF`, `LiftedObs`, `EncodedDynamics`, `latent_ensemble` | exists |
+| the blend in time between two steps | a functax plan over time and space does it, and `GridPointObs` does not | missing in vardax |
 | the scores of a twin | `diagnostix.skill`: `rmse`, `bias`, `crps`, `spread_skill` | exists |
 | cycling windows | pipekit-cycle: `DACycle`, `WindowedCycle` | exists |
 | the adjoint of a solve, checkpointing | integrix: `adjoint.Checkpointed`, `adjoint.to_diffrax_adjoint` | exists |
@@ -187,6 +262,8 @@ What is missing goes upstream, before the step here that needs it. The issues ar
 
 - **A bilevel gradient**, in argminax, which owns the adjoints of a minimiser: the gradient of an outer loss through $\hat{\mathbf{z}}(\boldsymbol{\nu})$ by the implicit function theorem, with Hessian-vector products. Today every caller writes `jax.grad` through `optx.minimise` with `ImplicitAdjoint`. `bilevel` here calls it.
 - **The condition number of a whitened Gauss–Newton Hessian**, in `argminax.diagnose`, next to `degrees_of_freedom`.
+
+- **An observation operator built from a functax plan**, in vardax, which owns observation operators. vardax#277 asks for it already. It should take the plan as given, so that the point of the field, the land rule and the blend in time arrive with the plan and vardax learns nothing about C-grids. Until it lands, `sesmax-experiment` applies the plan itself, which is one call.
 
 Two needs are met by choosing the right piece. `rollout` passes no adjoint today (step E1), and the choice of one is integrix's `to_diffrax_adjoint`, which already resolves to `DirectAdjoint`. The synthetic observations of a twin are a draw from an observation operator and its noise, which is a few lines here.
 
@@ -297,6 +374,77 @@ def priors(model: Model, state: PyTree) -> dict[str, Gaussian]: ...
 An entry of `unknowns` replaces the default of the same path, for one run.
 
 The control of a `Problem` is a flat vector, and that is what every method in the stack takes. `unwhiten` gives it back as named pieces.
+
+### Observations at places and times
+
+`Observations` above is the simple case: the same $D_ y$ values at every step, through one function of the state. Observations from an instrument are scattered in space and time, and they get their own structure. It holds the data and names the three maps, and the `Problem` builds the reading from them.
+
+```python
+# Shapes: N_y observations, padded; D_s space coordinates
+
+# proposed (sesmax-core): what a model can show, and where it lives
+class Observable(eqx.Module):
+    """A field of the model on its grid: the map o, with what a reading needs."""
+
+    # o(x), a located field, so its point is known
+    read: Callable[[PyTree], CField]
+    # coords(axis, at=), today (gridax)
+    grid: Any
+    # wet(at=), today (gridax); None for no land
+    mask: Any | None = None
+
+
+# proposed (sesmax-experiment)
+class PointObservations(eqx.Module):
+    """y_i at (s_i, t_i); a row with ``valid`` False carries no weight."""
+
+    values: Float[Array, " obs"]
+    std: Float[Array, " obs"]
+    coords: Float[Array, "obs space"]
+    times: Float[Array, " obs"]
+    valid: Bool[Array, " obs"]
+    # the map o: a name the component registers, such as "ssh", or an Observable
+    observable: str | Observable = eqx.field(static=True)
+    # the map L: a functax scheme, and how to blend in time
+    scheme: Scheme = eqx.field(static=True, default_factory=Linear)
+    in_time: Literal["linear", "nearest"] = eqx.field(static=True, default="linear")
+    # the map m: from the values read to what is measured; None is the identity
+    instrument: Callable[[Float[Array, " obs"]], Float[Array, " obs"]] | None = None
+
+
+# proposed (sesmax-experiment)
+# h = m ∘ L ∘ o, on a saved window: (T, ...) in each field → (N_y,)
+def observation_operator(
+    observations: PointObservations, model: Model, window: Window
+) -> Callable[[PyTree], Float[Array, " obs"]]: ...
+```
+
+A `Problem` takes one set of observations or several, one per instrument, and their misfits stack in $\mathbf{r}$. A velocity from a drifter is two sets, one of `"u"` and one of `"v"`, at the same places.
+
+### The control in other coordinates
+
+An entry of `unknowns` is a `Gaussian`, which is whitened, or any map that satisfies vardax's `StateParameterization`: a `decode`, a `penalty` and an `init_control`. So a basis and a network need no code here.
+
+```python
+# today (vardax): the protocol
+class StateParameterization(Protocol):
+    # z = g_dec(ω)
+    def decode(self, theta: Any, t: float | None = None) -> Float[Array, "..."]: ...
+
+    # ℛ(ω)
+    def penalty(self, theta: Any) -> Float[Array, ""]: ...
+
+    def init_control(self, *, key: PRNGKeyArray | None = None) -> Any: ...
+
+
+# today (vardax): z = μ_z + Φ ω, ℛ = ½ ωᵀ Σ_ω⁻¹ ω
+state_in_modes = vdx.LinearParameterization(vdx.linear_basis(modes, variance=1.0), background=mean)
+
+# proposed (sesmax-experiment): Gaussian satisfies the same protocol, as the whitening map
+unknowns = {"state": state_in_modes, "params.F": sxe.Gaussian(7.0, 1.0)}
+```
+
+An ensemble method that works in the latent space takes the encoder as well, and that is filterax's `LatentETKF` with its `LiftedObs`. `Ensemble` hands them the problem's maps.
 
 ### The methods
 
@@ -422,7 +570,13 @@ class TwinResult(eqx.Module):
 | Cycles, protocols | pipekit-cycle |
 | Priors of parameterizations, forcing, model error | `sesmax-param` |
 | Priors of a model's state and own parameters | the component |
-| Training an emulator or an amortised map | pipekit-train |
+| Interpolation, its adjoint, area weights | functax |
+| Observation operators, averaging kernels | vardax |
+| What a model can show as a field | the component |
+| A radiance from a state | radtrax, through sesmax#240 |
+| Bases, decoders, filters in a latent space | vardax, filterax |
+| A model in reduced coordinates | `sesmax-core` |
+| Training an emulator, an encoder or an amortised map | pipekit-train, with the networks of geonnax |
 | Scores against other methods | geobench |
 
 ## Examples
@@ -461,6 +615,69 @@ problem = sxe.Problem(
 # proposed (sesmax-experiment)
 # ẑ = argmin 𝒥(z)
 result = sxe.estimate(problem, method=sxe.Minimise(optx.BFGS(rtol=1e-8, atol=1e-8)))
+```
+
+### Read a field along a track
+
+The reading runs today, with gridax and functax alone. The grid has 8 by 6 cells and a ghost ring, with land east of $x = 5.5$.
+
+```python
+import gridax
+import jax.numpy as jnp
+from functax.geometry import Axis, Points, RectilinearGrid
+from functax.interp import Linear, Policies
+
+# Shapes: Ny = 8, Nx = 10 with the ghost ring; N_y = 3
+
+# today (gridax)
+grid = gridax.CartesianCGrid2D.from_interior(8, 6, 8.0, 6.0)
+mask = gridax.Mask2D.from_mask(jnp.ones(grid.shape, bool).at[:, 6:].set(False))
+y_T, x_T = jnp.meshgrid(grid.coords("y", at="T"), grid.coords("x", at="T"), indexing="ij")
+
+# today (functax): L for a field at point ``at``
+def reading(at, places):
+    source = RectilinearGrid((Axis(grid.coords("y", at=at)), Axis(grid.coords("x", at=at))))
+    return Linear().plan(source, Points(places), policies=Policies(missing="renormalise"))
+
+# (y, x): open sea, beside the coast, on land
+places = jnp.array([[3.0, 2.5], [3.0, 5.4], [3.0, 7.5]])
+# η = 2x + y at the centres, NaN on land
+eta = jnp.where(mask.wet(at="T"), 2.0 * x_T + y_T, jnp.nan)
+# ŷ = L η → [8.0, 13.0, nan]
+reading("T", places)(eta.reshape(-1))
+# Lᵀ r → (Ny · Nx,), a residual sent back to the grid
+reading("T", places).adjoint(jnp.array([1.0, 2.0, 0.0]))
+```
+
+The same along a track, as observations of a problem.
+
+```python
+# proposed (sesmax-experiment): sea-surface height where and when the altimeter saw it
+track = sxe.PointObservations(
+    values=ssh, std=0.03, coords=places, times=times, valid=valid, observable="ssh"
+)
+# proposed (sesmax-experiment)
+problem = sxe.Problem(
+    model=model,
+    state=state,
+    window=window,
+    observations=track,
+    unknowns={"state": sxe.Gaussian(background, 1.0)},
+)
+```
+
+### Estimate a state in a few modes
+
+```python
+# today (vardax): z = μ_z + Φ ω, with D_ω = 20 modes of a long run
+modes = vdx.linear_basis(Phi, variance=1.0)
+# proposed (sesmax-experiment): the same problem, with the state in the basis
+reduced = dataclasses.replace(
+    problem, unknowns={"state": vdx.LinearParameterization(modes, background=mean)}
+)
+# proposed (sesmax-experiment)
+# ω̂ = argmin 𝒥(ω), with 20 unknowns
+result = sxe.estimate(reduced, method=sxe.LeastSquares(amx.GaussNewtonCG(rtol=1e-8, atol=1e-8)))
 ```
 
 ### Estimate the state and a parameter together
@@ -559,7 +776,20 @@ The gradient agrees with a central difference of the outer loss, 8.287e-04 at a 
 
 **An ensemble on the same problem.** `filterax.EKI` with 50 members estimates $F = 7.973 \pm 0.056$ when it is given the true initial state. That is not the problem of the third row, which starts from the background, so the two numbers are not a comparison. One problem object for both methods is what would make them one.
 
-Not covered: `Problem` itself (the prototype is a 30-line class), model error as an unknown, `twin`, filters, a masked observation, and any model with a spatial grid.
+**Reading a field.** A second scratch run on 27 November 2026, at `aee04fb`, with functax 0.0.13 and gridax 0.3.3, on the grid of the track example, for fields that are linear in space.
+
+| Check | Result |
+| --- | --- |
+| a centre field read at three places, no land | 8.0, 13.8, 18.0, exact |
+| the same with land east of $x = 5.5$ and `missing="renormalise"` | 8.0, 13.0, NaN |
+| an east-face field read with its own coordinates | 8.0, 13.8, 18.0, exact |
+| the same field read with the centre coordinates | 9.0, 14.8, 19.0 |
+| the dot-product test of the adjoint | 0.0 |
+| three places at three times, on four saved steps, one plan | exact, with a gradient on 10 of 320 values |
+
+**A basis on Lorenz-96.** The same run took the modes of a long Lorenz-96 trajectory. Twenty of the forty hold 90 % of the variance and leave an error of 1.5 in the state, three times the observation error. Lorenz-96 does not reduce, so a reduced control is not tested on it. It needs a model with a red spectrum, which is the ocean's.
+
+Not covered: `Problem` itself (the prototype is a 30-line class), model error as an unknown, `twin`, filters, the three maps composed on a model, a footprint, an estimate in a basis, and any model with a spatial grid.
 
 ## Steps and gates
 
@@ -568,7 +798,9 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 | E0 | the rest of the run half: epic sesmax#186 | [the run-loop design](run_loop.md) |
 | E1 | `rollout` and `rollout_loss` take an integrix adjoint | Levenberg–Marquardt and the implicit gradient run, as tests |
 | E2 | `Component.priors`, `priors`, `Window`, `Observations`, `Problem`, `Result`, `simulate`, `estimate` with `Minimise` | the four-row table, as tests; the README quickstart of the core gives the same numbers |
+| E2a | `Observable` in the core, `PointObservations`, `observation_operator` | the six checks of the reading table as tests, on a model with land; the dot-product test of the whole operator |
 | E3 | `LeastSquares`, `Ensemble`, `Variational` | one problem, three methods, a documented difference |
+| E3a | a `StateParameterization` as an unknown, and `LatentETKF` through `Ensemble` | on a double gyre, a basis that holds 99 % of the variance gives the full estimate to within the stated spread |
 | E4 | `twin`, and the diagnostics of a `Result` | the truth lies within the stated spread on a seeded twin |
 | E5 | `bilevel`, over argminax's bilevel gradient | that gradient released in argminax; the gradient against a finite difference, to 1 % |
 | E6 | the analysis monitors and their record | a run and an estimate write the same record |
@@ -584,6 +816,10 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 | SE-5 | Correlated observation errors | diagonal first | a lineax operator |
 | SE-6 | Window with a moving start (cycling) | `pipekit_cycle.DACycle` around the problem | a `Cycle` of problems here |
 | SE-7 | Does the command line expose `estimate`? | not at first, only `simulate` | yes, with a spec |
+| SE-8 | One structure for observations, or two? | two: `Observations` for every step, `PointObservations` for places and times | one, with the simple case as a full set of places |
+| SE-9 | The default in time | the linear blend of two steps | the nearest step, which is cheaper and first order |
+| SE-10 | Who names the observables? | the component, as `Component.observables` | each experiment writes its own function of the state |
+| SE-11 | Is `unwhiten` renamed `decode`, now that whitening is one map of several? | yes | keep the name |
 
 ## References
 
@@ -596,15 +832,17 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 - Franceschi, L. et al. (2018). [Bilevel programming for hyperparameter optimization and meta-learning](https://arxiv.org/abs/1806.04910). arXiv:1806.04910.
 - Hoffman, R. N. and Atlas, R. (2016). [Future observing system simulation experiments](https://doi.org/10.1175/bams-d-15-00200.1). *Bulletin of the American Meteorological Society* 97, 1601–1616.
 - Iglesias, M. A., Law, K. J. H. and Stuart, A. M. (2013). [Ensemble Kalman methods for inverse problems](https://doi.org/10.1088/0266-5611/29/4/045001). *Inverse Problems* 29, 045001.
+- Janjić, T. et al. (2018). [On the representation error in data assimilation](https://doi.org/10.1002/qj.3130). *Quarterly Journal of the Royal Meteorological Society* 144, 1257–1278.
 - Kidger, P. (2022). [On neural differential equations](https://arxiv.org/abs/2202.02435). arXiv:2202.02435.
 - Le Dimet, F.-X. and Talagrand, O. (1986). [Variational algorithms for analysis and assimilation of meteorological observations: theoretical aspects](https://doi.org/10.3402/tellusa.v38i2.11706). *Tellus A* 38, 97.
+- Peyron, M. et al. (2021). [Latent space data assimilation by using deep learning](https://doi.org/10.1002/qj.4153). *Quarterly Journal of the Royal Meteorological Society* 147, 3759–3777.
 - Rader, J., Lyons, T. and Kidger, P. (2024). [Optimistix: modular optimisation in JAX and Equinox](https://arxiv.org/abs/2402.09983). arXiv:2402.09983.
 - Rodgers, C. D. (2000). [Inverse Methods for Atmospheric Sounding](https://doi.org/10.1142/3171). World Scientific.
 
 ## Relationships
 
 - Part of: [the workspace packages](workspace_packages.md), steps W3 (run) and W6 (work)
-- Builds on: optimistix, argminax, filterax, vardax, integrix, diagnostix, pipekit-cycle
+- Builds on: optimistix, argminax, filterax, vardax, functax, gridax, integrix, diagnostix, pipekit-cycle
 - Depends on: [the run-loop design](run_loop.md), [sesmax-param](sesmax_param.md) for priors
 - Uses: the horizon of [sesmax-testing](sesmax_testing.md)
 - Issues: sesmax#186, sesmax#15
