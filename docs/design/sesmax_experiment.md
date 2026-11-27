@@ -251,7 +251,7 @@ A method, a diagnostic and a score are already in the stack, so this package wri
 | averaging kernels, several instruments | vardax: `AveragingKernel`, `MultiInstrumentFusion` | exists |
 | a control in a basis or in a network | vardax: `ReducedBasis`, `StateParameterization`, `LinearParameterization`, `NeuralFieldParameterization`, `eof_basis` | exists |
 | filtering in a latent space | filterax: `LatentETKF`, `LatentLETKF`, `LiftedObs`, `EncodedDynamics`, `latent_ensemble` | exists |
-| the blend in time between two steps | a functax plan over time and space does it, and `GridPointObs` does not | missing in vardax |
+| the blend in time between two steps | a functax plan over time and space does it, and `GridPointObs` does not | vardax#319, open |
 | the scores of a twin | `diagnostix.skill`: `rmse`, `bias`, `crps`, `spread_skill` | exists |
 | cycling windows | pipekit-cycle: `DACycle`, `WindowedCycle` | exists |
 | the adjoint of a solve, checkpointing | integrix: `adjoint.Checkpointed`, `adjoint.to_diffrax_adjoint` | exists |
@@ -264,6 +264,7 @@ What is missing goes upstream, before the step here that needs it. The issues ar
 - **The condition number of a whitened Gauss–Newton Hessian**, in `argminax.diagnose`, next to `degrees_of_freedom`.
 
 - **An observation operator built from a functax plan**, in vardax, which owns observation operators. vardax#277 asks for it already. It should take the plan as given, so that the point of the field, the land rule and the blend in time arrive with the plan and vardax learns nothing about C-grids. Until it lands, `sesmax-experiment` applies the plan itself, which is one call.
+- **A blend in time in the point operator**, in vardax. `GridPointObs` compares an observation with the state at one step, and vardax#319 asks for the blend of the two saved states around its time. On a field that grows by 10 per unit of time and is saved every 0.5, a time rounded to a step reads 2.0 and 2.5 off, and the blend is exact. `sesmax-experiment` does not wait for it, because the plan over time and space already blends.
 
 Two needs are met by choosing the right piece. `rollout` passes no adjoint today (step E1), and the choice of one is integrix's `to_diffrax_adjoint`, which already resolves to `DirectAdjoint`. The synthetic observations of a twin are a draw from an observation operator and its noise, which is a few lines here.
 
