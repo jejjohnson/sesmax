@@ -19,6 +19,7 @@ keywords:
 Decided on 30 October 2026, and built: `sesmax-core` is the bottom package of sesmax. It holds the contract that makes a model usable by an integrator, an optimiser, a filter and a run loop at once, and the pieces that every component of the Earth system shares.
 Decided by the owner on 26 November: the core composes the machinery of the stack and writes none. Time stepping is diffrax and integrix, stencils and grids are gridax, linear algebra is lineax and gaussx, bases are functax, constants are geophysix.
 Proposed, for review: the core shrinks to the contract. The toys move to [`sesmax-testing`](sesmax_testing.md), drag, forcing and bases to [`sesmax-param`](sesmax_param.md), and the known fields stay as `Covariates`.
+Proposed on 27 November, for review: a component says what its models show, as named `Observable`s, and a model can be seen through any encoder and decoder, of which `ScaledModel` is the affine case. Training either map stays out of sesmax.
 Alternative: keep one core and add modules to it, which is fewer releases, but then everyone who wants the model contract installs 75 toy names and eight basis constructors.
 Status: released at 0.3.1, at sesmax `a34e46c`. [The workspace and core plan](workspace_and_core.md) has the history of the move from somax and what changed since. This page is the design of the package.
 
@@ -105,6 +106,26 @@ The time scale depends on the regime: $T = L / U$ for the advective set, $T = 1 
 The same map with a sample mean and standard deviation standardises a state for a network or a filter, so the two compose.
 The numbers that say which regime a run is in are $Ro = U / (f_ 0 L)$, $Bu = g H / (f_ 0 L)^2$ and $Fr = U / \sqrt{g H}$.
 
+### A model in other coordinates
+
+The affine map is one case of a pair of maps, an encoder $g_ \text{enc}: \mathbb{R}^{D_ x} \to \mathbb{R}^{D_ z}$ and a decoder $g_ \text{dec}: \mathbb{R}^{D_ z} \to \mathbb{R}^{D_ x}$. A model $\mathrm{d}\mathbf{x}/\mathrm{d}t = f(\mathbf{x}, t)$ seen in the coordinates $\mathbf{z} = g_ \text{enc}(\mathbf{x})$ is again a model, by the chain rule:
+
+```math
+\frac{\mathrm{d}\mathbf{z}}{\mathrm{d}t} = \mathbf{J}_\text{enc}(\mathbf{x}) f(\mathbf{x}, t)
+```
+
+where $\mathbf{x} = g_ \text{dec}(\mathbf{z})$ and $\mathbf{J}_ \text{enc} \in \mathbb{R}^{D_ z \times D_ x}$ is the Jacobian of the encoder. Three cases differ in what is lost.
+
+| Pair | $\mathbf{J}_ \text{enc}$ | $D_ z$ | Exact? |
+| --- | --- | --- | --- |
+| scales, standardisation | $\mathrm{diag}(1 / \boldsymbol{\sigma})$ | $D_ x$ | yes |
+| a basis, $\mathbf{x} = \boldsymbol{\mu} + \boldsymbol{\Phi} \mathbf{z}$ with orthonormal columns | $\boldsymbol{\Phi}^\top$ | the number of modes | only with every mode |
+| a learned encoder and decoder | by automatic differentiation | the latent size | no |
+
+The second is a Galerkin projection, $\mathrm{d}\mathbf{z}/\mathrm{d}t = \boldsymbol{\Phi}^\top f(\boldsymbol{\mu} + \boldsymbol{\Phi} \mathbf{z})$ ([Benner et al., 2015](https://doi.org/10.1137/130932715)). It drops what the kept modes exchange with the others, so a reduced model drifts from the full one even from a state inside the span. The vertical modes of the next section are the one reduction in the core that loses nothing, because the modes diagonalise the coupling.
+
+A model that is learned in the latent space, $\mathrm{d}\mathbf{z}/\mathrm{d}t = f_ \theta(\mathbf{z})$, is not a projection of $f$. It is a model in its own right, whose decoder is what it shows. It fits the contract as it is, and training it is not the core's work.
+
 ### Layers and inversions
 
 Two pieces of geophysical fluid dynamics are shared by an ocean and an atmosphere.
@@ -144,6 +165,8 @@ A strong-constraint variational method minimises
 where $\mathbf{y}_ t$ are observations, $h$ the observation operator, and $\boldsymbol{\Sigma}_ x$, $\boldsymbol{\Sigma}_ \varepsilon$ the background and observation covariances ([Le Dimet and Talagrand, 1986](https://doi.org/10.3402/tellusa.v38i2.11706)).
 For a control that is not the state (a forcing, a parameter), the model maps the control through the whole window to the stacked observations, $G(\boldsymbol{\theta}) = \mathrm{vec}[h(\mathbf{x}_ t(\boldsymbol{\theta}))]$, and the cost is that of 3D-Var over $\boldsymbol{\theta}$.
 The core supplies $\mathcal{M}$ and $G$; the methods are filterax's and vardax's.
+
+The observation operator is a composition, $h = m \circ \mathbf{L} \circ o$, which [the experiment design](sesmax_experiment.md) sets out. Only its first map is the model's: the observable $o$ takes the state to a field on the grid, such as a sea-surface height from a streamfunction. The reading $\mathbf{L}$ at places and times is functax's, and the instrument $m$ is vardax's or radtrax's. So the core supplies one more thing, a way for a model to say what it shows and on which point of which grid.
 
 ## Background: the numerics
 
@@ -340,11 +363,52 @@ priors: Callable[[Model, PyTree], Mapping[str, Any]] | None = None
 
 # proposed (sesmax-core): rollout takes the adjoint of the solve
 def rollout(model, state0, *, dt, n_steps, adjoint=None, ...) -> PyTree: ...
+
+
+# proposed (sesmax-core): what a model can show, and where it lives
+class Observable(eqx.Module):
+    """A field of the model on its grid: the map o, with what a reading needs."""
+
+    # o(x), a located field, so its point is known
+    read: Callable[[PyTree], CField]
+    # coords(axis, at=), today (gridax)
+    grid: Any
+    # wet(at=), today (gridax); None for no land
+    mask: Any | None = None
+
+
+# proposed (sesmax-core): one more field of Component
+# the observables of a model, by name: "ssh", "u", "v"
+observables: Callable[[Model], Mapping[str, Observable]] | None = None
+
+
+# proposed (sesmax-core): a model seen through a pair of maps
+class TransformedModel(Model):
+    """dz/dt = J_enc(x) f(x, t), with x = g_dec(z)."""
+
+    inner: Model
+    encode: Callable[[PyTree], PyTree]
+    decode: Callable[[PyTree], PyTree]
+
+    def vector_field(self, t, state, args=None):
+        # x = g_dec(z)
+        inner_state = self.decode(state)
+        # f(x, t)
+        tendency = self.inner.vector_field(t, inner_state, args)
+        # J_enc(x) f, one forward-mode product
+        return jax.jvp(self.encode, (inner_state,), (tendency,))[1]
+
+    def apply_boundary_conditions(self, state):
+        # the boundaries are those of the inner model
+        return self.encode(self.inner.apply_boundary_conditions(self.decode(state)))
 ```
 
 - **Covariates.** [The param design](sesmax_param.md) separates a known field from a forcing term. The reader of records (`InterpolatedForcing` today) stays in the core under that name, since a component, a term and an experiment all read it.
 - **Priors.** [The experiment design](sesmax_experiment.md) reads a component's priors through this field, so it names no component.
 - **Adjoints.** Recommended: a spec that integrix resolves to a diffrax adjoint. Alternative: a diffrax object, which ties every caller to diffrax.
+- **Observables.** A component names the fields its models show, and `sesmax-experiment` builds the reading from the grid and the mask of each. Recommended: a located field, so that the point comes with it. Alternative: a bare array and a point name, which is one more thing to get wrong.
+- **A model in other coordinates.** `ScaledModel` stays as the affine case, which is exact, needs no Jacobian product and also scales time. `TransformedModel` is the general case, for a basis or a learned pair. Its maps are any two callables, so the `.encode` and `.decode` of a filterax codec fit, and filterax's `EncodedDynamics` is the same idea for one step of a filter. Diagnostics are those of the inner model on the decoded state. A model learned in the latent space needs nothing new: it is a `Model`, and its decoder is its `Observable`.
+- **What stays out.** Fitting a basis is vardax's `eof_basis`, and training an encoder, a decoder or a latent model is pipekit-train's with the networks of geonnax. The core holds the slot they fill.
 - **What leaves.** The toys (75 names) to `sesmax-testing`; drag, wind, relaxation, the bases and `BasisForcing` (most of the 48 names of `forcing`) to `sesmax-param`; `SubsampleObs` to vardax's operators. Recommended: move with the spelling kept, so a caller changes one import.
 
 ## Examples
@@ -438,6 +502,43 @@ gradient = eqx.filter_grad(rollout_loss)(Lorenz96.create(F=7.0), state0, referen
 # dℒ/dF = −0.0247: the loss falls as F rises towards 8
 ```
 
+### A model in other coordinates
+
+The slot is five lines, and the run below is a scratch one from 27 November 2026, on Lorenz-96 with 40 variables.
+
+```python
+import jax
+import sesmax_core as sx
+
+# proposed (sesmax-core), as a function: dz/dt = J_enc(x) f(x), with x = g_dec(z)
+def latent_field(model, encode, decode):
+    def field(t, z, args=None):
+        x = decode(z)
+        return jax.jvp(encode, (x,), (model.vector_field(t, x, args),))[1]
+
+    return field
+
+
+# today (sesmax-core): the affine case
+affine = sx.StateAffine(loc=L96State(x=jnp.asarray(2.0)), scale=L96State(x=jnp.asarray(4.0)))
+scaled = sx.ScaledModel(inner=model, transform=affine)
+# the two tendencies differ by 0.0
+latent_field(model, affine.forward, affine.inverse)(0.0, affine.forward(state))
+
+# a basis from a long run: z = Φᵀ (x − μ), x = μ + Φ z
+encode = lambda x: Phi.T @ (x - mean)
+decode = lambda z: mean + Phi @ z
+```
+
+| Modes kept | Variance held | Error of the start, in the basis | Error after 0.2 time units |
+| --- | --- | --- | --- |
+| 40 | 100 % | 7e-15 | 1e-14 |
+| 30 | 97.8 % | 1.05 | 2.43 |
+| 20 | 90.2 % | 1.51 | 3.13 |
+| 10 | 70.5 % | 2.29 | 3.01 |
+
+The errors are root mean squares over the 40 variables, against the full model from the same state. With every mode the reduced model is the full one to rounding, which is the check that the slot is right. With fewer it is poor, because the spectrum of Lorenz-96 is nearly flat. So Lorenz-96 tests the slot and not the idea, which needs a model with a red spectrum.
+
 ### One model, two assimilation libraries
 
 ```python
@@ -480,6 +581,8 @@ Counted at sesmax `a34e46c`: 15,612 lines of source, 1,026 test functions in 60 
 | `testing` | 75 names: Lorenz-63, Lorenz-96 and its two-scale form, the 1-D and 2-D PDE problems, linear shallow water | released; moves to `sesmax-testing` |
 | monitors, checkpoints, the run loop | — | moved to `sesmax-experiment` (sesmax#197) |
 | `Covariates`, `Component.priors`, an adjoint in `rollout` | — | proposed here |
+| `Observable`, `Component.observables` | — | proposed here, for [sesmax-experiment](sesmax_experiment.md), E2a |
+| `TransformedModel` | the affine case is `ScaledModel` | proposed here |
 | gradient checks against finite differences | — | open, sesmax#105 |
 | the levels L1 to L3 (`_src/array.py`, `Step`, `simulate`) | — | open, sesmax#29 |
 | the walls of the linear shallow-water toys | defect | sesmax#202 |
@@ -495,11 +598,14 @@ The tutorial series, steps 1 to 16, follows the twelve steps to Navier–Stokes 
 | SC-3 | The adjoint of `rollout` | an integrix spec | a diffrax adjoint |
 | SC-4 | The adapters, here or in `sesmax-experiment`? | here: they are the contract seen from a method | there, with the problem that uses them |
 | SC-5 | The moved names | keep the spelling, no alias left behind | deprecated aliases for one release |
+| SC-6 | A model in other coordinates, here? | yes, `TransformedModel` beside `ScaledModel` | leave it to filterax's `EncodedDynamics`, which covers a filter and not an integration or a gradient |
+| SC-7 | What does an observable return? | a located field, with its grid and mask beside it | a bare array and the name of its point |
 
 ## References
 
 - Ascher, U. M., Ruuth, S. J. and Spiteri, R. J. (1997). [Implicit-explicit Runge–Kutta methods for time-dependent partial differential equations](https://hdl.handle.net/10.1016/S0168-9274(97)00056-1). *Applied Numerical Mathematics* 25, 151–167.
 - Barba, L. A. and Forsyth, G. F. (2018). [CFD Python: the 12 steps to Navier–Stokes equations](https://doi.org/10.21105/jose.00021). *Journal of Open Source Education* 1, 21.
+- Benner, P., Gugercin, S. and Willcox, K. (2015). [A survey of projection-based model reduction methods for parametric dynamical systems](https://doi.org/10.1137/130932715). *SIAM Review* 57, 483–531.
 - Griewank, A. and Walther, A. (2008). [Evaluating Derivatives](https://doi.org/10.1137/1.9780898717761). SIAM.
 - Kidger, P. (2022). [On neural differential equations](https://arxiv.org/abs/2202.02435). DPhil thesis, University of Oxford.
 - Le Dimet, F.-X. and Talagrand, O. (1986). [Variational algorithms for analysis and assimilation of meteorological observations: theoretical aspects](https://doi.org/10.3402/tellusa.v38i2.11706). *Tellus A* 38, 97–110.

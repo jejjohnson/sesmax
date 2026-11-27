@@ -19,6 +19,7 @@ keywords:
 Decided on 25 November 2026, and built: `sesmax-ocean` is the ocean component of sesmax. It holds seven models of the upper ocean on an Arakawa C-grid (three quasi-geostrophic, two shallow-water, two on the sphere), their scenarios and run configs, and the checks that say whether a grid resolves what a model needs.
 Decided by the owner on 26 November: the package composes the machinery of the stack and writes none. Stencils come from gridax, solves from `sesmax-core` and gaussx, constants from geophysix, and scores from diagnostix.
 Proposed, for review: the three changes of the section on the API, which are wind, drag and viscosity as terms of `sesmax-param`, the priors of a model registered through `Component`, and the metrics moved onto gridax and diagnostix.
+Proposed on 27 November, for review: a fourth, the observables of each model (sea-surface height and surface velocity) registered through `Component`, so that an experiment can read them along a track.
 Alternative to the first: keep the terms inside each `vector_field`, which is what runs today and needs no new package, but makes a different drag law a different model.
 Status: the models, scenarios and configs are merged at sesmax `a34e46c` and unreleased (version 0.0.0). [The ocean plan](ocean.md) has the history of the move from somax, the equality gate and the defects it found. This page is the design of the package.
 
@@ -149,6 +150,22 @@ On a band of latitudes $\phi$ and longitudes $\lambda$ of a sphere of radius $R$
 The planetary gradient $\beta = 2 \Omega \cos \phi / R$ is then implicit, and it goes to zero at the poles as it should.
 `SphericalSWM` is the shallow-water system above with these metrics, and `SphericalQG` advects the absolute vorticity $q + f$ with the flow of $\psi$, where $\nabla^2_ \text{sphere} \psi = q$.
 [Williamson et al. (1992)](https://hdl.handle.net/10.1016/S0021-9991(05)80016-6) is the standard set of test cases.
+
+### What a model shows
+
+An instrument does not see a state. It sees a field that the state implies, and which field depends on the model.
+
+| Observable | Quasi-geostrophy | Shallow water |
+| --- | --- | --- |
+| sea-surface height $\eta$ | $f_ 0 \psi_ 1 / g$, after the inversion | $h - H$, or $\sum_ k h_ k - \sum_ k H_ k$ for layers |
+| surface velocity | $(-\partial_ y \psi_ 1, \partial_ x \psi_ 1)$ | $(u_ 1, v_ 1)$ |
+| relative vorticity | $\nabla^2 \psi_ 1$ | $\zeta_ 1$ |
+
+where the subscript 1 is the top layer. Two consequences follow for an assimilation.
+
+In quasi-geostrophy the height is not local in the state. One altimeter point constrains $q$ over a deformation radius through the inversion, and the adjoint of the observation is the adjoint of that elliptic solve. In shallow water the height is the state itself at the centres, and the dynamics carry the information.
+
+No model here carries a tracer, so none shows a sea-surface temperature or salinity. An altimeter product is also an anomaly about a mean surface that these models do not have, so the mean dynamic topography enters as a known field, a covariate.
 
 ### The numbers that say what a run is
 
@@ -354,7 +371,7 @@ def compute_eval_metrics(model, state: State) -> dict[str, float]: ...
 
 ### Proposed
 
-Three changes, each in step with another design page.
+Four changes, each in step with another design page.
 
 ```python
 # proposed (sesmax-ocean, with sesmax-param): the model is its resolved dynamics,
@@ -371,11 +388,17 @@ def ocean_priors(model: Model, background: PyTree) -> dict[str, Gaussian]: ...
 
 # proposed (sesmax-ocean): a wind product is a covariate, read by the forcing term
 wind = Covariates({"tau_x": ..., "tau_y": ...})
+
+
+# proposed (sesmax-ocean): what its Component registers, read by sesmax-experiment
+# "ssh", "u", "v": o(x) as a located field, with the grid and the mask of the model
+def ocean_observables(model: Model) -> dict[str, Observable]: ...
 ```
 
 - **Terms.** Recommended: the seven models keep their names and factories, and `create` returns the sum, so no caller changes. Alternative: new classes beside the old ones, which doubles the surface. The equality tests hold the rewrite to today's numbers.
 - **Priors.** A model's state and its own parameters get their priors here, as [the experiment design](sesmax_experiment.md) describes; those of drag and wind sit in `sesmax-param`.
 - **Covariates.** A wind product, a bathymetry and a mask are known fields from outside the model, in the sense of [the param design](sesmax_param.md). `ForcingFields` and the basin bundles become their source.
+- **Observables.** Each model says what it shows, by the table of the maths section, as an `Observable` of [the core design](sesmax_core.md): a located field with its grid and mask. The quasi-geostrophic ones read the streamfunction that `diagnose` already computes. Interpolating to a track and the instrument are not written here: [the experiment design](sesmax_experiment.md) composes them from functax and vardax.
 
 ## Examples
 
@@ -501,6 +524,7 @@ Counted at sesmax `a34e46c`: 6,992 lines of source, 497 test functions in 37 fil
 | the double gyre over eight years | open pull request | sesmax#214 |
 | wind, drag and viscosity as terms | proposed | [sesmax-param](sesmax_param.md), P6 |
 | priors of the state and the model's parameters | proposed | [sesmax-experiment](sesmax_experiment.md), E2 |
+| observables: sea-surface height and surface velocity as located fields | proposed | [sesmax-experiment](sesmax_experiment.md), E2a |
 | spectra and a spectral energy budget | open | sesmax#166, sesmax#104 |
 | a QG prior against DUACS, as a benchmark | open | sesmax#236 |
 | the spectral models | open | sesmax#215 to sesmax#221 |
@@ -517,6 +541,7 @@ Not available, and not planned here: a primitive-equation model, sea ice, tides,
 | SO-3 | The Coriolis scheme | keep Sadourny's averaging, and add Arakawa–Lamb when a run needs energy conservation | switch the default |
 | SO-4 | A wind product as a covariate | `ForcingFields` and the bundles feed `Covariates` | each model keeps its own wind pattern |
 | SO-5 | The default time stepper of a config | a strong-stability-preserving scheme from integrix for shallow water | Tsit5 for every model |
+| SO-6 | What does an altimeter compare with? | the anomaly, with the mean dynamic topography as a covariate | the absolute height, with a mean surface inside the model |
 
 ## References
 
