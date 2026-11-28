@@ -34,11 +34,15 @@ This page says what the packages are and how they depend on each other. Each pac
 | --- | --- | --- |
 | [sesmax-core](sesmax_core.md) | the model contract, terms, scales, adapters; the move from somax | released, 0.3.1 |
 | [sesmax-ocean](sesmax_ocean.md) | seven ocean models, scenarios, checks; the move from somax | merged, unreleased |
+| [sesmax-atmos](sesmax_atmos.md) | energy balance models, and the fluid models with an atmosphere's numbers | proposed |
+| [sesmax-land](sesmax_land.md) | a bucket of water, a column of heat, the surface energy balance | proposed |
+| [sesmax-ice](sesmax_ice.md) | a slab of sea ice, snow, a shallow ice sheet | proposed |
 | [sesmax-testing](sesmax_testing.md) | toy models, and the checks that say a model is right | proposed |
 | [sesmax-param](sesmax_param.md) | parameterizations, forcing, model error, priors | proposed |
 | [sesmax-experiment](sesmax_experiment.md) | a problem and its verbs: simulate, estimate, bilevel, twin | the run half is merged |
 | [the run](sesmax_experiment_run.md) | chunks, monitors, the record, checkpoints, restarts | merged, with proposals |
 | [scaling](sesmax_scaling.md) | devices, and six ways to split the work | proposed |
+| [scales](sesmax_multiscale.md) | space, time and spectrum as one operation, and climate as a fit to statistics | proposed |
 
 ## What this page settles
 
