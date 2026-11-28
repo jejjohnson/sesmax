@@ -591,6 +591,6 @@ SP-4 is about the mechanism only. A prior on a leaf means a parameter and its un
 
 - Part of: [the workspace packages](workspace_packages.md), step W5
 - Builds on: gridax, functax, kernellib, integrix, gaussx, geophysix, vardax
-- Depends on: [sesmax-testing](sesmax_testing.md) for its checks, and the ocean models of [the ocean plan](ocean.md)
+- Depends on: [sesmax-testing](sesmax_testing.md) for its checks, and the ocean models of [the ocean design](sesmax_ocean.md)
 - Feeds: [sesmax-experiment](sesmax_experiment.md)
 - Issues: sesmax#106, sesmax#114, sesmax#144

@@ -164,7 +164,7 @@ A check is a function of a model and a state that raises with the numbers when t
 | contract | `jit`, `vmap`, and the same numbers with arrays and located fields |
 
 Here $\mathbf{M} \in \mathbb{R}^{D_ x \times D_ x}$ is the tangent-linear model over a window, and $\mathbf{v}, \mathbf{w} \in \mathbb{R}^{D_ x}$ are random directions.
-The first two are the checks which found the defects in [the ocean plan](ocean.md). somax's own conservation, invariant and multilayer tests (30 in three files) pass at `9cb19b3` all the same; the mass test starts from a nearly uniform state and allows a drift of 1e-6.
+The first two are the checks which found the defects in [the ocean design](sesmax_ocean.md). somax's own conservation, invariant and multilayer tests (30 in three files) pass at `9cb19b3` all the same; the mass test starts from a nearly uniform state and allows a drift of 1e-6.
 
 vardax ships its own Lorenz-63 and Lorenz-96. It is below sesmax in the stack and cannot import ours, so the two stay separate.
 
@@ -299,7 +299,7 @@ A package costs a release, a CI job, a README and an icon, so a new one needs a 
 
 | Step | Pull requests | Gate |
 | --- | --- | --- |
-| W1 | public helpers of the core; the ocean models ([ocean plan](ocean.md)) | the equality test against somax |
+| W1 | public helpers of the core; the ocean models ([ocean design](sesmax_ocean.md)) | the equality test against somax |
 | W2 | `sesmax-testing`: the toys, then the checks | the moved tests and notebooks give the same numbers; the new checks run on every toy and every ocean model |
 | W3 | `sesmax-experiment`: monitors, checkpoints, the run loop | the run-loop design's checks |
 | W4 | the ocean's scenarios and configs; somax is archived | somax's configs give somax's first chunk |

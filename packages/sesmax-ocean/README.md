@@ -2,7 +2,7 @@
 
 **Simple ocean models in JAX: quasi-geostrophic, shallow-water and spherical models on [`sesmax-core`](../sesmax-core/README.md) and [`gridax`](https://github.com/jejjohnson/gridax).**
 
-The models and their run configs come from [somax](https://github.com/jejjohnson/somax) (commit `9cb19b3`), and each one reproduces somax's numbers to round-off, up to the fixes since, which the API pages list. The plan and its gates are in [the ocean design page](https://jejjohnson.github.io/sesmax/ocean/).
+The models and their run configs come from [somax](https://github.com/jejjohnson/somax) (commit `9cb19b3`), and each one reproduces somax's numbers to round-off, up to the fixes since, which the API pages list. The design and the gates of the move are in [the ocean design page](https://jejjohnson.github.io/sesmax/sesmax-ocean/).
 
 ## 🧱 What is here
 

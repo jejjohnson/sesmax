@@ -24,7 +24,7 @@ Status: proposed, for review. The checks below are prototyped in a scratch scrip
 
 ## Motivation
 
-The seven ocean models came from somax, where 30 conservation, invariant and multilayer tests passed. The port to sesmax found two defects in the shallow-water models all the same: the mass equation was wrong on the outermost ring of cells, and the Coriolis force was a quarter of its value in the first column of a periodic box. [The ocean plan](ocean.md) has the numbers.
+The seven ocean models came from somax, where 30 conservation, invariant and multilayer tests passed. The port to sesmax found two defects in the shallow-water models all the same: the mass equation was wrong on the outermost ring of cells, and the Coriolis force was a quarter of its value in the first column of a periodic box. [The ocean design](sesmax_ocean.md) has the numbers.
 
 The tests missed them for an ordinary reason. The mass test started from a nearly uniform state and allowed a drift of 1e-6, so a wrong tendency at the edge had nothing to act on. There was no test that moved the state across the edge of the box and asked for the same answer.
 
@@ -496,6 +496,6 @@ The core's own tests take `sesmax-testing` from the development group. 15 of its
 
 - Part of: [the workspace packages](workspace_packages.md), step W2
 - Builds on: pipekit-array (`testing`), pipekit-jax, gridax, diffrax
-- Uses the findings of: [the ocean plan](ocean.md)
+- Uses the findings of: [the ocean design](sesmax_ocean.md)
 - Used by: [sesmax-param](sesmax_param.md), [sesmax-experiment](sesmax_experiment.md)
 - Issues: sesmax#105, sesmax#107, sesmax#145, sesmax#173, sesmax#183, sesmax#185, sesmax#202

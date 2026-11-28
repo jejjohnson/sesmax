@@ -355,7 +355,7 @@ Each phase ships as its own PR (stacked, in this repository) and merges only whe
 | C2 Ocean (done, with a different gate) | `sesmax-ocean` from the ocean models, presets, `resolution`, `eval`, the runner and configs; its own design page first | every remaining somax test passes under `sesmax-ocean` with only import changes; the DUACS sea-surface-height benchmark from the esmax plan runs as a baseline |
 | C3 Levels (open, sesmax#29) | L1 in `_src/array.py`, `Step` and `simulate` behind `sesmax-core[geo]`, as geostack's SL-O2 decides | primitive modules import no carrier; `simulate` exposes `model.l1` |
 
-The gate of C2 was replaced by equality with somax's numbers, because the core had moved to gridax; [the ocean page](ocean.md) has it, and the DUACS baseline is sesmax#236. The runner went to `sesmax-experiment` and not to `sesmax_core.sim`.
+The gate of C2 was replaced by equality with somax's numbers, because the core had moved to gridax; [the ocean design](sesmax_ocean.md) has it, and the DUACS baseline is sesmax#236. The runner went to `sesmax-experiment` and not to `sesmax_core.sim`.
 C0 and C1 change no science.
 Releases follow release-please: `sesmax-core` starts at 0.1.0, and the umbrella's first release waits for `sesmax-ocean`.
 

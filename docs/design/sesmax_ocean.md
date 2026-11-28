@@ -21,7 +21,7 @@ Decided by the owner on 26 November: the package composes the machinery of the s
 Proposed, for review: the three changes of the section on the API, which are wind, drag and viscosity as terms of `sesmax-param`, the priors of a model registered through `Component`, and the metrics moved onto gridax and diagnostix.
 Proposed on 27 November, for review: a fourth, the observables of each model (sea-surface height and surface velocity) registered through `Component`, so that an experiment can read them along a track.
 Alternative to the first: keep the terms inside each `vector_field`, which is what runs today and needs no new package, but makes a different drag law a different model.
-Status: the models, scenarios and configs are merged at sesmax `a34e46c` and unreleased (version 0.0.0). [The ocean plan](ocean.md) has the history of the move from somax, the equality gate and the defects it found. This page is the design of the package.
+Status: the models, scenarios and configs are merged at sesmax `a34e46c` and unreleased (version 0.0.0). The section on where it came from has the history of the move from somax, the equality gate and the defects it found. This page is the design of the package.
 
 ## Motivation
 
@@ -529,8 +529,93 @@ Counted at sesmax `a34e46c`: 6,992 lines of source, 497 test functions in 37 fil
 | a QG prior against DUACS, as a benchmark | open | sesmax#236 |
 | the spectral models | open | sesmax#215 to sesmax#221 |
 | a release | not yet | release-please, with the umbrella |
+| archiving somax | open | sesmax#194 |
 
 Not available, and not planned here: a primitive-equation model, sea ice, tides, and open boundaries with relaxation (sesmax#233 asks for the last).
+
+## Where it came from
+
+The models were moved from somax at commit `9cb19b3` on 25 and 26 November 2026, by sesmax#163 to sesmax#213 under the epics sesmax#152 and sesmax#186. The alternative, rejected, was to keep the models on finitevolX until the move was over, which would have given one workspace two C-grid libraries. This section keeps what the move decided and what it found.
+
+### The equality gate
+
+The first gate of the move, "every remaining somax test passes with only import changes", could not be kept, because the core moved from finitevolX to gridax in the meantime.
+What replaced it is equality by numbers.
+
+`packages/sesmax-ocean/tests/reference/make_reference.py` runs somax at `9cb19b3` and writes the initial states, tendencies, end states and diagnostics of each model family to an `.npz` file.
+The `test_equal_to_somax.py` files compare the ported models with them, on arrays and on located fields, with land in the masked cases.
+A case passes at a relative 1e-12 in float64, and `SphericalQG` at 1e-9, since its streamfunction is solved to a tolerance.
+The configs have the same gate: each starts where somax's does, and its first 20 steps agree to 1e-12.
+
+Every fix below changed a number, so each is its own pull request after the port.
+That pull request puts somax's numerics back in a test subclass (`packages/sesmax-ocean/tests/support/somax_numerics.py`), so the rest of the model stays under the gate.
+
+Three differences from somax are by design and not defects.
+gridax reads no dry cell, so beside land the Laplacian takes no flux through a coast.
+The T rows of a spherical grid are at cell centres and the cell areas are exact, where somax's rows were half a cell too far south and its areas approximate.
+The default radius and rotation rate are geophysix's.
+
+### What the move found
+
+The port copied somax's numerics first and fixed them afterwards, each fix with a test that fails before it.
+All of these were in somax at `9cb19b3`.
+
+| Defect | Models | Fixed by |
+| --- | --- | --- |
+| mass is not conserved: no flux through the edge faces | shallow water, spherical shallow water | sesmax#171 |
+| the momentum tendency reads unfilled ghosts at a periodic edge | shallow water | sesmax#174 |
+| the viscous term diffuses a velocity as a tracer | shallow water | sesmax#175 |
+| the Coriolis parameter is half a cell too far north | `SphericalSWM` | sesmax#176 |
+| the velocity and the fluxes at the edges of the band | `SphericalQG` | sesmax#177 |
+| the Coriolis term is halved beside walls and coasts | shallow water | sesmax#182 |
+| a tendency on two of the walls adds up there | shallow water | sesmax#184 |
+| the states a run returns have unfilled ghosts | every model, in the core | sesmax#201 |
+| the potential vorticity is not held on all four walls | QG | sesmax#213 |
+
+The first two were found by the trial port below; the others by the checks written since.
+The mass defect measured 1.3 % (walls) and 0.3 % (periodic) of the sum of the absolute tendencies on a random state, and 2e-18 and 8e-18 after the fix.
+The same wall defect is still open in the core's linear toys (sesmax#202).
+The conservation, translation and boundary tests that found them live in this package's tests today, written for three models by name; [`sesmax-testing`](sesmax_testing.md) makes them one check for any model.
+
+One test of somax passed for the wrong reason: `pv_inversion` inverted the initial state of a run, which is zero for every barotropic model. Here it inverts a random field.
+
+### The trial port, before the move
+
+This section is the evidence the decision rested on, kept as it was written on 25 November.
+
+We ran all seven models of somax `9cb19b3` through a thin adapter from the old class names onto gridax v0.3.1 and sesmax-core `566b3c7`, with array states, and compared them with somax on finitevolX `c6f3d99`.
+Each case is a 32 × 24 grid with random initial fields, in float64, with and without a mask, and 20 Heun steps (5 for the spherical QG model).
+The masks were all water by a mistake in the script; the equality tests of the package have land.
+The numbers are the largest difference over the interior cells divided by the largest value of somax's array, over every case of a model.
+
+| Model | Tendency | End state | Diagnostics |
+| --- | --- | --- | --- |
+| Barotropic QG | 6.5e-16 | 8.5e-17 | 1.6e-15 |
+| Baroclinic QG | 6.5e-15 | 4.4e-16 | 9.0e-15 |
+| Reparameterized QG | 2.5e-14 | 1.3e-14 | 2.4e-14 |
+| Nonlinear shallow water | 2.5e-16 | 9.8e-17 | 9.8e-16 |
+| Multilayer shallow water | 1.8e-16 | 2.8e-15 | 1.8e-15 |
+| Spherical shallow water, shifted | 8.3e-16 | 1.9e-16 | 5.6e-4 |
+| Spherical QG, shifted | 6.5e-12 | 1.3e-13 | 5.6e-4 |
+
+The shallow-water cases cover a periodic box and walls, with `upwind1` and `weno5`.
+"Shifted" means that somax runs with its latitude range moved north by half a cell, which puts its rows where gridax has them; without it the spherical tendencies differ by about 0.2.
+The 5.6e-4 is in the area-weighted diagnostics only, and it is the difference between approximate and exact cell areas. The fields themselves agree, at the tolerance of the CG solve (1e-10) for the QG model.
+
+So the move is mechanical, and equality to round-off is a gate we can ask for.
+Not covered: gradients, located fields, float32, and a state with velocities on land.
+
+### Decisions of the move
+
+Decided on 25 November 2026, and kept.
+
+| ID | Question | Decision | What happened |
+| --- | --- | --- | --- |
+| OC-1 | The C2 gate | equality by numbers | the `test_equal_to_somax.py` files |
+| OC-2 | Located fields in the ocean states | from the first port: arrays and `CField`s | both are tested |
+| OC-3 | The defects | copy, then fix in the same stack, with the numbers before and after | nine fixes, each its own pull request |
+| OC-4 | Runner | after the models | W3 and W4 followed W1 |
+| OC-5 | `sesmax-testing` | after the models | not started; its design is [its own page](sesmax_testing.md) |
 
 ## Open questions
 
@@ -562,7 +647,6 @@ Not available, and not planned here: a primitive-equation model, sea ice, tides,
 ## Relationships
 
 - Part of: [the workspace packages](workspace_packages.md), a component at tier 2 of its proposal
-- History: [the ocean plan](ocean.md), which has the move from somax, the equality gate and the defects
 - Builds on: `sesmax-core`, gridax, gaussx, geophysix
 - Feeds: [sesmax-testing](sesmax_testing.md), [sesmax-param](sesmax_param.md), [sesmax-experiment](sesmax_experiment.md)
 - Issues: sesmax#104, sesmax#115, sesmax#152, sesmax#166, sesmax#186, sesmax#214, sesmax#233, sesmax#236
