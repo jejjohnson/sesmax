@@ -76,6 +76,9 @@ project:
         - file: design/sesmax_workspace.md
         - file: design/sesmax_core.md
         - file: design/sesmax_ocean.md
+        - file: design/sesmax_atmos.md
+        - file: design/sesmax_land.md
+        - file: design/sesmax_ice.md
         - file: design/sesmax_testing.md
         - file: design/sesmax_param.md
         - file: design/sesmax_experiment.md

@@ -68,7 +68,7 @@ flowchart TD
     ebm1 -->|"the global mean"| ebm0
 ```
 
-**The dynamic branch is the ocean's.** A layer of air of constant potential temperature obeys the shallow-water equations, with the depth of the layer for $H$ and a reduced gravity $g' = g \Delta\theta / \theta$ between two layers. Nothing in the equations of [the ocean design](sesmax_ocean.md) changes. What changes is the numbers:
+**The dynamic branch is the ocean's** ([Vallis, 2017](https://doi.org/10.1017/9781107588417)). A layer of air of constant potential temperature obeys the shallow-water equations, with the depth of the layer for $H$ and a reduced gravity $g' = g \Delta\theta / \theta$ between two layers. Nothing in the equations of [the ocean design](sesmax_ocean.md) changes. What changes is the numbers:
 
 | | Upper ocean | Troposphere |
 | --- | --- | --- |
@@ -387,7 +387,6 @@ A0 to A2 depend on no decision that is open. A3 waits for SA-1.
 ## References
 
 - Budyko, M. I. (1969). [The effect of solar radiation variations on the climate of the Earth](https://doi.org/10.3402/tellusa.v21i5.10109). *Tellus* 21, 611–619.
-- Frierson, D. M. W., Held, I. M. and Zurita-Gotor, P. (2006). [A gray-radiation aquaplanet moist GCM. Part I: static stability and eddy scale](https://doi.org/10.1175/JAS3753.1). *Journal of the Atmospheric Sciences* 63, 2548–2566.
 - Held, I. M. and Suarez, M. J. (1994). [A proposal for the intercomparison of the dynamical cores of atmospheric general circulation models](https://hdl.handle.net/10.1175/1520-0477(1994)075<1825:APFTIO>2.0.CO;2). *Bulletin of the American Meteorological Society* 75, 1825–1830.
 - North, G. R. (1975). [Theory of energy-balance climate models](https://hdl.handle.net/10.1175/1520-0469(1975)032<2033:TOEBCM>2.0.CO;2). *Journal of the Atmospheric Sciences* 32, 2033–2043.
 - Phillips, N. A. (1956). [The general circulation of the atmosphere: a numerical experiment](https://doi.org/10.1002/qj.49708235202). *Quarterly Journal of the Royal Meteorological Society* 82, 123–164.
