@@ -1,6 +1,6 @@
 """Rules that hold across the workspace's packages.
 
-The tiers of ``docs/design/workspace_and_core.md`` are enforced here: the core
+The tiers of ``docs/design/sesmax_workspace.md`` are enforced here: the core
 imports no component and nothing from somax, and the umbrella holds no code.
 The import check reads the sources rather than importing them, so it also
 catches an import inside a function body.

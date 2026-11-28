@@ -21,7 +21,7 @@
 📓 [Tutorials](https://jejjohnson.github.io/sesmax/steps-to-navier-stokes/) ·
 📚 [API reference](https://jejjohnson.github.io/sesmax/reference/) ·
 🗂️ [Capability index](https://jejjohnson.github.io/sesmax/reference/capabilities/) ·
-🧭 [Design](https://jejjohnson.github.io/sesmax/workspace-and-core/)
+🧭 [Design](https://jejjohnson.github.io/sesmax/sesmax-workspace/)
 
 </div>
 
@@ -231,7 +231,7 @@ The [core's README](packages/sesmax-core/README.md) inverts for an unknown sourc
 | 1 | `sesmax-atmos`, `sesmax-land`, `sesmax-ice` | one component each | later |
 | 0 | [`sesmax-core`](packages/sesmax-core/README.md) | states, terms, forcing, rescaling, rollouts, assimilation adapters | released (0.1.0) |
 
-Imports point down the tiers. Two components never import each other: what they share goes into the core, and what couples them goes into the coupler. The phases and their gates are in the [workspace and core design](https://jejjohnson.github.io/sesmax/workspace-and-core/), and the components after the ocean are in geostack's [plan for the Earth-system workspace](https://github.com/jejjohnson/geostack/blob/main/docs/design/esmax.md) (written when the name was esmax). The land and the ice only start when they have real code.
+Imports point down the tiers. Two components never import each other: what they share goes into the core, and what couples them goes into the coupler. The phases and their gates are in the [workspace overview](https://jejjohnson.github.io/sesmax/sesmax-workspace/), and the components after the ocean are in geostack's [plan for the Earth-system workspace](https://github.com/jejjohnson/geostack/blob/main/docs/design/esmax.md) (written when the name was esmax). The land and the ice only start when they have real code.
 
 somax stays the working ocean package until `sesmax-ocean` is in.
 
@@ -251,7 +251,7 @@ somax stays the working ocean package until `sesmax-ocean` is in.
 - **[Documentation](https://jejjohnson.github.io/sesmax/)**: the home page, the guides and the executed notebooks.
 - **[API reference](https://jejjohnson.github.io/sesmax/reference/)**: one page per public module, generated from the docstrings.
 - **[Capability index](https://jejjohnson.github.io/sesmax/reference/capabilities/)**: every public name once, with a one-line summary, together with the names of the main libraries underneath.
-- **[Design](https://jejjohnson.github.io/sesmax/workspace-and-core/)**: the workspace, what moves from somax, the phases and the gates.
+- **[Design](https://jejjohnson.github.io/sesmax/sesmax-workspace/)**: the packages, their tiers and the order of work, with a page per package.
 
 ## 🧩 Ecosystem
 

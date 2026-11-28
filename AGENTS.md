@@ -6,7 +6,7 @@ Standing instructions for **every** coding agent working in this repository
 
 ## What this repo is
 
-sesmax ("simple Earth-system models in JAX") is a uv workspace of packages whose models are cheap, differentiable forward models to use as priors in short-window data assimilation (a window of hours to weeks). The plan, the phases and what moves here from [somax](https://github.com/jejjohnson/somax) are in [`docs/design/workspace_and_core.md`](docs/design/workspace_and_core.md); read it before changing the layout.
+sesmax ("simple Earth-system models in JAX") is a uv workspace of packages whose models are cheap, differentiable forward models to use as priors in short-window data assimilation (a window of hours to weeks). The packages, their tiers and the order of work are in [`docs/design/sesmax_workspace.md`](docs/design/sesmax_workspace.md); read it before changing the layout. What moved here from [somax](https://github.com/jejjohnson/somax), with the renames and the phases, is in [`docs/design/sesmax_core.md`](docs/design/sesmax_core.md).
 
 People build on the core, so **the core is a library of primitives**: new code composes what is here, and anything genuinely new lands where the next person will find and reuse it.
 
@@ -150,7 +150,7 @@ diff <(git -C ../somax show 9cb19b3:somax/_src/core/types.py | sed -f scripts/so
 
 The diff may show only the changes allowed above (imports, the four renames, docstrings that say "somax", behaviour-neutral lint or type fixes). The somax tests for the module are copied to the same relative path under `packages/sesmax-core/tests/`. The commit message names the source: `Moved from somax 9cb19b3: somax/_src/core/types.py`.
 
-The ocean models (phase C2, [`docs/design/ocean.md`](docs/design/ocean.md)) also move from finitevolX to gridax, so a diff cannot check them. Instead a ported model has to give somax's numbers: `packages/sesmax-ocean/tests/reference/make_reference.py` runs somax at `9cb19b3` and writes arrays, and the `test_equal_to_somax.py` files compare tendencies, end states and diagnostics with them to a relative 1e-12 in float64, on arrays and on located fields. A change that moves a number is its own PR, after the port; that PR puts somax's numerics back in a test subclass (`packages/sesmax-ocean/tests/support/somax_numerics.py`), so the rest of the model stays under the gate.
+The ocean models (phase C2, [`docs/design/sesmax_ocean.md`](docs/design/sesmax_ocean.md)) also move from finitevolX to gridax, so a diff cannot check them. Instead a ported model has to give somax's numbers: `packages/sesmax-ocean/tests/reference/make_reference.py` runs somax at `9cb19b3` and writes arrays, and the `test_equal_to_somax.py` files compare tendencies, end states and diagnostics with them to a relative 1e-12 in float64, on arrays and on located fields. A change that moves a number is its own PR, after the port; that PR puts somax's numerics back in a test subclass (`packages/sesmax-ocean/tests/support/somax_numerics.py`), so the rest of the model stays under the gate.
 
 ### The public API
 

@@ -2,7 +2,7 @@
 
 **What is done with a [sesmax](https://github.com/jejjohnson/sesmax) model: runs in chunks, with monitors and checkpoints.**
 
-The run loop is moving here from [somax](https://github.com/jejjohnson/somax) (commit `9cb19b3`), as a pipeline on [pipekit](https://github.com/jejjohnson/pipekit). The design is in [the run-loop page](https://jejjohnson.github.io/sesmax/run-loop/); the progress is in [sesmax#186](https://github.com/jejjohnson/sesmax/issues/186). The package names no component of the Earth system: a component registers its models through `sesmax_core.component.Component`.
+The run loop moved here from [somax](https://github.com/jejjohnson/somax) (commit `9cb19b3`), as a pipeline on [pipekit](https://github.com/jejjohnson/pipekit). The design is in [the page on the run](https://jejjohnson.github.io/sesmax/sesmax-experiment-run/); the move was [sesmax#186](https://github.com/jejjohnson/sesmax/issues/186). The package names no component of the Earth system: a component registers its models through `sesmax_core.component.Component`.
 
 ## 🧱 What is here
 

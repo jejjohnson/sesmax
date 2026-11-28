@@ -26,9 +26,19 @@ numbering:
 Proposed: give the workspace five kinds of package. `sesmax-core` holds the contracts, `sesmax-param` the parametric part of a model (parameterizations, forcing and model error), each component of the Earth system is a package of models, `sesmax-testing` says whether a model is right, and `sesmax-experiment` is where models are used: simulation, parameter estimation, state estimation, bilevel problems and monitoring.
 Benchmarks, which say whether a model is good, live in the planned geobench repository.
 Alternative: keep one core and add modules to it as needed (`sesmax_core.testing`, `sesmax_core.sim`), which is fewer releases, but the core then carries every toy and every workflow to anyone who only wants the model contract.
-Status: proposed, for review. The ocean models of W1 are merged (sesmax#152), and so is the start of W3 (sesmax#197, sesmax#198); the rest is not started. The owner has settled six points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, the ocean models come before the split, and a prior sits with what it describes, so those of parameterizations in param and those of models in their component (25 November). A seventh came on 26 November: sesmax composes the machinery of the stack instead of writing its own, so a missing piece is added first to the package that owns it, and each design page says which.
+Status: proposed, for review. The ocean models of W1 are merged (sesmax#152), and so are the run loop of W3 and the scenarios of W4 (sesmax#186); W2, W5 and W6 are not started. The owner has settled six points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, the ocean models come before the split, and a prior sits with what it describes, so those of parameterizations in param and those of models in their component (25 November). A seventh came on 26 November: sesmax composes the machinery of the stack instead of writing its own, so a missing piece is added first to the package that owns it, and each design page says which.
 
-Each new package has its own design page, with the motivation, the maths, the numerics, the API, examples and a prototype: [sesmax-testing](sesmax_testing.md), [sesmax-param](sesmax_param.md) and [sesmax-experiment](sesmax_experiment.md). This page says what the packages are and how they depend on each other.
+This page says what the packages are and how they depend on each other. Each package has its own design page, with the motivation, the maths, the numerics, the API, examples and what was measured.
+
+| Page | Covers | State of the package |
+| --- | --- | --- |
+| [sesmax-core](sesmax_core.md) | the model contract, terms, scales, adapters; the move from somax | released, 0.3.1 |
+| [sesmax-ocean](sesmax_ocean.md) | seven ocean models, scenarios, checks; the move from somax | merged, unreleased |
+| [sesmax-testing](sesmax_testing.md) | toy models, and the checks that say a model is right | proposed |
+| [sesmax-param](sesmax_param.md) | parameterizations, forcing, model error, priors | proposed |
+| [sesmax-experiment](sesmax_experiment.md) | a problem and its verbs: simulate, estimate, bilevel, twin | the run half is merged |
+| [the run](sesmax_experiment_run.md) | chunks, monitors, the record, checkpoints, restarts | merged, with proposals |
+| [scaling](sesmax_scaling.md) | devices, and six ways to split the work | proposed |
 
 ## What this page settles
 
@@ -83,7 +93,7 @@ The forcing is the one part whose move lightens the install, as nothing else in 
 The core gains two things the other packages need.
 
 - **Public helpers.** The positivity checks, the Burger-number helpers, the diagnostics bridge, and `each`, `values` and `placed` for located fields are private today, and every component needs them.
-- **`Component`.** The small type in [the run-loop design](run_loop.md) through which a component registers its models, checks and units. It sits in the core so that a component can register without importing `sesmax-experiment`.
+- **`Component`.** The small type in [the run-loop design](sesmax_experiment_run.md) through which a component registers its models, checks and units. It sits in the core so that a component can register without importing `sesmax-experiment`.
 
 (param)=
 ## sesmax-param: what do the resolved dynamics not supply?
@@ -164,7 +174,7 @@ A check is a function of a model and a state that raises with the numbers when t
 | contract | `jit`, `vmap`, and the same numbers with arrays and located fields |
 
 Here $\mathbf{M} \in \mathbb{R}^{D_ x \times D_ x}$ is the tangent-linear model over a window, and $\mathbf{v}, \mathbf{w} \in \mathbb{R}^{D_ x}$ are random directions.
-The first two are the checks which found the defects in [the ocean plan](ocean.md). somax's own conservation, invariant and multilayer tests (30 in three files) pass at `9cb19b3` all the same; the mass test starts from a nearly uniform state and allows a drift of 1e-6.
+The first two are the checks which found the defects in [the ocean design](sesmax_ocean.md). somax's own conservation, invariant and multilayer tests (30 in three files) pass at `9cb19b3` all the same; the mass test starts from a nearly uniform state and allows a drift of 1e-6.
 
 vardax ships its own Lorenz-63 and Lorenz-96. It is below sesmax in the stack and cannot import ours, so the two stay separate.
 
@@ -211,7 +221,7 @@ It owns no method. Every algorithm in the table above already has a home, and th
 
 - **The problem.** One object says which leaves of a model, a state and a forcing are unknown, and reads the priors that `sesmax-param` and the component put on them. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
 - **The work.** A thin function per row that takes a problem, hands it to a method and returns the estimate with a record.
-- **The run.** The chunk loop, checkpoints, restarts, run specs, artifacts and the command line of [the run-loop design](run_loop.md), which become the simulation part of this package.
+- **The run.** The chunk loop, checkpoints, restarts, run specs, artifacts and the command line of [the run-loop design](sesmax_experiment_run.md), which become the simulation part of this package.
 - **The monitoring.** The monitors of a run, and the statistics of an analysis (innovations, spread against skill) with the same verdict and the same record.
 - **Twin experiments.** Truth from a model, observations from the truth, an estimate, and its error against the truth.
 
@@ -295,13 +305,63 @@ Timing the steppers (sesmax#107) compares our own code with itself and stays in 
 
 A package costs a release, a CI job, a README and an icon, so a new one needs a second user or a different set of dependencies.
 
+## The repository
+
+The repository holds one uv workspace, like pyrox: a root project that is never published and one directory per distribution under `packages/`.
+Each distribution is imported as `sesmax_<part>`, and imports only point down the tiers.
+
+```mermaid
+flowchart TD
+    couple["sesmax-couple<br/>tier 2 · later"]
+    ocean["sesmax-ocean<br/>tier 1 · merged"]
+    exp["sesmax-experiment<br/>tier 1 · merged"]
+    atmos["sesmax-atmos<br/>tier 1 · later"]
+    core["sesmax-core<br/>tier 0 · 0.3.1"]
+    stack["gridax · integrix · functax · geophysix · gaussx<br/>spectraldiffx · geonnax · pipekit<br/>filterax · vardax (extras)"]
+    umbrella["sesmax<br/>code-free umbrella"]
+    couple --> ocean
+    couple --> atmos
+    ocean --> core
+    exp --> core
+    atmos --> core
+    core --> stack
+    umbrella -.installs.-> core
+    umbrella -.installs.-> ocean
+    umbrella -.installs.-> exp
+```
+
+The tree after phase C1 (the scaffold plus the core); `packages/sesmax-ocean/` and `packages/sesmax-experiment/` have joined it since:
+
+```text
+sesmax/
+├── pyproject.toml              # sesmax-workspace, never published; [tool.uv.workspace]
+├── uv.lock
+├── release-please-config.json  # one entry per package, component tags
+├── .release-please-manifest.json
+├── Makefile
+├── AGENTS.md  CLAUDE.md  CODE_REVIEW.md  README.md
+├── docs/                       # one site for the workspace (MyST + MkDocs API)
+│   ├── design/                 # one page per package, and this one
+│   └── api/                    # one page per public sesmax_core module
+├── scripts/capabilities.py     # workspace-aware, after pyrox's PACKAGES table
+└── packages/
+    ├── sesmax-core/
+    │   ├── pyproject.toml
+    │   ├── README.md  CHANGELOG.md
+    │   ├── src/sesmax_core/
+    │   └── tests/
+    └── sesmax/                 # umbrella: dependencies only, no code
+        ├── pyproject.toml
+        └── src/sesmax/__init__.py   # __version__ only
+```
+
 ## Order of work
 
 | Step | Pull requests | Gate |
 | --- | --- | --- |
-| W1 | public helpers of the core; the ocean models ([ocean plan](ocean.md)) | the equality test against somax |
+| W1 | public helpers of the core; the ocean models ([ocean design](sesmax_ocean.md)) | the equality test against somax |
 | W2 | `sesmax-testing`: the toys, then the checks | the moved tests and notebooks give the same numbers; the new checks run on every toy and every ocean model |
-| W3 | `sesmax-experiment`: monitors, checkpoints, the run loop | the run-loop design's checks |
+| W3 | `sesmax-experiment`: monitors, checkpoints, the run loop (merged) | the run-loop design's checks |
 | W4 | the ocean's scenarios and configs; somax is archived | somax's configs give somax's first chunk |
 | W5 | `sesmax-param`: the forcing, drag and damping move; one hierarchy; model error; the ocean models as sums of terms | the moved tests; the reference check of every ocean model, unchanged |
 | W6 | `sesmax-experiment`: problems, estimation, bilevel, twins | its own design page |
@@ -324,6 +384,6 @@ W5 comes after the port, which needs models with their physics inside to compare
 
 ## Relationships
 
-- Changes: [the workspace and core design](workspace_and_core.md) (its tier table and C2 to C3 rows) and [the run-loop design](run_loop.md) (`sesmax_core.sim` becomes `sesmax_experiment`). Both keep their text until this page is accepted.
+- History: the plan of 30 October for the workspace and the core is in [the core design](sesmax_core.md), in its section on where it came from.
 - Needs in geostack: the layer map and the dependency graph list the new packages.
 - Related: sesmax#29 (levels), sesmax#105, sesmax#106 (scale-selective stabilisation, a parameterization), sesmax#107, sesmax#114 (bases from functax), somax#213 (hybrid terms), somax#234 (atmosphere and coupling).

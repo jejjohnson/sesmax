@@ -10,7 +10,7 @@
 #   layer:*  — which implementation layer (if the project has a layer stack)
 #   type:*   — left to issue templates (NOT auto-applied on PRs)
 #
-# The layer:* scopes are the workspace's tiers (docs/design/workspace_and_core.md).
+# The layer:* scopes are the workspace's tiers (docs/design/sesmax_workspace.md).
 
 "area:engineering":
   - changed-files:

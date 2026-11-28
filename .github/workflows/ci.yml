@@ -41,7 +41,7 @@ jobs:
 
   # Each package installed alone into a clean venv, with no workspace around
   # it: proves its base install is complete, that it imports no package above
-  # its tier (docs/design/workspace_and_core.md), and that no optional extra
+  # its tier (docs/design/sesmax_workspace.md), and that no optional extra
   # is pulled in. The stack's git pins only resolve together with the
   # workspace's override-dependencies (gaussx, pipekit), so those are passed
   # in, read from the root pyproject.toml.

@@ -12,7 +12,7 @@
 
 📖 [Documentation](https://jejjohnson.github.io/sesmax/) ·
 📚 [API reference](https://jejjohnson.github.io/sesmax/reference/) ·
-🧭 [Design](https://jejjohnson.github.io/sesmax/workspace-and-core/)
+🧭 [Design](https://jejjohnson.github.io/sesmax/sesmax-workspace/)
 
 </div>
 

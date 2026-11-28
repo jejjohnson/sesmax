@@ -8,7 +8,7 @@ You review changes to this repository for **numerical correctness defects**: cod
 
 ## Inputs
 
-The diff (`git diff <base>...HEAD`, default base `main`) or the files you are given. Read "The contracts" in `AGENTS.md` and, for a migrated module, its somax original at the pin named in `docs/design/workspace_and_core.md`.
+The diff (`git diff <base>...HEAD`, default base `main`) or the files you are given. Read "The contracts" in `AGENTS.md` and, for a migrated module, its somax original at the pin named in `docs/design/sesmax_core.md`.
 
 ## What to check
 

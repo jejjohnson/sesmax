@@ -8,7 +8,7 @@ commands, the pre-commit checklist, the two-tool docs, git and PR rules).
 The essentials, in case you only read this file:
 
 - A uv workspace: one package per directory under `packages/` (`sesmax-core` in tier 0, components such as `sesmax-ocean` in tier 1, a coupler in tier 2, and the code-free umbrella `sesmax`). A package imports only packages below its tier (`tests/test_workspace.py`). Search [`docs/api/capabilities.md`](../docs/api/capabilities.md) before writing a helper.
-- The plan, the phases and what moves from somax are in [`docs/design/workspace_and_core.md`](../docs/design/workspace_and_core.md); code copied from somax keeps its behaviour and changes only imports and the listed renames.
+- The packages and their tiers are in [`docs/design/sesmax_workspace.md`](../docs/design/sesmax_workspace.md), and what moved from somax, with the renames, in [`docs/design/sesmax_core.md`](../docs/design/sesmax_core.md); code copied from somax keeps its behaviour and changes only imports and the listed renames.
 - Model steps are pure functions of state, parameters and forcing that `jit`, `grad` and `vmap` go through; optional dependencies sit behind an extra and raise an `ImportError` naming it. The contracts for models, terms, forcing, DA adapters and monitors are in `AGENTS.md`.
 
 The rules for every project:

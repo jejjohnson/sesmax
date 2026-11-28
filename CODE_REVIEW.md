@@ -63,7 +63,7 @@ they cannot see.
 ### 2. The contracts
 
 - **Migrated code** from somax changes only its imports and the renames in
-  `docs/design/workspace_and_core.md`, and the commit message names the
+  `docs/design/sesmax_core.md`, and the commit message names the
   somax commit it came from; a behaviour change hidden in a move is a
   **High** finding.
 - **Model steps** are pure functions of state, parameters and forcing that

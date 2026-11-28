@@ -23,7 +23,7 @@ Proposed on 26 November, for review: forcing, covariate and control name three d
 Decided by the owner on 26 November: sesmax composes the machinery of the stack and does not write its own. A piece that is missing is added first to the package that owns the concept, and the section on what this package builds on says which piece goes where.
 Recommended for what is open: a prior here is attached to its leaf (SP-4).
 Alternative: a `priors()` method on each term, which leaves the leaves plain and writes each name twice.
-Status: proposed, for review. The numbers below are from a scratch prototype; the package is not started. It is step W5 of [the workspace packages](workspace_packages.md).
+Status: proposed, for review. The numbers below are from a scratch prototype; the package is not started. It is step W5 of [the workspace packages](sesmax_workspace.md).
 
 ## Motivation
 
@@ -589,8 +589,8 @@ SP-4 is about the mechanism only. A prior on a leaf means a parameter and its un
 
 ## Relationships
 
-- Part of: [the workspace packages](workspace_packages.md), step W5
+- Part of: [the workspace packages](sesmax_workspace.md), step W5
 - Builds on: gridax, functax, kernellib, integrix, gaussx, geophysix, vardax
-- Depends on: [sesmax-testing](sesmax_testing.md) for its checks, and the ocean models of [the ocean plan](ocean.md)
+- Depends on: [sesmax-testing](sesmax_testing.md) for its checks, and the ocean models of [the ocean design](sesmax_ocean.md)
 - Feeds: [sesmax-experiment](sesmax_experiment.md)
 - Issues: sesmax#106, sesmax#114, sesmax#144
