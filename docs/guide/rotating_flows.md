@@ -10,7 +10,7 @@ Rotation is what makes a flow geophysical. The Coriolis force turns whatever mov
 | [17](../notebooks/step17_shallow_water_2d.ipynb) | The double gyre, with gravity waves | `NonlinearShallowWater2D` |
 | [18](../notebooks/step18_barotropic_qg.ipynb) | The double gyre, without them | `BarotropicQG` |
 
-The models of steps 14 to 16 are test problems in `sesmax_core.testing`, and those of steps 17 and 18 are the ocean's, in `sesmax_ocean.swm` and `sesmax_ocean.qg`.
+The models of steps 14 to 16 are test problems in `sesmax_core.testing`, and those of steps 17 and 18 are the ocean's, in `sesmax_ocean.swm` and `sesmax_ocean.qg`. [The double gyre](../notebooks/doublegyre_barotropic_qg.ipynb) runs the model of step 18 for eight years at a lower viscosity, until its two gyres stop being mirror images.
 
 ## Balance
 
