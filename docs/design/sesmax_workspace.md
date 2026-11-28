@@ -42,6 +42,7 @@ This page says what the packages are and how they depend on each other. Each pac
 | [sesmax-experiment](sesmax_experiment.md) | a problem and its verbs: simulate, estimate, bilevel, twin | the run half is merged |
 | [the run](sesmax_experiment_run.md) | chunks, monitors, the record, checkpoints, restarts | merged, with proposals |
 | [scaling](sesmax_scaling.md) | devices, and six ways to split the work | proposed |
+| [scales](sesmax_multiscale.md) | space, time and spectrum as one operation, and climate as a fit to statistics | proposed |
 
 ## What this page settles
 
