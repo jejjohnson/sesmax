@@ -1,6 +1,6 @@
 [project]
 name = "sesmax-experiment"
-version = "0.0.0"
+version = "0.1.0"
 description = "Runs of sesmax models: a chunked run loop, its monitors and its checkpoints."
 authors = [
     {name = "J. Emmanuel Johnson", email = "jemanjohnson34@gmail.com"},

@@ -1,3 +1,5 @@
 {
-  "packages/sesmax-core": "0.3.1"
+  "packages/sesmax-core": "0.4.0",
+  "packages/sesmax-experiment": "0.1.0",
+  "packages/sesmax-ocean": "0.1.0"
 }

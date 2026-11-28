@@ -1,6 +1,6 @@
 [project]
 name = "sesmax-ocean"
-version = "0.0.0"
+version = "0.1.0"
 description = "Simple ocean models in JAX: quasi-geostrophic, shallow-water and spherical models on sesmax-core."
 authors = [
     {name = "J. Emmanuel Johnson", email = "jemanjohnson34@gmail.com"},
