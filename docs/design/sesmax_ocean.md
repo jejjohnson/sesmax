@@ -20,6 +20,7 @@ Decided on 25 November 2026, and built: `sesmax-ocean` is the ocean component of
 Decided by the owner on 26 November: the package composes the machinery of the stack and writes none. Stencils come from gridax, solves from `sesmax-core` and gaussx, constants from geophysix, and scores from diagnostix.
 Proposed, for review: the three changes of the section on the API, which are wind, drag and viscosity as terms of `sesmax-param`, the priors of a model registered through `Component`, and the metrics moved onto gridax and diagnostix.
 Proposed on 27 November, for review: a fourth, the observables of each model (sea-surface height and surface velocity) registered through `Component`, so that an experiment can read them along a track.
+Proposed on 28 November, for review: the page opens its maths with the family of models, from the Navier–Stokes equations down, and names the one hole in it. The 1.5-layer quasi-geostrophic model of sesmax#233 is the model for mapping sea-surface height and is not built. The two-dimensional Navier–Stokes equation needs no new class, since it is `BarotropicQG` with `beta=0`, and gets a named scenario of decaying turbulence.
 Alternative to the first: keep the terms inside each `vector_field`, which is what runs today and needs no new package, but makes a different drag law a different model.
 Status: the models, scenarios and configs are merged at sesmax `a34e46c` and unreleased (version 0.0.0). The section on where it came from has the history of the move from somax, the equality gate and the defects it found. This page is the design of the package.
 
@@ -63,6 +64,85 @@ What the move to sesmax adds is that they share one contract with every other co
 ## Background: the maths
 
 Throughout, $(x, y)$ are the eastward and northward coordinates, $t$ is time, $f = f_ 0 + \beta y$ is the Coriolis parameter, $g$ gravity, $\nu$ a lateral viscosity, $\kappa$ a linear bottom drag and $\tau_ 0$ the amplitude of the wind.
+
+### The family, from the full equations down
+
+Every model of this package is the same fluid with something assumed away. The fluid is sea water on a rotating planet, and its equations are the Navier–Stokes equations. In the form that ocean models start from, with the Boussinesq and the traditional approximations already made, they are
+
+```math
+\frac{D \mathbf{v}}{D t} + f \hat{\mathbf{z}} \times \mathbf{v} = -\frac{1}{\rho_0} \nabla p + b \hat{\mathbf{z}} + \nu \nabla^2 \mathbf{v}
+```
+
+```math
+\nabla \cdot \mathbf{v} = 0
+```
+
+```math
+\frac{D b}{D t} = \kappa_b \nabla^2 b
+```
+
+where $\mathbf{v} = (u, v, w)$ is the velocity in three dimensions, $D / D t = \partial_ t + \mathbf{v} \cdot \nabla$ the derivative along the flow, $p$ the pressure, $\rho_ 0$ a reference density, $b = -g (\rho - \rho_ 0) / \rho_ 0$ the buoyancy and $\kappa_ b$ its diffusivity. Nobody runs these for a basin: a grid that resolves convection over an ocean is out of reach. Each step down the family removes a kind of motion, and with it a time scale that the step would have had to resolve.
+
+```mermaid
+flowchart TD
+    ns["Navier–Stokes<br/>compressible, rotating, stratified<br/>not planned"]
+    bq["Boussinesq, non-hydrostatic<br/>u, v, w, b in three dimensions<br/>not planned"]
+    pe["primitive equations<br/>hydrostatic, continuous in depth<br/>not planned"]
+    msw["layered shallow water<br/>h, u, v per layer<br/>MultilayerShallowWater2D"]
+    sw["shallow water, one layer<br/>h, u, v<br/>NonlinearShallowWater2D, SphericalSWM"]
+    rg["reduced-gravity shallow water<br/>the same class, with g′ for g"]
+    lsw["linear shallow water<br/>LinearShallowWater2D, a toy of the core"]
+    lqg["layered quasi-geostrophy<br/>q per layer<br/>BaroclinicQG, ReparameterizedQG"]
+    eb["1.5-layer quasi-geostrophy<br/>one q, with a deformation radius<br/>open: sesmax#233"]
+    bt["barotropic quasi-geostrophy<br/>one q<br/>BarotropicQG, SphericalQG"]
+    ns2["2-D Navier–Stokes, vorticity form<br/>BarotropicQG with β = 0<br/>IncompressibleNS2D, a toy of the core"]
+    ns -->|"density varies little<br/>no sound waves"| bq
+    bq -->|"thin: (H/L)² ≪ 1<br/>no convection"| pe
+    pe -->|"layers of constant density<br/>no mixing"| msw
+    msw -->|"one layer"| sw
+    sw -->|"a deep resting layer below"| rg
+    sw -->|"small amplitude<br/>no advection"| lsw
+    msw -->|"Ro ≪ 1, Bu ~ 1<br/>no gravity waves"| lqg
+    lqg -->|"a deep resting layer below"| eb
+    lqg -->|"one layer, rigid lid<br/>no deformation radius"| bt
+    bt -->|"β = 0<br/>no Rossby waves"| ns2
+```
+
+| Step down | It assumes | It removes | It buys |
+| --- | --- | --- | --- |
+| Boussinesq | density differs from $\rho_ 0$ by a part in a thousand | sound waves | a step set by the flow and not by sound |
+| hydrostatic | the motion is thin, $(H / L)^2 \ll 1$ | convection, steep internal waves | no equation for $w$; pressure by an integral |
+| layers | density is constant in each of $N_ l$ layers | mixing, a continuous profile | $N_ l$ two-dimensional problems |
+| one layer | the layers move together, or only one moves | baroclinic instability | one two-dimensional problem |
+| reduced gravity | the layer below is deep and at rest | the fast external wave | waves at $\sqrt{g' H}$, about 3 m/s where $\sqrt{g H}$ is 200 m/s |
+| linear | small amplitude, $Fr \ll 1$ and $Ro \ll 1$ | advection, eddies | exact solutions to test against |
+| quasi-geostrophic | $Ro \ll 1$ and $Bu \sim 1$, small changes of thickness | gravity waves, fronts, the equator | one advected scalar; a step set by the currents |
+| rigid lid, one layer | the surface does not move | the deformation radius | a Poisson problem in place of a Helmholtz one |
+| $\beta = 0$ | the planet's curvature is not felt | Rossby waves, the western boundary current | two-dimensional turbulence and nothing else |
+
+The Navier–Stokes equations are therefore in the package twice, as its top and as its bottom. The top, in three dimensions, is not planned. The bottom is `BarotropicQG` without the planetary gradient: with $\beta = 0$, no wind and no drag its equation is $\partial_ t q + J(\psi, q) = \nu \nabla^2 q$ with $\nabla^2 \psi = q$, which is the two-dimensional incompressible Navier–Stokes equation for the vorticity. The model runs with `beta=0.0`, and its tendency differs from the one with $\beta$ by a term exactly linear in $\beta$ (checked to $10^{-26}$ on a 64 × 64 box). The core has the same equation as a toy, `IncompressibleNS2D`, with no-slip walls, a lid-driven cavity and a channel, where the ocean model has free-slip walls.
+
+**Which one to use.** The rule is to take the lowest model in the family that still has the motion the question is about, because each step up costs a shorter time step or a larger state.
+
+| The question is about | Use | Because | It cannot show |
+| --- | --- | --- | --- |
+| a method, on a flow with a cascade | `BarotropicQG` with $\beta = 0$ | the cheapest chaotic flow on a grid | anything of an ocean |
+| gyres, a western boundary current, Rossby waves | `BarotropicQG` | one scalar, one Poisson solve per evaluation | eddies from baroclinic instability |
+| mapping sea-surface height between altimeter tracks | 1.5-layer quasi-geostrophy, when sesmax#233 lands; `BaroclinicQG` until then | the height is the state, and the first deformation radius sets its scale | waves, and the flow below the thermocline |
+| mesoscale eddies and their energy | `BaroclinicQG` | baroclinic instability needs two layers or more | fronts, large changes of thickness |
+| waves, adjustment, the equator | `NonlinearShallowWater2D` | gravity and Kelvin waves are in it, and $f$ may pass through zero | vertical structure |
+| the same over a thermocline, cheaply | the same class with $g'$ for $g$ | the step grows by the ratio of the two wave speeds, about sixty for the numbers above | the external mode |
+| fronts, outcropping, a strong current over layers | `MultilayerShallowWater2D` | thickness may change by its own size | mixing between layers |
+| the cost of balance: what quasi-geostrophy leaves out | `ReparameterizedQG` beside the layered shallow water | the two differ by one projection | — |
+| a basin wide enough that $\beta$ changes across it | `SphericalSWM`, `SphericalQG` | $f$ and the metric are the sphere's | a globe: the domain is a band of latitudes |
+| a test with a known answer | `LinearShallowWater2D`, in the core | gravity waves, inertial oscillations and geostrophic adjustment have exact solutions | advection |
+
+Four habits go with the table.
+
+- **Check the numbers before the model.** $Ro$, $Bu$ and $Fr$ of the flow say which rows are allowed. A quasi-geostrophic model at $Ro = 0.5$ runs and is wrong.
+- **The step tells you what you are paying for.** A shallow-water model resolves a wave that travels at $\sqrt{g H}$, and a quasi-geostrophic one resolves only the currents, at the price of an elliptic solve per evaluation.
+- **For an assimilation, where the observation enters differs.** In quasi-geostrophy one height constrains the vorticity over a deformation radius through the inversion. In shallow water the height is the state, and the dynamics spread it (the section on what a model shows).
+- **For more than one device, the families split differently.** Shallow water cuts into patches, and quasi-geostrophy does not, because of its global solve ([the scaling design](sesmax_scaling.md)).
 
 ### Barotropic quasi-geostrophy
 
@@ -528,10 +608,13 @@ Counted at sesmax `a34e46c`: 6,992 lines of source, 497 test functions in 37 fil
 | spectra and a spectral energy budget | open | sesmax#166, sesmax#104 |
 | a QG prior against DUACS, as a benchmark | open | sesmax#236 |
 | the spectral models | open | sesmax#215 to sesmax#221 |
+| a 1.5-layer quasi-geostrophic model in sea-surface height, and a linear shallow-water model of internal tides | open | sesmax#233 |
+| two-dimensional Navier–Stokes, as `BarotropicQG` with `beta=0` | runs today; a scenario of decaying turbulence is proposed | `sesmax_ocean.qg` |
+| the linear shallow-water models, `IncompressibleNS2D` | merged, as toys | `sesmax_core.testing` |
 | a release | not yet | release-please, with the umbrella |
 | archiving somax | open | sesmax#194 |
 
-Not available, and not planned here: a primitive-equation model, sea ice, tides, and open boundaries with relaxation (sesmax#233 asks for the last).
+Not available, and not planned here: the top three boxes of the family (the compressible, the non-hydrostatic and the primitive equations), sea ice, and open boundaries with relaxation (sesmax#233 asks for the last).
 
 ## Where it came from
 
@@ -626,6 +709,8 @@ Decided on 25 November 2026, and kept.
 | SO-3 | The Coriolis scheme | keep Sadourny's averaging, and add Arakawa–Lamb when a run needs energy conservation | switch the default |
 | SO-4 | A wind product as a covariate | `ForcingFields` and the bundles feed `Covariates` | each model keeps its own wind pattern |
 | SO-5 | The default time stepper of a config | a strong-stability-preserving scheme from integrix for shallow water | Tsit5 for every model |
+| SO-7 | Does `IncompressibleNS2D` stay a toy, or join the ocean models? | a toy, moving to `sesmax-testing`: its cavity and channel are tests, and the ocean's form of it is `BarotropicQG` | register it as an ocean model as well |
+| SO-8 | Is reduced gravity an argument, or a model of its own? | an argument: `g` is already a leaf, and a factory `from_reduced_gravity(g_prime, H)` documents it | a class `ReducedGravitySWM` |
 | SO-6 | What does an altimeter compare with? | the anomaly, with the mean dynamic topography as a covariate | the absolute height, with a mean surface inside the model |
 
 ## References
