@@ -26,7 +26,9 @@ numbering:
 Proposed: give the workspace five kinds of package. `sesmax-core` holds the contracts, `sesmax-param` the parametric part of a model (parameterizations, forcing and model error), each component of the Earth system is a package of models, `sesmax-testing` says whether a model is right, and `sesmax-experiment` is where models are used: simulation, parameter estimation, state estimation, bilevel problems and monitoring.
 Benchmarks, which say whether a model is good, live in the planned geobench repository.
 Alternative: keep one core and add modules to it as needed (`sesmax_core.testing`, `sesmax_core.sim`), which is fewer releases, but the core then carries every toy and every workflow to anyone who only wants the model contract.
-Status: proposed, for review. Nothing here is implemented. The owner has settled five points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, and the ocean models come before the split (25 November).
+Status: proposed, for review. The ocean models of W1 are merged (sesmax#152), and so is the start of W3 (sesmax#197, sesmax#198); the rest is not started. The owner has settled six points: the toys and the checks are one package, the experiment package covers more than simulation, there is a package for the parametric part, model error belongs in it, the ocean models come before the split, and a prior sits with what it describes, so those of parameterizations in param and those of models in their component (25 November). A seventh came on 26 November: sesmax composes the machinery of the stack instead of writing its own, so a missing piece is added first to the package that owns it, and each design page says which.
+
+Each new package has its own design page, with the motivation, the maths, the numerics, the API, examples and a prototype: [sesmax-testing](sesmax_testing.md), [sesmax-param](sesmax_param.md) and [sesmax-experiment](sesmax_experiment.md). This page says what the packages are and how they depend on each other.
 
 ## What this page settles
 
@@ -36,6 +38,7 @@ Status: proposed, for review. Nothing here is implemented. The owner has settled
 | Where do drag, closures, forcing and model error live? | `sesmax-param` |
 | Where do runs and estimation live? | `sesmax-experiment` |
 | Who owns the methods? | vardax, filterax, argminax, as today |
+| Where does the machinery come from? | the stack (gridax, functax, integrix, kernellib, gaussx, argminax, filterax, vardax, diagnostix, geophysix, pipekit); a gap goes there first |
 | Where do benchmarks live? | geobench |
 | When do we split? | After the ocean models, before the run loop |
 
@@ -87,11 +90,11 @@ The core gains two things the other packages need.
 
 Split the right-hand side of a model into the resolved dynamics and the part whose form we choose or learn,
 
-$$
+```math
 \frac{\mathrm{d}\mathbf{x}}{\mathrm{d}t} = f(\mathbf{x}) + p(\mathbf{x}; \boldsymbol{\theta}) + u(t; \mathbf{w}) + \boldsymbol{\eta}(t)
-$$ (packages-rhs)
+```
 
-where $\mathbf{x} \in \mathbb{R}^{D_x}$ is the state, $f: \mathbb{R}^{D_x} \to \mathbb{R}^{D_x}$ the resolved dynamics (advection, pressure, Coriolis), $p$ a parameterization with parameters $\boldsymbol{\theta} \in \mathbb{R}^{D_\theta}$, $u(t; \mathbf{w}) \in \mathbb{R}^{D_x}$ a forcing with coefficients $\mathbf{w} \in \mathbb{R}^{D_w}$, and $\boldsymbol{\eta}(t) \in \mathbb{R}^{D_x}$ the model error.
+where $\mathbf{x} \in \mathbb{R}^{D_ x}$ is the state, $f: \mathbb{R}^{D_ x} \to \mathbb{R}^{D_ x}$ the resolved dynamics (advection, pressure, Coriolis), $p$ a parameterization with parameters $\boldsymbol{\theta} \in \mathbb{R}^{D_ \theta}$, $u(t; \mathbf{w}) \in \mathbb{R}^{D_ x}$ a forcing with coefficients $\mathbf{w} \in \mathbb{R}^{D_ w}$, and $\boldsymbol{\eta}(t) \in \mathbb{R}^{D_ x}$ the model error.
 
 The last three terms are the package. Each is parametric: a formula, a basis expansion or a network, whose parameters carry a prior.
 "Can be learned" is not the test, because every parameter of $f$ is a leaf too, gravity and layer depth included. The test is whether the term's form is ours to choose.
@@ -160,7 +163,7 @@ A check is a function of a model and a state that raises with the numbers when t
 | convergence | does the error fall at the order of the scheme? |
 | contract | `jit`, `vmap`, and the same numbers with arrays and located fields |
 
-Here $\mathbf{M} \in \mathbb{R}^{D_x \times D_x}$ is the tangent-linear model over a window, and $\mathbf{v}, \mathbf{w} \in \mathbb{R}^{D_x}$ are random directions.
+Here $\mathbf{M} \in \mathbb{R}^{D_ x \times D_ x}$ is the tangent-linear model over a window, and $\mathbf{v}, \mathbf{w} \in \mathbb{R}^{D_ x}$ are random directions.
 The first two are the checks which found the defects in [the ocean plan](ocean.md). somax's own conservation, invariant and multilayer tests (30 in three files) pass at `9cb19b3` all the same; the mass test starts from a nearly uniform state and allows a drift of 1e-6.
 
 vardax ships its own Lorenz-63 and Lorenz-96. It is below sesmax in the stack and cannot import ours, so the two stay separate.
@@ -173,40 +176,40 @@ The twelve files of `tests/testing` move with the toys.
 (experiment)=
 ## sesmax-experiment: what do we do with the model?
 
-Everything we do with a model asks for a different part of the same control. Collect the initial state, the parameters and the forcing coefficients in one vector $\mathbf{z} \in \mathbb{R}^{D_z}$, with prior mean $\boldsymbol{\mu}_z \in \mathbb{R}^{D_z}$ and covariance $\boldsymbol{\Sigma}_z \in \mathbb{R}^{D_z \times D_z}$, and write $\mathbf{x}_t(\mathbf{z}) \in \mathbb{R}^{D_x}$ for the state after $t$ of $T$ steps. The cost of a window is
+Everything we do with a model asks for a different part of the same control. Collect the initial state, the parameters and the forcing coefficients in one vector $\mathbf{z} \in \mathbb{R}^{D_ z}$, with prior mean $\boldsymbol{\mu}_ z \in \mathbb{R}^{D_ z}$ and covariance $\boldsymbol{\Sigma}_ z \in \mathbb{R}^{D_ z \times D_ z}$, and write $\mathbf{x}_ t(\mathbf{z}) \in \mathbb{R}^{D_ x}$ for the state after $t$ of $T$ steps. The cost of a window is
 
-$$
+```math
 \mathcal{J}(\mathbf{z}; \boldsymbol{\nu}) = \frac{1}{2} \Vert \mathbf{z} - \boldsymbol{\mu}_z \Vert^2_{\boldsymbol{\Sigma}_z^{-1}} + \frac{1}{2} \sum_{t \leq T} \Vert \mathbf{y}_t - h_t(\mathbf{x}_t(\mathbf{z})) \Vert^2_{\boldsymbol{\Sigma}_\varepsilon^{-1}}
-$$ (packages-cost)
+```
 
-where $\mathbf{y}_t \in \mathbb{R}^{D_y}$ are the observations, $h_t: \mathbb{R}^{D_x} \to \mathbb{R}^{D_y}$ the observation operators, $\boldsymbol{\Sigma}_\varepsilon \in \mathbb{R}^{D_y \times D_y}$ the error covariance, and $\boldsymbol{\nu} \in \mathbb{R}^{D_\nu}$ holds what the cost itself depends on (a prior scale, a closure, a covariance).
+where $\mathbf{y}_ t \in \mathbb{R}^{D_ y}$ are the observations, $h_ t: \mathbb{R}^{D_ x} \to \mathbb{R}^{D_ y}$ the observation operators, $\boldsymbol{\Sigma}_ \varepsilon \in \mathbb{R}^{D_ y \times D_ y}$ the error covariance, and $\boldsymbol{\nu} \in \mathbb{R}^{D_ \nu}$ holds what the cost itself depends on (a prior scale, a closure, a covariance).
 
 | Work | Unknown | Answer | Method from |
 | --- | --- | --- | --- |
-| Simulation | none | $\mathbf{x}_t(\mathbf{z})$ for a given $\mathbf{z}$ | diffrax, `pipekit_cycle.Cycle` |
-| State estimation | $\mathbf{x}_0$, or $\mathbf{x}_t$ in cycles | $\mathrm{argmin}_{\mathbf{x}_0} \mathcal{J}$, or a filter | vardax, filterax, `pipekit_cycle.DACycle` |
-| Parameter estimation | $\boldsymbol{\theta}$ | $\mathrm{argmin}_{\boldsymbol{\theta}} \mathcal{J}$, or an ensemble process | optimistix, argminax, `filterax.EKI` |
-| Forcing estimation | forcing coefficients | $\mathrm{argmin}_{\mathbf{u}} \mathcal{J}$ | `vardax.ThreeDVar` with `WindowOperator` |
+| Simulation | none | $\mathbf{x}_ t(\mathbf{z})$ for a given $\mathbf{z}$ | diffrax, `pipekit_cycle.Cycle` |
+| State estimation | $\mathbf{x}_ 0$, or $\mathbf{x}_ t$ in cycles | $\mathrm{argmin}_ {\mathbf{x}_ 0} \mathcal{J}$, or a filter | vardax, filterax, `pipekit_cycle.DACycle` |
+| Parameter estimation | $\boldsymbol{\theta}$ | $\mathrm{argmin}_ {\boldsymbol{\theta}} \mathcal{J}$, or an ensemble process | optimistix, argminax, `filterax.EKI` |
+| Forcing estimation | forcing coefficients | $\mathrm{argmin}_ {\mathbf{u}} \mathcal{J}$ | `vardax.ThreeDVar` with `WindowOperator` |
 | Bilevel | $\boldsymbol{\nu}$ | see below | the adjoints of vardax and argminax |
 | Monitoring | none | health of a run, and of an analysis | the monitors, `filterax.utils` |
 
 A bilevel problem learns $\boldsymbol{\nu}$ through the estimate of the inner one, with an outer loss $\mathcal{L}$:
 
-$$
+```math
 \hat{\boldsymbol{\nu}} = \mathrm{argmin}_{\boldsymbol{\nu}} \ \mathcal{L}(\hat{\mathbf{z}}(\boldsymbol{\nu}))
-$$ (packages-bilevel)
+```
 
 where the inner estimate is
 
-$$
+```math
 \hat{\mathbf{z}}(\boldsymbol{\nu}) = \mathrm{argmin}_{\mathbf{z}} \ \mathcal{J}(\mathbf{z}; \boldsymbol{\nu})
-$$ (packages-inner)
+```
 
 ### What it owns
 
 It owns no method. Every algorithm in the table above already has a home, and the package holds what is missing between them.
 
-- **The problem.** One object says which leaves of a model, a state and a forcing are unknown, and reads the priors that `sesmax-param` put on them. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
+- **The problem.** One object says which leaves of a model, a state and a forcing are unknown, and reads the priors that `sesmax-param` and the component put on them. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
 - **The work.** A thin function per row that takes a problem, hands it to a method and returns the estimate with a record.
 - **The run.** The chunk loop, checkpoints, restarts, run specs, artifacts and the command line of [the run-loop design](run_loop.md), which become the simulation part of this package.
 - **The monitoring.** The monitors of a run, and the statistics of an analysis (innovations, spread against skill) with the same verdict and the same record.
