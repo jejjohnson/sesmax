@@ -49,6 +49,29 @@ So the joint problem, in which the state and the drag are both unknown, has no h
 - As someone **planning an observing system**, I want a twin experiment, in which the truth is mine and the answer is known.
 - As the person **on call** for a long run, I want it to stop with a reason when the state, the mass or the innovations go wrong, and to restart from the last good point.
 
+## If you know Keras
+
+The split between the core and this package is the one Keras makes between building a model and training it. The core is where a model is built, and this package is where it is compiled, fitted and run.
+
+| Keras | sesmax | Where |
+| --- | --- | --- |
+| `Layer` | `Term` | [sesmax-core](sesmax_core.md) |
+| `Model` | `Model`, `TermModel` | sesmax-core |
+| calling the model | `integrate`, `step`, `rollout` | sesmax-core |
+| `compile(loss, optimizer, metrics)` | a `Problem` and a `Method` | here |
+| `fit` | `estimate`, `bilevel` | here |
+| `predict` | `simulate` | here |
+| `evaluate` | `twin`, and the checks of [sesmax-testing](sesmax_testing.md) | here, sesmax-testing |
+| callbacks | monitors | here |
+| `History` | `Result`, and the record of a run | here |
+
+The analogy bends in four places, and each is a choice of this design.
+
+- **Terms add, layers chain.** A Keras model feeds the output of one layer into the next. A `TermModel` sums tendencies, so it is closer to a sum of branches than to a `Sequential`.
+- **A model is not yet a forward map.** A Keras model takes an input to an output. A sesmax model is a tendency with its boundaries, and it becomes a forward map only with a solver and a window. So the core can already predict, with `integrate`, and `simulate` is the managed form, with chunks, monitors and checkpoints.
+- **Compiling does not touch the model.** Keras binds the loss and the optimiser onto the model. Here the model stays an immutable pytree, and a `Problem` holds the model, the observations, the priors and what is unknown. One model can sit in many problems, and the core carries no observation, prior or optimiser.
+- **A fit is of more than weights.** The unknown can be the initial state, a forcing, a parameter, or all three. The data are one window of observations through an observation operator, and not batches of independent samples. The method may be an ensemble with no gradient, and the answer is an estimate with a spread, and not a changed model.
+
 ## Background: the maths
 
 ### One control
