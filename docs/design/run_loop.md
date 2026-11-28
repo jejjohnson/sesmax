@@ -25,6 +25,7 @@ The lower level, `run_chunks`, is a pipeline of pipekit operators that needs not
 The upper level, with run specs, artifacts and the `sesmax-sim` command, sits behind a `[sim]` extra.
 Alternative: keep the runner in `sesmax-ocean`, which is simpler for C2, but a second component would then have to copy the loop, because the tiers forbid it importing the ocean.
 Status: proposed, for review. The chunk pipeline is prototyped, and nothing else here is implemented. This page answers SX-4 and #28.
+Status on 28 November 2026: built, in `sesmax-experiment` and not in `sesmax_core.sim`, by sesmax#196 to sesmax#208 under epic sesmax#186. This page is kept as the plan and its history. [The design of the run](sesmax_experiment_run.md) says what the package is today and what is proposed next.
 
 ## What this page settles
 

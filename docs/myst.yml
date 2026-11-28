@@ -80,6 +80,8 @@ project:
         - file: design/sesmax_testing.md
         - file: design/sesmax_param.md
         - file: design/sesmax_experiment.md
+        - file: design/sesmax_experiment_run.md
+        - file: design/sesmax_scaling.md
         - file: design/ocean.md
         - file: design/numerics_wishlist.md
     - title: Project

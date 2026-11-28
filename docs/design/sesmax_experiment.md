@@ -17,7 +17,7 @@ keywords:
 
 ## Decision
 
-Proposed: one package, `sesmax-experiment`, is where a model is used. It has two halves. The run (chunks, checkpoints, monitors, run specs, a command line) is [the run-loop design](run_loop.md) and epic sesmax#186, and this page does not repeat it. The work (a problem, and a thin verb for each thing we do with it) is what this page designs.
+Proposed: one package, `sesmax-experiment`, is where a model is used. It has two halves. The run (chunks, checkpoints, monitors, run specs, a command line) is [the design of the run](sesmax_experiment_run.md) and epic sesmax#186, and this page does not repeat it. The work (a problem, and a thin verb for each thing we do with it) is what this page designs.
 Decided by the owner: the package covers simulation, parameter estimation, state estimation, bilevel problems and monitoring, and the monitors move to it.
 Recommended for what is open: the problem says what is unknown, and one verb, `estimate`, covers states, parameters and forcing.
 Alternative: one function per kind of estimation, which reads well until someone wants two unknowns at once.
@@ -295,7 +295,7 @@ flowchart LR
 | structure | `Problem` | the model, what is unknown, and the cost |
 | step | `simulate`, `estimate`, `bilevel`, `twin` | one verb per kind of work |
 | strategy | `Method` | how the unknown is found, from another library |
-| recipe | a run spec and the command line | [the run loop](run_loop.md) |
+| recipe | a run spec and the command line | [the run](sesmax_experiment_run.md) |
 
 ### The problem
 
@@ -559,7 +559,7 @@ class TwinResult(eqx.Module):
 
 ### The run half
 
-[The run-loop design](run_loop.md) holds `run_chunks`, `RunSpec`, `simulate`, `spinup`, `restart`, checkpoints, the health record and the command line. The monitors, the checkpointer and `run_chunks` are merged. This page adds two things for this half: `simulate` of a spec and `simulate` of a `Problem` are the same verb on different inputs, and a `Result` writes the same record as a run, so a cost history and a health record share a reader.
+[The design of the run](sesmax_experiment_run.md) holds `run_chunks`, `RunSpec`, `simulate`, `spinup`, `restart`, checkpoints, the health record and the command line, all merged, and proposes what a run needs next: means, ensembles, an early end, and a fit watched with the same monitors and record. This page adds two things for this half: `simulate` of a spec and `simulate` of a `Problem` are the same verb on different inputs, and a `Result` writes the same record as a run, so a cost history and a health record share a reader.
 
 ### What it does not own
 
@@ -796,7 +796,7 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 
 | Step | Pull request | Gate |
 | --- | --- | --- |
-| E0 | the rest of the run half: epic sesmax#186 | [the run-loop design](run_loop.md) |
+| E0 | the rest of the run half: epic sesmax#186, merged | [the design of the run](sesmax_experiment_run.md) |
 | E1 | `rollout` and `rollout_loss` take an integrix adjoint | Levenberg–Marquardt and the implicit gradient run, as tests |
 | E2 | `Component.priors`, `priors`, `Window`, `Observations`, `Problem`, `Result`, `simulate`, `estimate` with `Minimise` | the four-row table, as tests; the README quickstart of the core gives the same numbers |
 | E2a | `Observable` in the core, `PointObservations`, `observation_operator` | the six checks of the reading table as tests, on a model with land; the dot-product test of the whole operator |
@@ -844,6 +844,6 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 
 - Part of: [the workspace packages](workspace_packages.md), steps W3 (run) and W6 (work)
 - Builds on: optimistix, argminax, filterax, vardax, functax, gridax, integrix, diagnostix, pipekit-cycle
-- Depends on: [the run-loop design](run_loop.md), [sesmax-param](sesmax_param.md) for priors
+- Depends on: [the design of the run](sesmax_experiment_run.md), [sesmax-param](sesmax_param.md) for priors
 - Uses: the horizon of [sesmax-testing](sesmax_testing.md)
 - Issues: sesmax#186, sesmax#15
