@@ -1,7 +1,7 @@
 """somax models as pipekit Operators with serializable flat configs.
 
 Exercises the pipekit bridge (``sesmax_core.operators``): flat-primitive
-``get_config``, faithful ``pipekit_ops.serial`` round-trip, ForwardModel
+``get_config``, faithful ``pipekit_ops.saving`` round-trip, ForwardModel
 conformance, pipeline composition, and driving ``pipekit_cycle.Cycle``.
 
 These require pipekit (a base somax dependency); the ``importorskip``
@@ -64,7 +64,7 @@ def test_model_not_in_config():
 
 
 # ----------------------------------------------------------------------
-# pipekit_ops.serial round-trip
+# pipekit_ops.saving round-trip
 # ----------------------------------------------------------------------
 
 
