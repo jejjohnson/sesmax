@@ -18,7 +18,7 @@ keywords:
 ## Decision
 
 Decided on 25 November 2026, and built: the run lives in `sesmax-experiment`, in two levels. `run_chunks` takes a built model and runs it in chunks, with monitors and stages between them, and writes nothing. `simulate`, `spinup` and `restart` take a run spec and a directory, and write the snapshots, the record, the checkpoints and the manifest. Both are merged (sesmax#197 to sesmax#208, under epic sesmax#186).
-Decided by the owner on 28 November: this page is the expansion of [the experiment design](sesmax_experiment.md) for its run half. It plays the part that the fit loop and its callbacks play in a training library: the loop, what watches it, what it records, and how it stops and starts again.
+Asked by the owner on 28 November: this page is the expansion of [the experiment design](sesmax_experiment.md) for its run half. It plays the part that the fit loop and its callbacks play in a training library: the loop, what watches it, what it records, and how it stops and starts again.
 Proposed, for review: nine additions, each in the section on the API. In order of what they unblock, they are a solver block in the spec, an end that is early and is not a failure, a stop on a signal, means over an interval, snapshots of observables, an ensemble of runs, the lineage of a restart, a fit watched with the same monitors and record as a run, and one writer protocol shared with pipekit-train.
 Status: the built half is at sesmax `4420115` and unreleased (version 0.0.0). The numbers on this page are from scratch runs on 28 November. [The run-loop plan](run_loop.md) of 5 November has the history: the move from somax, the pipekit mapping and the two defects its prototype found. This page is the design.
 
@@ -53,18 +53,18 @@ What exists today covers the run of one model from one file. What is missing sho
 
 ### A run in chunks
 
-A model is $\partial_ t \mathbf{x} = f(\mathbf{x}, t; \boldsymbol{\theta})$ with state $\mathbf{x} \in \mathbb{R}^{D_ x}$. Its flow map $\Phi_ {s \to t}$ takes the state at time $s$ to the state at $t$. A timeline is a list of times $t_ 0 < t_ 1 < \dots < t_ N$, and a run is the composition
+A model is $\partial_ t \mathbf{x} = f(\mathbf{x}, t; \boldsymbol{\theta})$ with state $\mathbf{x} \in \mathbb{R}^{D_ x}$. Its flow map $\Phi_ {s \to t}$ takes the state at time $s$ to the state at $t$. A timeline is a list of times $t_ 0 < t_ 1 < \dots < t_ N$, and a run is the composition, for $k = 1, \dots, N$, of
 
 ```math
-\mathbf{x}_k = \Phi_{t_{k-1} \to t_k}(\mathbf{x}_{k-1}), \quad k = 1, \dots, N
+\mathbf{x}_k = \Phi_{t_{k-1} \to t_k}(\mathbf{x}_{k-1})
 ```
 
 Each factor is one chunk, and the host sees $\mathbf{x}_ k$ between two of them. The exact flow does not care where the cuts are, since $\Phi_ {s \to t} \circ \Phi_ {r \to s} = \Phi_ {r \to t}$. A discrete solver cares, in two ways.
 
-**The grid of steps.** A one-step method $\Psi_ h$ with a requested step $\Delta t$ takes $n_ k$ equal steps in chunk $k$,
+**The grid of steps.** A one-step method $\Psi_ h$ ([Hairer, Nørsett and Wanner, 1993](https://doi.org/10.1007/978-3-540-78862-1)) with a requested step $\Delta t$ takes $n_ k$ equal steps of $h_ k = (t_ k - t_ {k-1}) / n_ k$ in chunk $k$, so that $\tilde{\mathbf{x}}_ k = \Psi_ {h_ k}^{n_ k}(\tilde{\mathbf{x}}_ {k-1})$, and the number is
 
 ```math
-n_k = \max \left( 1, \left\lceil \frac{t_k - t_{k-1}}{\Delta t} - \epsilon \right\rceil \right), \quad h_k = \frac{t_k - t_{k-1}}{n_k}, \quad \tilde{\mathbf{x}}_k = \Psi_{h_k}^{n_k}(\tilde{\mathbf{x}}_{k-1})
+n_k = \max \left( 1, \left\lceil \frac{t_k - t_{k-1}}{\Delta t} - \epsilon \right\rceil \right)
 ```
 
 with $\epsilon = 10^{-9}$, so that a ratio which is a whole number but for rounding stays that number. When every chunk is a multiple of $\Delta t$, the steps fall at the same times whatever the cuts, and the run is the same map. When one is not, its steps are shorter than $\Delta t$ and the discretisation depends on the timeline. Stating $n_ k$ is what keeps this choice out of the hands of floating point: without it, 24 of 40 chunks took one step more ([the plan](run_loop.md) has the measurement).
@@ -128,14 +128,16 @@ The line also holds the wall time of the integration, the wall time of everythin
 A snapshot is $g(\mathbf{x}(t_ k))$, one instant. What an observation product holds is often a mean over an interval,
 
 ```math
-\bar{g} = \frac{1}{t_b - t_a} \int_{t_a}^{t_b} g(\mathbf{x}(t)) \, dt
+\bar{g} = \frac{1}{t_b - t_a} \int_{t_a}^{t_b} g(\mathbf{x}(t)) \mathrm{d}t
 ```
 
-and the mean of $M$ snapshots is a quadrature of this integral with $M$ points, with no control of its error for a signal that moves between two of them. The integral can instead be carried by the solve. Add an accumulator $\mathbf{a}$ to the state,
+and the mean of $M$ snapshots is a quadrature of this integral with $M$ points, with no control of its error for a signal that moves between two of them. The integral can instead be carried by the solve. Add to the state an accumulator $\mathbf{a}$ that starts at $\mathbf{a}(t_ a) = \mathbf{0}$ and obeys
 
 ```math
-\partial_t \mathbf{x} = f(\mathbf{x}, t), \quad \partial_t \mathbf{a} = g(\mathbf{x}), \quad \mathbf{a}(t_a) = \mathbf{0}, \quad \bar{g} = \frac{\mathbf{a}(t_b)}{t_b - t_a}
+\partial_t \mathbf{a} = g(\mathbf{x})
 ```
+
+beside the model's own equation. Then $\bar{g} = \mathbf{a}(t_ b) / (t_ b - t_ a)$.
 
 The accumulator does not enter $f$, so the state is unchanged, and the quadrature has the order and the step of the solver. The measured difference on Lorenz-96 is five to seven digits (the prototype table).
 
@@ -144,7 +146,7 @@ The accumulator does not enter $f$, so the state is unchanged, and the quadratur
 $B$ members $\mathbf{x}^{(b)}$ of one model take the same steps, so a chunk of the ensemble is one compiled call over a leading axis. What an ensemble adds to the record is the survival fraction, the share of members that are still finite and inside their guards at $t_ k$,
 
 ```math
-S_k = \frac{1}{B} \sum_{b=1}^{B} \mathbb{1} \left[ \mathbf{x}^{(b)}_j \text{ is good for all } j \leq k \right]
+S_k = \frac{1}{B} \left\lvert \left\{ b : \mathbf{x}^{(b)}_j \text{ is good for all } j \leq k \right\} \right\rvert
 ```
 
 which is the measure of stability that sesmax#108 asks for.
@@ -157,7 +159,7 @@ A minimiser of a cost $\mathcal{J}(\mathbf{z})$ is also a loop with a state, $(\
 | --- | --- |
 | $\mathcal{J}(\mathbf{z}_ i)$ and $\lVert \nabla \mathcal{J}(\mathbf{z}_ i) \rVert$ | whether the fit moves |
 | $\mathcal{J}(\mathbf{z}_ i) / (N_ y / 2)$ | whether the error model is right, since $\mathbb{E}[\mathcal{J}_ \text{min}] = N_ y / 2$ |
-| $\chi^2$ of the innovations | the same, per time |
+| $\chi^2$ of the innovations ([Desroziers et al., 2005](https://doi.org/10.1256/qj.05.108)) | the same, per time |
 
 The parallel with the stepper holds too. The memory $\mathbf{s}_ i$ is to a fit what the controller's state is to an adaptive solve: a fit continued from $\mathbf{z}_ i$ alone is another fit (measured below).
 
@@ -212,7 +214,7 @@ The differences stay below the error of the solve, so the answer is as good. It 
 
 ## What it is built on
 
-The loop, the cadence, the sinks and the retry are pipekit's. The steps are diffrax's, through the model. What is written here is the advance of one chunk, the monitors and the artifacts of a run.
+The loop, the cadence, the sinks and the retry are pipekit's. The steps are diffrax's ([Kidger, 2021](https://arxiv.org/abs/2202.02435)), through the model. What is written here is the advance of one chunk, the monitors and the artifacts of a run.
 
 | Need | Upstream, by its public name | State |
 | --- | --- | --- |
@@ -463,7 +465,7 @@ writer = TrackerWriter(tracker, run_name="gyre")     # pipekit_experiment.Experi
 - **R5, observables.** A year of full states is large and mostly unread. A run for a twin experiment needs the surface height on its own cadence. This uses the `Observable` of [the core design](sesmax_core.md), and the self-describing output of sesmax#224.
 - **R6, an ensemble.** The chunk is mapped over a leading axis with `eqx.filter_vmap`, and the stages see a frame of members. sesmax#108 is its first user.
 - **R7, lineage.** A restart writes in a new directory, by design, since it must not replace what it reads. The link back is then the only way to read a run of three jobs as one.
-- **R8, a watched fit.** optimistix solvers can be stepped from the host, which turns an iteration into a chunk. The cost is the host's time per iteration, which is nothing beside a model run and doubled the time of a toy (measured below). A fit that is not watched stays one compiled call.
+- **R8, a watched fit.** optimistix solvers ([Rader, Lyons and Kidger, 2024](https://arxiv.org/abs/2402.09983)) can be stepped from the host, which turns an iteration into a chunk. The cost is the host's time per iteration, which is nothing beside a model run and doubled the time of a toy (measured below). A fit that is not watched stays one compiled call.
 - **R9, a tracker.** `MetricWriter` is the seam. A writer over `ExperimentTracker` sends the same lines to MLflow or to Weights & Biases, as `LogToExperiment` does for a fit.
 
 ### What it does not own
@@ -725,7 +727,7 @@ R0 to R3 depend on nothing and are small. R4 and R6 are the two that change what
 - Ramadhan, A. et al. (2020). [Oceananigans.jl: fast and friendly geophysical fluid dynamics on GPUs](https://doi.org/10.21105/joss.02018). *Journal of Open Source Software* 5, 2018.
 - Söderlind, G. (2002). [Automatic control and adaptive time-stepping](https://doi.org/10.1023/A:1021160023092). *Numerical Algorithms* 31, 281–310.
 
-The schedules, the wall-time limit and the checkpoint that holds a stepper's state are ideas from Oceananigans, the rename and the retention from Orbax, and the record from CLU. [The plan](run_loop.md) has the table of what was taken from each.
+The schedules, the wall-time limit and the checkpoint that holds a stepper's state are ideas from Oceananigans ([Ramadhan et al., 2020](https://doi.org/10.21105/joss.02018)), the rename and the retention from Orbax, and the record from CLU. [The plan](run_loop.md) has the table of what was taken from each.
 
 ## Relationships
 
