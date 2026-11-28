@@ -514,7 +514,7 @@ metrics = compute_eval_metrics(model, state)
 ```python
 # today (sesmax-ocean)
 # Ro = 0.01, β̂ = 100, δ_M = 0.05 of the basin, which is 3.2 cells
-model, scales = BarotropicQG.from_nondimensional(
+nd_model, scales = BarotropicQG.from_nondimensional(
     nx=64, ny=64, rossby=0.01, beta_hat=100.0, delta_M=0.05
 )
 # ν = δ_M³ β̂ = 0.0125, f₀ = 1/Ro = 100, scales.kind = "advective"
