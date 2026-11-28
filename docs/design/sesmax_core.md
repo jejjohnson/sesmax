@@ -183,7 +183,7 @@ A solve compiles for a given structure and set of shapes. `Model.integrate` reus
 `integrate` is `diffrax.diffeqsolve`, by default with the pair of [Tsitouras (2011)](https://doi.org/10.1016/j.camwa.2011.06.002) at a fixed step. `step` advances one increment and returns a bare state, and the adapters and `rollout` call only `step`, so a model changes how it integrates by overriding `build_terms`. `imex_solver` and `stable_step` are integrix's, re-exported.
 
 **Adjoints.**
-Reverse mode through a solve stores the trajectory. diffrax's default checkpoints it, and supports reverse mode only; forward mode, which Gauss–Newton and Hessian-vector products need, takes `DirectAdjoint`. `rollout` checkpoints a scan of $n$ steps in blocks, storing about $2\sqrt{n}$ states. `rollout` passes no adjoint to the model today, which [the experiment design](sesmax_experiment.md) fixes.
+Reverse mode through a solve stores the trajectory. diffrax's default checkpoints it, and supports reverse mode only; forward mode, which Gauss–Newton and Hessian-vector products need, takes `DirectAdjoint`. `rollout` stores every state by default. With `checkpoint=True` it recomputes each block of `save_every` steps on the backward pass and stores about $n / s + s$ states for a block of $s$ steps, which is about $2\sqrt{n}$ when $s$ is near $\sqrt{n}$. `rollout_loss` checkpoints by default, but its block is its `stride`, one step unless set, so it saves memory only when the stride is near $\sqrt{n}$. `rollout` passes no adjoint to the model today, which [the experiment design](sesmax_experiment.md) fixes.
 
 **Located fields.**
 A field is an array or a `gridax.CField`, which knows its point on the C-grid. The helpers `each`, `values` and `placed` let one formula serve both, and fields on different points raise instead of adding silently.
@@ -521,9 +521,9 @@ def latent_field(model, encode, decode):
 
 # today (sesmax-core): the affine case
 affine = sx.StateAffine(loc=L96State(x=jnp.asarray(2.0)), scale=L96State(x=jnp.asarray(4.0)))
-scaled = sx.ScaledModel(inner=model, transform=affine)
+scaled = sx.ScaledModel(inner=truth, transform=affine)
 # the two tendencies differ by 0.0
-latent_field(model, affine.forward, affine.inverse)(0.0, affine.forward(state))
+latent_field(truth, affine.forward, affine.inverse)(0.0, affine.forward(state0))
 
 # a basis from a long run: z = Φᵀ (x − μ), x = μ + Φ z
 encode = lambda x: Phi.T @ (x - mean)
