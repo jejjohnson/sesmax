@@ -13,7 +13,7 @@ from typing import Any
 
 import jax
 import numpy as np
-from pipekit_ops.hashing import sha256_hex, stable_json
+from pipekit_ops.saving import sha256_hex, stable_json
 
 from sesmax_core import io
 from sesmax_core.fields import values
