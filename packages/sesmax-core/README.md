@@ -21,7 +21,7 @@
 📓 [Tutorials](https://jejjohnson.github.io/sesmax/steps-to-navier-stokes/) ·
 📚 [API reference](https://jejjohnson.github.io/sesmax/reference/) ·
 🗂️ [Capability index](https://jejjohnson.github.io/sesmax/reference/capabilities/) ·
-🧭 [Design](https://jejjohnson.github.io/sesmax/workspace-and-core/)
+🧭 [Design](https://jejjohnson.github.io/sesmax/sesmax-core/)
 
 </div>
 
@@ -245,7 +245,7 @@ Every name below is public in the module named beside it. The [capability index]
 - **[Documentation](https://jejjohnson.github.io/sesmax/)**: the home page, the guides and the executed notebooks.
 - **[API reference](https://jejjohnson.github.io/sesmax/reference/)**: one page per public module, generated from the docstrings.
 - **[Capability index](https://jejjohnson.github.io/sesmax/reference/capabilities/)**: every public name once, with a one-line summary.
-- **[Workspace and core design](https://jejjohnson.github.io/sesmax/workspace-and-core/)**: what moved from somax, the phases and the gates.
+- **[Core design](https://jejjohnson.github.io/sesmax/sesmax-core/)**: the design of the package, and what moved from somax, the phases and the gates.
 
 ## 🧩 Ecosystem
 

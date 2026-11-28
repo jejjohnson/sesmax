@@ -25,7 +25,7 @@ Also decided, on 25 November: an experiment holds no default priors. Those of a 
 Decided by the owner on 26 November: sesmax composes the machinery of the stack and does not write its own. A piece that is missing is added first to the package that owns the concept, and the section on what this package builds on says which piece goes where.
 Proposed on 26 November, for review: a control is a role in one experiment and not a kind of input. The covariates of [the param design](sesmax_param.md), the known fields from outside the model, are never in it.
 Proposed on 27 November, for review: an observation operator is a composition of three maps, what the model can show, a reading at places and times, and the instrument, and this package writes none of them. A control may be in other coordinates than the unknowns, through a basis or a decoder, with whitening as the first case.
-Status: proposed, for review. The numbers are from a scratch prototype. The run half (W3) is under way: the package, the monitors and the runs in chunks are merged (sesmax#197, sesmax#198). The work half is step W6 of [the workspace packages](workspace_packages.md) and waits for `sesmax-param`.
+Status: proposed, for review. The numbers are from a scratch prototype. The run half (W3) is under way: the package, the monitors and the runs in chunks are merged (sesmax#197, sesmax#198). The work half is step W6 of [the workspace packages](sesmax_workspace.md) and waits for `sesmax-param`.
 
 ## Motivation
 
@@ -842,7 +842,7 @@ Not covered: `Problem` itself (the prototype is a 30-line class), model error as
 
 ## Relationships
 
-- Part of: [the workspace packages](workspace_packages.md), steps W3 (run) and W6 (work)
+- Part of: [the workspace packages](sesmax_workspace.md), steps W3 (run) and W6 (work)
 - Builds on: optimistix, argminax, filterax, vardax, functax, gridax, integrix, diagnostix, pipekit-cycle
 - Depends on: [the design of the run](sesmax_experiment_run.md), [sesmax-param](sesmax_param.md) for priors
 - Uses: the horizon of [sesmax-testing](sesmax_testing.md)

@@ -6,7 +6,7 @@ Standing instructions for **every** coding agent working in this repository
 
 ## What this repo is
 
-sesmax ("simple Earth-system models in JAX") is a uv workspace of packages whose models are cheap, differentiable forward models to use as priors in short-window data assimilation (a window of hours to weeks). The plan, the phases and what moves here from [somax](https://github.com/jejjohnson/somax) are in [`docs/design/workspace_and_core.md`](docs/design/workspace_and_core.md); read it before changing the layout.
+sesmax ("simple Earth-system models in JAX") is a uv workspace of packages whose models are cheap, differentiable forward models to use as priors in short-window data assimilation (a window of hours to weeks). The packages, their tiers and the order of work are in [`docs/design/sesmax_workspace.md`](docs/design/sesmax_workspace.md); read it before changing the layout. What moved here from [somax](https://github.com/jejjohnson/somax), with the renames and the phases, is in [`docs/design/sesmax_core.md`](docs/design/sesmax_core.md).
 
 People build on the core, so **the core is a library of primitives**: new code composes what is here, and anything genuinely new lands where the next person will find and reuse it.
 

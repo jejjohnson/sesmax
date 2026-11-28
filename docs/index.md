@@ -5,7 +5,7 @@
 sesmax is a workspace of packages: a shared core, one package per Earth-system component, and later a coupler on top. Its models are the forward models inside an assimilation window of hours to weeks, so they are built to be cheap enough for ensembles, differentiable through a whole window, honest about their error, and learnable.
 
 :::{note} Status
-`sesmax-core` holds the model-agnostic machinery moved from [somax](https://github.com/jejjohnson/somax), and the ocean component follows. The plan, its phases and its gates are in the [workspace and core design](design/workspace_and_core.md).
+`sesmax-core` holds the model-agnostic machinery moved from [somax](https://github.com/jejjohnson/somax), and the ocean component follows. The packages and the order of work are in the [workspace overview](design/sesmax_workspace.md), and the move from somax in the [core design](design/sesmax_core.md).
 :::
 
 ## Packages

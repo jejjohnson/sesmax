@@ -20,7 +20,7 @@ Proposed: one package, `sesmax-testing`, holds the toy models and a set of check
 Recommended: a check returns a number and a tolerance, so the same function serves a test suite, a notebook and a run report.
 Alternative: pytest helpers that only raise, which are shorter but leave nothing to print or to store.
 Decided by the owner on 26 November: sesmax composes the machinery of the stack and does not write its own. A piece that is missing is added first to the package that owns the concept, and the section on what this package builds on says which piece goes where.
-Status: proposed, for review. The checks below are prototyped in a scratch script; the package is not started. It is step W2 of [the workspace packages](workspace_packages.md), and it does not block [the run loop](sesmax_experiment_run.md).
+Status: proposed, for review. The checks below are prototyped in a scratch script; the package is not started. It is step W2 of [the workspace packages](sesmax_workspace.md), and it does not block [the run loop](sesmax_experiment_run.md).
 
 ## Motivation
 
@@ -494,7 +494,7 @@ The core's own tests take `sesmax-testing` from the development group. 15 of its
 
 ## Relationships
 
-- Part of: [the workspace packages](workspace_packages.md), step W2
+- Part of: [the workspace packages](sesmax_workspace.md), step W2
 - Builds on: pipekit-array (`testing`), pipekit-jax, gridax, diffrax
 - Uses the findings of: [the ocean design](sesmax_ocean.md)
 - Used by: [sesmax-param](sesmax_param.md), [sesmax-experiment](sesmax_experiment.md)

@@ -186,7 +186,7 @@ omit = ["tests/*", "packages/*/tests/*"]
 
 [tool.coverage.report]
 show_missing = true
-# Very low to start (SX-6 in docs/design/workspace_and_core.md); raised in
+# Very low to start (SX-6 in docs/design/sesmax_core.md); raised in
 # follow-ups as the moved code gains tests.
 fail_under = 30
 exclude_also = [

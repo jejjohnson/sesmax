@@ -646,7 +646,7 @@ Decided on 25 November 2026, and kept.
 
 ## Relationships
 
-- Part of: [the workspace packages](workspace_packages.md), a component at tier 2 of its proposal
+- Part of: [the workspace packages](sesmax_workspace.md), a component at tier 2 of its proposal
 - Builds on: `sesmax-core`, gridax, gaussx, geophysix
 - Feeds: [sesmax-testing](sesmax_testing.md), [sesmax-param](sesmax_param.md), [sesmax-experiment](sesmax_experiment.md)
 - Issues: sesmax#104, sesmax#115, sesmax#152, sesmax#166, sesmax#186, sesmax#214, sesmax#233, sesmax#236

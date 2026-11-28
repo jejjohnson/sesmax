@@ -784,7 +784,7 @@ The schedules, the wall-time limit and the checkpoint that holds a stepper's sta
 
 ## Relationships
 
-- Part of: [the experiment design](sesmax_experiment.md), its run half; step W3 of [the workspace packages](workspace_packages.md)
+- Part of: [the experiment design](sesmax_experiment.md), its run half; step W3 of [the workspace packages](sesmax_workspace.md)
 - Builds on: pipekit-ops, pipekit-cycle, diffrax, integrix, `sesmax-core`
 - Next to: [the scaling design](sesmax_scaling.md), for more than one device and for a domain in pieces
 - Issues: sesmax#186 (closed children sesmax#187 to sesmax#193), sesmax#108, sesmax#224, sesmax#238
