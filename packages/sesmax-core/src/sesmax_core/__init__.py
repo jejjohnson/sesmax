@@ -137,7 +137,7 @@ if TYPE_CHECKING:
     from sesmax_core._src.operator_term import OperatorTerm
 
 
-__version__ = "0.3.1"  # x-release-please-version
+__version__ = "0.4.0"  # x-release-please-version
 
 __all__ = [
     "AbstractForcing",

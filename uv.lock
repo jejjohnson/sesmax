@@ -2884,7 +2884,7 @@ requires-dist = [
 
 [[package]]
 name = "sesmax-core"
-version = "0.3.1"
+version = "0.4.0"
 source = { editable = "packages/sesmax-core" }
 dependencies = [
     { name = "diffrax" },
@@ -2954,7 +2954,7 @@ provides-extras = ["da", "flows", "xarray"]
 
 [[package]]
 name = "sesmax-experiment"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/sesmax-experiment" }
 dependencies = [
     { name = "diffrax" },
@@ -3002,7 +3002,7 @@ provides-extras = ["checkpoint", "sim"]
 
 [[package]]
 name = "sesmax-ocean"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/sesmax-ocean" }
 dependencies = [
     { name = "equinox" },
