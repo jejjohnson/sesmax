@@ -1,8 +1,8 @@
 ---
 title: "Scaling sesmax: one device, and then more than one"
-subtitle: "Design · what runs on a CPU, a GPU and a TPU, and the four ways to split a run: in time, in space, over members and over weights"
+subtitle: "Design · what runs on a CPU, a GPU and a TPU, and the five ways to split the work: multiply the run, split the time, the space, the weights or the data"
 short_title: Scaling
-description: "Design of how a sesmax run scales: why one program serves a CPU, a GPU and a TPU, the cost of a run and of its gradient, four strategies with a diagram each (chunks in time, patches in space, a model replicated over members, weights split over devices), what JAX and GeoPatcher give for each, which strategy fits which problem, and measurements on four devices of one CPU."
+description: "Design of how a sesmax run scales: why one program serves a CPU, a GPU and a TPU, the cost of a run and of its gradient, one way of thinking about a split (identify, split, apply, combine), five strategies with a diagram each (a run multiplied over members, chunks in time, patches in space, weights split over devices, data split into batches), what JAX and GeoPatcher give for each, which strategy fits which problem, and measurements on four devices of one CPU."
 date: 2026-11-28
 keywords:
   - sesmax
@@ -17,8 +17,8 @@ keywords:
 
 ## Decision
 
-Proposed, for review: sesmax scales along four axes, and each has one strategy that we support. Time is cut into chunks, which is built ([the design of the run](sesmax_experiment_run.md)). Members of an ensemble are a leading axis, mapped in one compiled call and placed across devices. Space is cut into patches with a halo, in two modes: an exchange with the neighbours at every evaluation, which is exact, and a wide halo that is thrown away after a few steps, which is the split, map and merge of GeoPatcher. Weights are split across devices only for a learned term, and that is the job of the library that trains it.
-Recommended: build them in that order. Members first, because nothing in a model changes. Patches second, and only for a model without a global solve.
+Proposed, for review: every way to scale is the same four moves, identify what is large, split along it, apply the same step to each piece, and combine. There are five things to split along, and each has one strategy that we support. A run is multiplied over the members of an ensemble, which are a leading axis, mapped in one compiled call and placed across devices. Time is cut into chunks, which is built ([the design of the run](sesmax_experiment_run.md)). Space is cut into patches with a halo, in two modes: an exchange with the neighbours at every evaluation, which is exact, and a wide halo that is thrown away after a few steps, which is the split, map and merge of GeoPatcher. Weights are split across devices only for a learned term, and that is the job of the library that trains it. Data is split into batches when a cost is a sum over windows that do not share a run.
+Recommended: build members first, because nothing in a model changes. Patches second, and only for a model without a global solve.
 Alternative: write the models for a distributed-memory library from the start, as the large ocean models do ([Silvestri et al., 2025](https://doi.org/10.1029/2024MS004465)). That is the wrong trade for models whose purpose is a cheap, differentiable prior on one device.
 Status: nothing on this page is built beyond the chunks. The numbers are from scratch runs on 28 November, on four devices that JAX was asked to make out of one CPU. They show that a strategy gives the right numbers. They say nothing about speed, and nothing here was run on a GPU or a TPU.
 
@@ -31,6 +31,60 @@ A sesmax model is small on purpose. A three-layer quasi-geostrophic state on 512
 - **A real basin.** The North Atlantic at a kilometre is 5,000 cells across, and then one field is 200 MB and one step is the cost.
 
 These are three different problems, and one answer does not fit them. An ensemble wants more devices and no change to the model. A gradient wants memory traded for time. A basin wants the domain in pieces. This page says which answer goes with which problem, and what we would build for each.
+
+## How to think about a split
+
+Every strategy on this page is the same four moves. They are the split, apply and combine of xarray, which [geotoolz](https://github.com/jejjohnson/geotoolz#where-it-comes-from) draws for a scene too large for memory, with one move in front: say what is large.
+
+```mermaid
+flowchart LR
+    identify["identify<br/>what is large,<br/>and what ties its pieces together"]
+    split["split<br/>cut along it,<br/>into equal pieces"]
+    apply["apply<br/>the same compiled step<br/>to every piece"]
+    combine["combine<br/>put the pieces back,<br/>and pass on what crosses a cut"]
+    identify --> split --> apply --> combine
+    combine -.->|"the next step"| apply
+```
+
+A run has five things that can be large, so there are five places to cut. What differs between them is what has to cross a cut, and how often.
+
+```mermaid
+flowchart TB
+    one["one run<br/>weights θ, a state x on a grid, N steps, data y"]
+    one --> M & T & S & W & D
+    subgraph M["1 · multiply the run"]
+        direction TB
+        m1["x, member 1"] ~~~ m2["x, member 2"] ~~~ m3["x, member 3"]
+    end
+    subgraph T["2 · split the time"]
+        direction TB
+        t1["steps 1 to n"] -->|"the state"| t2["steps n to 2n"] -->|"the state"| t3["steps 2n to 3n"]
+    end
+    subgraph S["3 · split the space"]
+        direction TB
+        s1["x, west"] <-->|"a halo"| s2["x, middle"] <-->|"a halo"| s3["x, east"]
+    end
+    subgraph W["4 · split the weights"]
+        direction TB
+        w1["θ, part 1"] -->|"what it computed"| w2["θ, part 2"] -->|"what it computed"| w3["θ, part 3"]
+    end
+    subgraph D["5 · split the data"]
+        direction TB
+        d1["y, batch 1"] --> add(("add the costs<br/>and the gradients"))
+        d2["y, batch 2"] --> add
+        d3["y, batch 3"] --> add
+    end
+```
+
+| Way | Identify | Split | Apply | Combine | What crosses a cut |
+| --- | --- | --- | --- | --- | --- |
+| 1, multiply the run | many runs of one model | a leading axis of members | a chunk, mapped over the axis | stack, and take statistics | nothing |
+| 2, split the time | many steps | a timeline of chunks | a chunk, one after another | compose, and join the snapshots | the state, once per chunk |
+| 3, split the space | a large grid | patches with a halo | the tendency, or a few steps, per patch | crop the halo and merge | a halo, at every evaluation or every few steps |
+| 4, split the weights | a large network | parts of θ, each on a device | each part, in order | the output of the last part | what each part computed, at every evaluation |
+| 5, split the data | many windows or observations | batches of y | the cost and its gradient, per batch | add | one number and one gradient per batch |
+
+The first and the last copy the model and cut nothing inside a run, so they are free. The middle three cut inside a run, and each pays for what crosses: time in order, since a chunk waits for the one before; space in messages or in work on a halo; weights in messages at every layer.
 
 ## User stories
 
@@ -55,10 +109,11 @@ where $c_ f$ is the cost of the tendency per value. Its working memory is a few 
 
 | Factor | Axis | Coupled? | Strategy |
 | --- | --- | --- | --- |
-| $N_ t$ | time | each step needs the one before | chunks |
-| $D_ x$ | space | each cell needs its neighbours | patches with a halo |
-| $B$ | members | not at all, between two analyses | replicate the model, split the members |
-| the size of $\boldsymbol{\theta}$ | weights | through every evaluation | split the weights |
+| $B$ | members | not at all, between two analyses | 1, multiply the run |
+| $N_ t$ | time | each step needs the one before | 2, chunks |
+| $D_ x$ | space | each cell needs its neighbours | 3, patches with a halo |
+| the size of $\boldsymbol{\theta}$ | weights | through every evaluation | 4, split the weights |
+| the number of windows $M$ of a fit | data | only through the sum of their costs | 5, split the data |
 
 The coupling is what decides the price. Members are free to split. Space costs a halo. Time cannot be split at all for a forward run, only cut.
 
@@ -111,6 +166,18 @@ On a 64 × 64 shallow-water model the host took 27 ms of the 98 ms of a chunk, s
 ### Weights
 
 A physical model has a handful of parameters and fields the size of its state. Its weights are not what is large. A learned term or an emulator can have $10^8$ weights, and then the weights are split over devices as the state is. That is a matter for the library that trains it, and for sesmax it changes one thing: a term whose weights live on several devices is still a term.
+
+### Data
+
+A fit minimises a cost. When the cost is a sum over $M$ windows that each have their own run,
+
+```math
+\mathcal{J}(\mathbf{z}) = \sum_{m=1}^{M} \mathcal{J}_m(\mathbf{z})
+```
+
+its gradient is the sum of the gradients, $\nabla \mathcal{J} = \sum_ m \nabla \mathcal{J}_ m$, and the windows are as independent as members are. Each device holds a copy of the model and a batch of windows, and what comes back is one number and one gradient per batch. A parameter fitted over many windows, a prior scale tuned over many cases and the training of an emulator are of this kind.
+
+Inside one window this does not help. The observations of a window share one trajectory, so splitting them splits the observation operators and not the run, and the run is the cost.
 
 ## Background: the numerics
 
@@ -169,35 +236,9 @@ Two things it does not have. There is no halo as such: a margin that is cropped 
 
 ## The strategies
 
-```mermaid
-flowchart LR
-    run["a run<br/>B members, N_t steps, D_x values"]
-    run --> time["time<br/>chunks"]
-    run --> members["members<br/>one model, many states"]
-    run --> space["space<br/>patches with a halo"]
-    run --> weights["weights<br/>a learned term in pieces"]
-    time --> t1["bounded memory, restarts<br/>built"]
-    members --> m1["one compiled call<br/>across devices"]
-    space --> s1["exchange each evaluation<br/>exact"]
-    space --> s2["wide halo, cropped<br/>split, map, merge"]
-    weights --> w1["left to the training library"]
-```
+Each strategy is one row of the table above, with what we would build for it.
 
-### Strategy 1: chunks in time
-
-```mermaid
-flowchart LR
-    x0["x₀"] -->|chunk 1<br/>on the device| x1["x₁"] -->|chunk 2| x2["x₂"] -->|chunk 3| x3["x₃"]
-    x1 -.-> h1["host<br/>monitors, record"]
-    x2 -.-> h2["host<br/>snapshot, checkpoint"]
-    x3 -.-> h3["host<br/>final state"]
-```
-
-One state is in memory at a time, the run can stop and continue at any cut, and the host looks between cuts. It is built, and [the design of the run](sesmax_experiment_run.md) is its page. For a gradient, the same idea is the checkpoints of the adjoint, which the experiment design takes from diffrax and integrix.
-
-**Use it** always. It is the base that the others stand on, since a chunk is the unit that is mapped over members or over patches.
-
-### Strategy 2: one model, many members
+### Strategy 1: multiply the run
 
 ```mermaid
 flowchart TD
@@ -222,7 +263,21 @@ The chunk is mapped over a leading axis of the state, and that axis is split acr
 
 **Use it** for ensembles, sweeps, twin experiments in bulk, and the forward runs of an ensemble Kalman inversion. It is the only strategy whose gain is nearly the number of devices.
 
-### Strategy 3a: patches that exchange
+### Strategy 2: split the time, into chunks
+
+```mermaid
+flowchart LR
+    x0["x₀"] -->|chunk 1<br/>on the device| x1["x₁"] -->|chunk 2| x2["x₂"] -->|chunk 3| x3["x₃"]
+    x1 -.-> h1["host<br/>monitors, record"]
+    x2 -.-> h2["host<br/>snapshot, checkpoint"]
+    x3 -.-> h3["host<br/>final state"]
+```
+
+One state is in memory at a time, the run can stop and continue at any cut, and the host looks between cuts. It is built, and [the design of the run](sesmax_experiment_run.md) is its page. For a gradient, the same idea is the checkpoints of the adjoint, which the experiment design takes from diffrax and integrix.
+
+**Use it** always. It is the base that the others stand on, since a chunk is the step that is applied to every member and to every patch.
+
+### Strategy 3a: split the space, with an exchange
 
 ```mermaid
 flowchart LR
@@ -245,7 +300,7 @@ Each device holds a piece of the field with a halo of the stencil's reach. Befor
 
 **Use it** for a large domain of a model with a finite reach: shallow water, advection and diffusion of a tracer. Veros does this for a full ocean model in JAX, with MPI between the pieces ([Häfner et al., 2021](https://doi.org/10.1029/2021MS002717)).
 
-### Strategy 3b: patches with a wide halo, cropped
+### Strategy 3b: split the space, with a wide halo that is cropped
 
 ```mermaid
 flowchart LR
@@ -262,7 +317,7 @@ With a tapered window in place of the crop, the same picture is how a learned te
 
 **Use it** for a few steps between two exchanges when messages are expensive, for an operator applied to a field far larger than the one it was trained on, and for an analysis that is local, such as a local ensemble filter.
 
-### Strategy 4: weights in pieces
+### Strategy 4: split the weights
 
 ```mermaid
 flowchart LR
@@ -272,23 +327,46 @@ flowchart LR
     subgraph d1["device 1"]
         w1["weights, part 2"]
     end
-    x["a state or a batch"] --> w0 --> w1 --> y["a tendency"]
-    data["or: all the weights on every device,<br/>and the batch split"] -.-> y
+    x["a state"] --> w0 -->|"what it computed"| w1 --> y["a tendency"]
 ```
 
-A network too large for one device has its weights split, and one whose batch is too large has the batch split and the weights copied. Both are layouts of the same mesh. sesmax has no model of that size. A learned term of [the param design](sesmax_param.md) is trained by pipekit-train on geonnax networks, and arrives here as a term.
+A network too large for one device has its weights split, and every evaluation then passes from one part to the next. sesmax has no model of that size. A learned term of [the param design](sesmax_param.md) is trained by pipekit-train on geonnax networks, and arrives here as a term.
 
 **Use it** when training an emulator, outside sesmax. Inside sesmax the question is only whether a term with split weights still composes, and it does, because a layout is a property of an array and not of a term.
+
+### Strategy 5: split the data
+
+```mermaid
+flowchart TD
+    z["one control z<br/>the same on every device"]
+    subgraph e0["device 0"]
+        b0["windows 1 to 8<br/>a run and a cost each"]
+    end
+    subgraph e1["device 1"]
+        b1["windows 9 to 16"]
+    end
+    subgraph e2["device 2"]
+        b2["windows 17 to 24"]
+    end
+    z --> e0 & e1 & e2
+    e0 & e1 & e2 -->|"a cost and a gradient"| add(("add"))
+    add --> step["one step of the minimiser"]
+    step -.->|"the next z"| z
+```
+
+The model is copied and the windows are dealt out. Each device runs its windows and returns a cost and a gradient, and their sum is what the minimiser sees. In JAX this is strategy 1 with a sum at the end: the windows are a leading axis that is split across devices, and the sum is taken over it. Nothing new is needed in a model.
+
+**Use it** for a parameter or a prior scale fitted over many windows, and for training. Do not expect it to speed up one window, whose observations share one run.
 
 ### Which strategy for which problem
 
 ```mermaid
 flowchart TD
     q0{"Does one member<br/>fit on one device?"}
-    q0 -->|yes| q1{"More than one member,<br/>or a sweep?"}
-    q1 -->|yes| s2["Strategy 2<br/>members across devices"]
+    q0 -->|yes| q1{"More than one member or window,<br/>or a sweep?"}
+    q1 -->|yes| s2["Strategy 1<br/>multiply the run across devices"]
     q1 -->|no| q2{"Is the gradient<br/>what does not fit?"}
-    q2 -->|yes| s1["Strategy 1<br/>checkpoints of the adjoint, a shorter window"]
+    q2 -->|yes| s1["Strategy 2<br/>checkpoints of the adjoint, a shorter window"]
     q2 -->|no| s0["one device, chunks<br/>nothing more to do"]
     q0 -->|no| q3{"Does the model have<br/>a global solve?"}
     q3 -->|no| s3["Strategy 3a<br/>patches that exchange"]
@@ -297,17 +375,18 @@ flowchart TD
 
 | Problem | Size | Strategy | Expect |
 | --- | --- | --- | --- |
-| a double gyre, eight years | one small state, many steps | 1 | one device; the time is the steps |
-| an ensemble of 64, or a sweep | many small states | 2 | close to the number of devices, less the host's share |
-| a twin experiment per design, hundreds of them | many independent runs | 2, or one job each | the scheduler does it as well as JAX does |
-| a 4D-Var over a long window | one state, a long tape | 1, for the gradient | memory traded for recomputation |
+| a double gyre, eight years | one small state, many steps | 2 | one device; the time is the steps |
+| an ensemble of 64, or a sweep | many small states | 1 | close to the number of devices, less the host's share |
+| a twin experiment per design, hundreds of them | many independent runs | 1, or one job each | the scheduler does it as well as JAX does |
+| a 4D-Var over a long window | one state, a long tape | 2, for the gradient | memory traded for recomputation |
+| a parameter fitted over many windows | many runs, one control | 5 | close to the number of devices; one sum per step of the minimiser |
 | a shallow-water basin at a kilometre | one large state, finite reach | 3a | the numbers of one device; a message per evaluation |
 | a quasi-geostrophic basin at a kilometre | one large state, a global solve | an automatic mesh over the solve | not designed here; open question SS-3 |
 | a learned closure applied to a large field | an operator with no exact reach | 3b, with a tapered window | no seams; not exact |
-| a local ensemble filter | an analysis per neighbourhood | 3b for the analysis, 2 for the forecasts | filterax's `LETKF` has the localisation |
-| training an emulator | large weights, large batches | 4 | pipekit-train's concern |
+| a local ensemble filter | an analysis per neighbourhood | 3b for the analysis, 1 for the forecasts | filterax's `LETKF` has the localisation |
+| training an emulator | large weights, large batches | 4 and 5 | pipekit-train's concern |
 
-Three rules of thumb come out of this. Reach for members before space, because it is free. Do not split a state that fits: 512 × 512 in three layers is 6 MB. And measure the host's share before adding devices, since it caps the gain.
+Three rules of thumb come out of this. Multiply before you cut: members and windows are free, and space is not. Do not split a state that fits: 512 × 512 in three layers is 6 MB. And measure the host's share before adding devices, since it caps the gain.
 
 ## What it builds on
 
