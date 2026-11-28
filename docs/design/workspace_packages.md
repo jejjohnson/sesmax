@@ -83,7 +83,7 @@ The forcing is the one part whose move lightens the install, as nothing else in 
 The core gains two things the other packages need.
 
 - **Public helpers.** The positivity checks, the Burger-number helpers, the diagnostics bridge, and `each`, `values` and `placed` for located fields are private today, and every component needs them.
-- **`Component`.** The small type in [the run-loop design](run_loop.md) through which a component registers its models, checks and units. It sits in the core so that a component can register without importing `sesmax-experiment`.
+- **`Component`.** The small type in [the run-loop design](sesmax_experiment_run.md) through which a component registers its models, checks and units. It sits in the core so that a component can register without importing `sesmax-experiment`.
 
 (param)=
 ## sesmax-param: what do the resolved dynamics not supply?
@@ -211,7 +211,7 @@ It owns no method. Every algorithm in the table above already has a home, and th
 
 - **The problem.** One object says which leaves of a model, a state and a forcing are unknown, and reads the priors that `sesmax-param` and the component put on them. Today that is spread over `control_filter`, `trainable_mask`, `SpatialBasis.prior_std` and the `std` of `make_ensemble`, and none of them covers the joint $\mathbf{z}$.
 - **The work.** A thin function per row that takes a problem, hands it to a method and returns the estimate with a record.
-- **The run.** The chunk loop, checkpoints, restarts, run specs, artifacts and the command line of [the run-loop design](run_loop.md), which become the simulation part of this package.
+- **The run.** The chunk loop, checkpoints, restarts, run specs, artifacts and the command line of [the run-loop design](sesmax_experiment_run.md), which become the simulation part of this package.
 - **The monitoring.** The monitors of a run, and the statistics of an analysis (innovations, spread against skill) with the same verdict and the same record.
 - **Twin experiments.** Truth from a model, observations from the truth, an estimate, and its error against the truth.
 
@@ -324,6 +324,6 @@ W5 comes after the port, which needs models with their physics inside to compare
 
 ## Relationships
 
-- Changes: [the workspace and core design](workspace_and_core.md) (its tier table and C2 to C3 rows) and [the run-loop design](run_loop.md) (`sesmax_core.sim` becomes `sesmax_experiment`). Both keep their text until this page is accepted.
+- Changes: [the workspace and core design](workspace_and_core.md) (its tier table and C2 to C3 rows) and [the run-loop design](sesmax_experiment_run.md) (`sesmax_core.sim` becomes `sesmax_experiment`). Both keep their text until this page is accepted.
 - Needs in geostack: the layer map and the dependency graph list the new packages.
 - Related: sesmax#29 (levels), sesmax#105, sesmax#106 (scale-selective stabilisation, a parameterization), sesmax#107, sesmax#114 (bases from functax), somax#213 (hybrid terms), somax#234 (atmosphere and coupling).

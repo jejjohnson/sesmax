@@ -20,7 +20,7 @@ keywords:
 Decided on 25 November 2026, and built: the run lives in `sesmax-experiment`, in two levels. `run_chunks` takes a built model and runs it in chunks, with monitors and stages between them, and writes nothing. `simulate`, `spinup` and `restart` take a run spec and a directory, and write the snapshots, the record, the checkpoints and the manifest. Both are merged (sesmax#197 to sesmax#208, under epic sesmax#186).
 Asked by the owner on 28 November: this page is the expansion of [the experiment design](sesmax_experiment.md) for its run half. It plays the part that the fit loop and its callbacks play in a training library: the loop, what watches it, what it records, and how it stops and starts again.
 Proposed, for review: nine additions, each in the section on the API. In order of what they unblock, they are a solver block in the spec, an end that is early and is not a failure, a stop on a signal, means over an interval, snapshots of observables, an ensemble of runs, the lineage of a restart, a fit watched with the same monitors and record as a run, and one writer protocol shared with pipekit-train.
-Status: the built half is at sesmax `4420115` and unreleased (version 0.0.0). The numbers on this page are from scratch runs on 28 November. [The run-loop plan](run_loop.md) of 5 November has the history: the move from somax, the pipekit mapping and the two defects its prototype found. This page is the design.
+Status: the built half is at sesmax `4420115` and unreleased (version 0.0.0). The numbers on this page are from scratch runs on 28 November. The section on where it came from, near the end, keeps what the plan of 5 November found: the two defects in how the core integrated, the test of the data mount, and what was taken from other platforms.
 
 ## Motivation
 
@@ -67,7 +67,7 @@ Each factor is one chunk, and the host sees $\mathbf{x}_ k$ between two of them.
 n_k = \max \left( 1, \left\lceil \frac{t_k - t_{k-1}}{\Delta t} - \epsilon \right\rceil \right)
 ```
 
-with $\epsilon = 10^{-9}$, so that a ratio which is a whole number but for rounding stays that number. When every chunk is a multiple of $\Delta t$, the steps fall at the same times whatever the cuts, and the run is the same map. When one is not, its steps are shorter than $\Delta t$ and the discretisation depends on the timeline. Stating $n_ k$ is what keeps this choice out of the hands of floating point: without it, 24 of 40 chunks took one step more ([the plan](run_loop.md) has the measurement).
+with $\epsilon = 10^{-9}$, so that a ratio which is a whole number but for rounding stays that number. When every chunk is a multiple of $\Delta t$, the steps fall at the same times whatever the cuts, and the run is the same map. When one is not, its steps are shorter than $\Delta t$ and the discretisation depends on the timeline. Stating $n_ k$ is what keeps this choice out of the hands of floating point: without it, 24 of 40 chunks took one step more (measured in the section on where it came from).
 
 **The memory of the stepper.** A restart from $\tilde{\mathbf{x}}_ k$ alone reproduces the run only if the stepper carries nothing else from one step to the next. A one-step method with stated steps carries nothing. An adaptive controller carries its last step size and its error history ([Söderlind, 2002](https://doi.org/10.1023/A:1021160023092)), and a multistep method carries past tendencies. The run loop starts each chunk from the state alone, so the first kind of stepper is exact across a cut and a restart, and the second is restarted at every cut.
 
@@ -202,7 +202,7 @@ The differences stay below the error of the solve, so the answer is as good. It 
 
 ### Writing
 
-- **A new name, never an old one.** A checkpoint is written as `<step>.partial.zarr` and renamed to `<step>.zarr`. The snapshots are streamed to `snapshots.partial.zarr` and renamed when the run ends. Nothing is renamed onto an existing store, because the mount the long runs write to refuses it (measured in [the plan](run_loop.md)).
+- **A new name, never an old one.** A checkpoint is written as `<step>.partial.zarr` and renamed to `<step>.zarr`. The snapshots are streamed to `snapshots.partial.zarr` and renamed when the run ends. Nothing is renamed onto an existing store, because the mount the long runs write to refuses it (measured in the section on where it came from).
 - **A write may fail.** A checkpoint that fails with an `OSError` is tried once more, and if that fails the run goes on without it. A checkpoint is not a result, so it never stops a run.
 - **A failed run leaves no result.** It leaves `run.log`, `metrics.jsonl` and the partial snapshots, and none of the names a reader takes for a finished run.
 - **A state that is not finite is never written**, whatever the monitors are.
@@ -717,6 +717,59 @@ R0 to R3 depend on nothing and are small. R4 and R6 are the two that change what
 | SR-10 | A different number of steps per chunk compiles again. Do we pad? | no, a spec gives equal chunks; document it for `Timeline.build` | pad the step times to one length |
 | SR-11 | Does the command line expose a fit? | not before R8 | yes, with a spec of the problem |
 
+## Where it came from
+
+The loop was planned on 5 November 2026 as `sesmax_core.sim`, a move of somax's runner (`somax/_src/cli/`, 5,662 lines at `9cb19b3`) onto pipekit. On 25 November it became its own package, so that the core carries no run loop and a second component does not have to copy one. The plan's prototype, on Lorenz-96 with 40 variables in float64, found two defects in how the core integrated. Both are fixed, and both explain choices on this page.
+
+**Every chunk compiled again** (fixed by sesmax#196). `build_terms` made a new closure per call, and Python-float times were static arguments of the compiled solve. Either one defeated the compile cache.
+
+| `build_terms` returns | Times | ms per call after the first |
+| --- | --- | --- |
+| a closure (before) | floats | 710 to 760 |
+| a module | floats, the same each call | 1 |
+| a module | arrays, new each call (after) | 1 |
+
+**A chunk could take a different number of steps** (fixed by `AdvanceChunk`). From $t = 0.2$ to $0.30000000000000004$ with $\Delta t = 0.01$, diffrax took 11 steps of about 0.0091 where 10 of 0.01 were meant, and 24 of 40 chunks did this.
+
+| Run to $t = 4$ | Largest difference from one solve |
+| --- | --- |
+| chunks of 0.1 with `dt = 0.01`, before | $1.2 \times 10^{-3}$ |
+| chunks of $2^{-3}$ with $\Delta t = 2^{-7}$, which divides exactly | 0 |
+| chunks of 0.1 with stated steps, 10 each | $3.8 \times 10^{-11}$ |
+
+**The data mount refuses a rename onto a store.** The mount the long runs write to is CIFS, and a test on a store of 50 files is why a checkpoint is always given a new name.
+
+| Operation | Result |
+| --- | --- |
+| rename to a new name | works, 184 ms |
+| rename onto an existing store | `PermissionError` |
+| move the old store aside, rename, delete the old one | works, 1.0 s, with a gap in which neither name holds a checkpoint |
+
+We tested that these renames succeed, and not that they are atomic under a crash.
+
+**What was taken from other platforms.** These come from reading their documentation.
+
+| Idea | Source | Here |
+| --- | --- | --- |
+| schedules by iteration, model time or wall time, combined with and and or | [Oceananigans](https://clima.github.io/OceananigansDocumentation/dev/simulations/schedules) | `Due` and the four schedules |
+| a wall-time limit, and a checkpoint at the end | [Oceananigans](https://clima.github.io/OceananigansDocumentation/dev/simulations/simulations_overview) | `WatchdogMonitor` and the resumable stop |
+| a rename to finish a write | [Orbax](https://orbax.readthedocs.io/en/latest/api_reference/checkpoint.path.atomicity.html) | versioned checkpoints |
+| retention by count and by period | [Orbax](https://orbax.readthedocs.io/en/latest/guides/checkpoint/api_refactor.html) | `keep_last` and `keep_every` |
+| steps per second, time left, a metric writer | [CLU](https://github.com/google/CommonLoopUtils/blob/main/clu/periodic_actions.py) | the record and `MetricWriter` |
+
+**What a user of somax's runner sees changed.**
+
+| | somax | Here |
+| --- | --- | --- |
+| compiles per run | one per chunk | one |
+| snapshots during a run | all in memory until the end | streamed, and renamed when the run succeeds |
+| a stop on a wall-time limit | an error, with no artifacts | a checkpoint and a resumable exit |
+| crash-recovery checkpoints | one store, overwritten | versioned stores, each finished by a rename |
+| the record per chunk | text in `run.log` | `metrics.jsonl` as well |
+| the Courant check | its own formula | `stable_step` |
+
+The YAML schema, the artifact names, the names of the checks and `run.log` did not change, and a store written by somax still loads.
+
 ## References
 
 - Courant, R., Friedrichs, K. and Lewy, H. (1928). [Über die partiellen Differenzengleichungen der mathematischen Physik](https://doi.org/10.1007/BF01448839). *Mathematische Annalen* 100, 32–74.
@@ -727,12 +780,11 @@ R0 to R3 depend on nothing and are small. R4 and R6 are the two that change what
 - Ramadhan, A. et al. (2020). [Oceananigans.jl: fast and friendly geophysical fluid dynamics on GPUs](https://doi.org/10.21105/joss.02018). *Journal of Open Source Software* 5, 2018.
 - Söderlind, G. (2002). [Automatic control and adaptive time-stepping](https://doi.org/10.1023/A:1021160023092). *Numerical Algorithms* 31, 281–310.
 
-The schedules, the wall-time limit and the checkpoint that holds a stepper's state are ideas from Oceananigans ([Ramadhan et al., 2020](https://doi.org/10.21105/joss.02018)), the rename and the retention from Orbax, and the record from CLU. [The plan](run_loop.md) has the table of what was taken from each.
+The schedules, the wall-time limit and the checkpoint that holds a stepper's state are ideas from Oceananigans ([Ramadhan et al., 2020](https://doi.org/10.21105/joss.02018)), the rename and the retention from Orbax, and the record from CLU.
 
 ## Relationships
 
 - Part of: [the experiment design](sesmax_experiment.md), its run half; step W3 of [the workspace packages](workspace_packages.md)
-- History: [the run-loop plan](run_loop.md)
 - Builds on: pipekit-ops, pipekit-cycle, diffrax, integrix, `sesmax-core`
 - Next to: [the scaling design](sesmax_scaling.md), for more than one device and for a domain in pieces
 - Issues: sesmax#186 (closed children sesmax#187 to sesmax#193), sesmax#108, sesmax#224, sesmax#238

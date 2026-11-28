@@ -22,7 +22,7 @@ numbering:
 
 Proposed: track eight items, with local blow-up signals, a spectral energy budget and gradient checks first, because each one tells us something about runs we already do.
 Nothing here is implemented, and each item has its own issue under #8.
-The engineering half of the same review, on checkpoints, schedules and run records, went into [the run-loop design](run_loop.md).
+The engineering half of the same review, on checkpoints, schedules and run records, went into [the run-loop design](sesmax_experiment_run.md).
 
 ## How to read the evidence
 
@@ -125,6 +125,6 @@ We don't rely on any of these.
 
 ## Relationships
 
-- Depends on: [the run-loop design](run_loop.md), for the health record and the manifest
+- Depends on: [the run-loop design](sesmax_experiment_run.md), for the health record and the manifest
 - Tracked in: #8
 - Issues: #103, #104, #105, #106, #107, #108, #109, #110

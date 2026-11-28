@@ -197,6 +197,6 @@ Decided on 25 November 2026, and kept.
 ## Relationships
 
 - Parent: sesmax#152 (the epic of W1) and sesmax#186 (W3 and W4); jejjohnson/somax#233 before them.
-- Follows: [the workspace and core design](workspace_and_core.md), whose C2 row this page replaces, [the workspace packages](workspace_packages.md), and [the run-loop design](run_loop.md), which W3 implemented.
+- Follows: [the workspace and core design](workspace_and_core.md), whose C2 row this page replaces, [the workspace packages](workspace_packages.md), and [the run-loop design](sesmax_experiment_run.md), which W3 implemented.
 - Feeds: [sesmax-testing](sesmax_testing.md), [sesmax-param](sesmax_param.md) and [sesmax-experiment](sesmax_experiment.md).
 - Related: sesmax#104, sesmax#109, sesmax#115, sesmax#166, sesmax#194, sesmax#202, sesmax#214, sesmax#236.
